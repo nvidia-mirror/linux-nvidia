@@ -1,7 +1,7 @@
 /*
  * dsi.c: Functions implementing tegra dsi interface.
  *
- * Copyright (c) 2011-2020, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -5541,9 +5541,12 @@ static void tegra_dc_dsi_setup_clk_nvdisplay(struct tegra_dc *dc,
 	}
 
 	if (base_clk && rate != clk_get_rate(base_clk)) {
+		tegra_nvdisp_switch_compclk(dc, false);
 		err = clk_set_rate(base_clk, rate);
 		if (err)
 			dev_err(&dc->ndev->dev, "Failed to set pll freq\n");
+		else
+			tegra_nvdisp_switch_compclk(dc, true);
 
 	}
 
