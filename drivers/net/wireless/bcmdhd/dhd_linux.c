@@ -3099,6 +3099,12 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 					DHD_ERROR(("ifidx:%d DHCP - REQUEST [RX]\n", ifidx));
 				} else if (dump_hex == 0x0105) {
 					DHD_ERROR(("ifidx:%d DHCP - ACK [RX]\n", ifidx));
+#ifdef CONFIG_BCMDHD_CUSTOM_NET_BW_EST_TEGRA
+					/* activate bw_estimator since DHCP is completed
+					 * the actual bw can never be one. So using value 1 as flag
+					 */
+					bcmdhd_stat.driver_stat.cur_bw_est = 1;
+#endif /* CONFIG_BCMDHD_CUSTOM_NET_BW_EST_TEGRA */
 				} else {
 					DHD_ERROR(("ifidx:%d DHCP - 0x%X [RX]\n", dump_hex, ifidx));
 				}
