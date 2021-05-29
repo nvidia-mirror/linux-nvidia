@@ -18,6 +18,7 @@
 #include <dce-log.h>
 #include <dce-util-common.h>
 #include <interface/dce-interface.h>
+#include <interface/dce-core-interface-errors.h>
 
 /**
  * dbg_dce_load_fw - loads the fw to DRAM.
@@ -305,6 +306,132 @@ static const struct file_operations admin_echo_fops = {
 	.write =	dbg_dce_admin_echo_fops_write,
 };
 
+/*
+ * Debugfs nodes for displaying a help message about tests required by external
+ * clients (ex: MODS)
+ */
+static int dbg_dce_tests_external_help_fops_show(struct seq_file *s, void *data)
+{
+	/* TODO: Add test description? */
+	seq_printf(s, "DCE External Test List\n"
+		      "----------------------\n"
+		      "   - Test #0: MODS ALU Test\n"
+		      "   - Test #1: MODS DMA Test\n");
+
+	return 0;
+
+}
+
+static int dbg_dce_tests_external_help_fops_open(struct inode *inode,
+						 struct file *file)
+{
+	return single_open(file, dbg_dce_tests_external_help_fops_show,
+			   inode->i_private);
+}
+
+static const struct file_operations tests_external_help_fops = {
+	.open		= dbg_dce_tests_external_help_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+/* Get status of last external client test run */
+static ssize_t dbg_dce_tests_external_status_fops_read(struct file *file,
+			char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct tegra_dce *d = file->private_data;
+	struct dce_device *d_dev = dce_device_from_dce(d);
+	char buf[15];
+	ssize_t bytes_printed;
+
+	bytes_printed = snprintf(buf, 15, "%d\n", d_dev->ext_test_status);
+	if (bytes_printed < 0) {
+		dce_err(d, "Unable to return external test status");
+		buf[0] = '\0';
+		bytes_printed = 0;
+	}
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, bytes_printed);
+}
+
+static const struct file_operations tests_external_status_fops = {
+	.open =		simple_open,
+	.read =		dbg_dce_tests_external_status_fops_read,
+};
+
+/* Run an external client test */
+static ssize_t dbg_dce_tests_external_run_fops_write(struct file *file,
+			const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	u32 test;
+	struct dce_ipc_message *msg = NULL;
+	struct dce_admin_ipc_cmd *req_msg = NULL;
+	struct dce_admin_ipc_resp *resp_msg = NULL;
+	struct tegra_dce *d = file->private_data;
+	struct dce_device *d_dev = dce_device_from_dce(d);
+
+	ret = kstrtou32_from_user(user_buf, count, 10, &test);
+	if (ret) {
+		dce_err(d, "Invalid test number!");
+		d_dev->ext_test_status = DCE_ERR_CORE_NOT_FOUND;
+		return -EINVAL;
+	}
+	switch (test) {
+	case DCE_ADMIN_EXT_TEST_ALU:
+		dce_info(d, "Running ALU test");
+		break;
+
+	case DCE_ADMIN_EXT_TEST_DMA:
+		dce_info(d, "Running DMA test");
+		break;
+
+	default:
+		dce_err(d, "Test(%u) not found! Check help node for valid test IDs.",
+			test);
+		d_dev->ext_test_status = DCE_ERR_CORE_NOT_FOUND;
+		return -EINVAL;
+	}
+
+	msg = dce_admin_allocate_message(d);
+	if (!msg) {
+		dce_err(d, "IPC msg allocation failed");
+		d_dev->ext_test_status = DCE_ERR_CORE_OTHER;
+		goto exit;
+	}
+
+	req_msg = (struct dce_admin_ipc_cmd *)(msg->tx.data);
+	resp_msg = (struct dce_admin_ipc_resp *) (msg->rx.data);
+
+	req_msg->args.ext_test.test  = test;
+	ret = dce_admin_send_cmd_ext_test(d, msg);
+	if (ret) {
+		dce_err(d, "Admin msg failed");
+		d_dev->ext_test_status = DCE_ERR_CORE_IPC_IVC_ERR;
+		goto exit;
+	}
+
+	if (resp_msg->error == DCE_ERR_CORE_SUCCESS)
+		dce_info(d, "Test passed!");
+	else if (resp_msg->error == DCE_ERR_CORE_NOT_IMPLEMENTED)
+		dce_err(d, "Test not implemented!");
+	else
+		dce_err(d, "Test failed(%d)!", (int32_t)resp_msg->error);
+	d_dev->ext_test_status = resp_msg->error;
+
+exit:
+	if (msg)
+		dce_admin_free_message(d, msg);
+
+	return count;
+}
+
+static const struct file_operations tests_external_run_fops = {
+	.open =		simple_open,
+	.write =	dbg_dce_tests_external_run_fops_write,
+};
+
 static ssize_t dbg_dce_boot_dce_fops_read(struct file *file,
 			char __user *user_buf, size_t count, loff_t *ppos)
 {
@@ -568,6 +695,7 @@ void dce_init_debug(struct tegra_dce *d)
 	struct dentry *retval;
 	struct device *dev = dev_from_dce(d);
 	struct dce_device *d_dev = dce_device_from_dce(d);
+	struct dentry *debugfs_dir = NULL;
 
 	d_dev->debugfs = debugfs_create_dir("tegra_dce", NULL);
 	if (!d_dev->debugfs)
@@ -605,6 +733,26 @@ void dce_init_debug(struct tegra_dce *d)
 
 	retval = debugfs_create_file("dump_hsp_regs", 0444,
 				     d_dev->debugfs, d, &dump_hsp_regs_fops);
+	if (!retval)
+		goto err_handle;
+
+	/* Tests */
+	debugfs_dir = debugfs_create_dir("tests", d_dev->debugfs);
+	if (!debugfs_dir)
+		goto err_handle;
+	debugfs_dir = debugfs_create_dir("external", debugfs_dir);
+	if (!debugfs_dir)
+		goto err_handle;
+	retval = debugfs_create_file("help", 0444,
+				     debugfs_dir, d, &tests_external_help_fops);
+	if (!retval)
+		goto err_handle;
+	retval = debugfs_create_file("run", 0220,
+				     debugfs_dir, d, &tests_external_run_fops);
+	if (!retval)
+		goto err_handle;
+	retval = debugfs_create_file("status", 0444,
+				     debugfs_dir, d, &tests_external_status_fops);
 	if (!retval)
 		goto err_handle;
 

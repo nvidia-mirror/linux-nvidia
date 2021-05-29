@@ -237,6 +237,11 @@ struct dce_device {
 	 * @debugfs : Debugfs node for DCE Linux device.
 	 */
 	struct dentry *debugfs;
+	/**
+	 * @ext_test_status : Return code for external client tests run via
+	 * debugfs
+	 */
+	s32 ext_test_status;
 #endif
 };
 
@@ -395,6 +400,8 @@ int dce_admin_get_ipc_channel_info(struct tegra_dce *d,
 					struct dce_ipc_queue_info *q_info);
 int dce_admin_send_cmd_echo(struct tegra_dce *d,
 			    struct dce_ipc_message *msg);
+int dce_admin_send_cmd_ext_test(struct tegra_dce *d,
+				struct dce_ipc_message *msg);
 int dce_admin_handle_ipc_requested_event(struct tegra_dce *d, void *params);
 int dce_admin_handle_ipc_received_event(struct tegra_dce *d, void *params);
 int dce_admin_ipc_wait(struct tegra_dce *d, u32 w_type);

@@ -396,6 +396,45 @@ out:
 }
 
 /**
+ * dce_admin_send_cmd_ext_test - Sends DCE_ADMIN_CMD_EXT_TEST cmd.
+ *
+ * @d - Pointer to tegra_dce struct.
+ * @msg - Pointer to dce_ipc_msg struct.
+ *
+ * Return - 0 if successful
+ */
+int dce_admin_send_cmd_ext_test(struct tegra_dce *d,
+				struct dce_ipc_message *msg)
+{
+	int ret = -1;
+	struct dce_admin_ipc_cmd *req_msg;
+	struct dce_admin_ipc_resp *resp_msg;
+
+	if (!msg || !msg->tx.data || !msg->rx.data)
+		goto out;
+
+	/* return if dce bootstrap not completed */
+	if (!dce_is_bootstrap_done(d)) {
+		dce_err(d, "Admin Bootstrap not yet done");
+		goto out;
+	}
+
+	req_msg = (struct dce_admin_ipc_cmd *)(msg->tx.data);
+	resp_msg = (struct dce_admin_ipc_resp *) (msg->rx.data);
+
+	req_msg->cmd = (uint32_t)DCE_ADMIN_CMD_EXT_TEST;
+
+	ret = dce_admin_send_msg(d, msg);
+	if (ret) {
+		dce_err(d, "Error sending test msg : [%d]", ret);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+/**
  * dce_admin_send_cmd_ver - Sends DCE_ADMIN_CMD_VERSION cmd.
  *
  * @d - Pointer to tegra_dce struct.

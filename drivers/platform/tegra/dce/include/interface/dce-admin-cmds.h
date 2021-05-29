@@ -52,13 +52,14 @@
 						// coverage data
 #define DCE_ADMIN_CMD_PERF_START	0x0FU   // start collecting perf data
 #define DCE_ADMIN_CMD_PERF_STOP		0x10U   // stop collecting perf data
-#define DCE_ADMIN_CMD_TEST_START	0x11U   // start tests
-#define DCE_ADMIN_CMD_TEST_STOP		0x12U   // stop tests and return status
-#define DCE_ADMIN_CMD_DEBUG		0x13U   // debug command
+#define DCE_ADMIN_CMD_INT_TEST_START	0x11U // start internal tests
+#define DCE_ADMIN_CMD_INT_TEST_STOP	0x12U // stop internal tests and return status
+#define DCE_ADMIN_CMD_EXT_TEST		0x13U // run external test (blocking call)
+#define DCE_ADMIN_CMD_DEBUG		0x14U   // debug command
 
-#define DCE_ADMIN_CMD_RM_BOOTSTRAP	0x14U   // tell RM to "bootstrap"
+#define DCE_ADMIN_CMD_RM_BOOTSTRAP	0x15U   // tell RM to "bootstrap"
 
-#define DCE_ADMIN_CMD_NEXT		0x15U   // must be last command ID + 1
+#define DCE_ADMIN_CMD_NEXT		0x16U   // must be last command ID + 1
 
 struct dce_admin_version_info {
 	uint32_t	version;
@@ -77,6 +78,14 @@ struct dce_admin_fw_version_info {
 
 struct dce_admin_echo {
 	uint32_t	data;
+};
+
+enum dce_admin_ext_test {
+	DCE_ADMIN_EXT_TEST_ALU	= 0U,
+	DCE_ADMIN_EXT_TEST_DMA	= 1U,
+};
+struct dce_admin_ext_test_args {
+	enum dce_admin_ext_test	test;
 };
 
 struct dce_admin_log_args {
@@ -133,6 +142,7 @@ struct dce_admin_ipc_cmd {
 	union {
 		struct dce_admin_version_info		version;
 		struct dce_admin_echo			echo;
+		struct dce_admin_ext_test_args		ext_test;
 		struct dce_admin_log_args		log;
 		struct dce_admin_ipc_info_args		ipc_info;
 		struct dce_admin_mem_args		mem_map;
