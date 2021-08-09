@@ -255,9 +255,6 @@ enum {
 	/* struct nv_camera_vi_capture_status */
 	NVHOST_CAMERA_VI_CAPTURE_STATUS = 22,
 
-	/* struct nv_camera_vi_capture_set_compand */
-	NVHOST_CAMERA_VI_CAPTURE_SET_COMPAND = 23,
-
 	/* struct nv_camera_vi_capture_set_progress_status */
 	NVHOST_CAMERA_VI_CAPTURE_SET_PROGRESS_STATUS = 24,
 

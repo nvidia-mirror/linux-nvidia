@@ -140,20 +140,6 @@
 	_IOW('I', 7, __u32)
 
 /**
- * Set global VI pixel companding config, this applies to all VI channels in
- * which this is functionality enabled.
- *
- * @note Pixel companding must be explicitly enabled in each channel by setting
- *	 the compand_enable bit in the @ref vi_channel_config for every capture
- *	 descriptor.
- *
- * @param[in]	ptr	Pointer to a struct @ref vi_capture_compand
- * @returns	0 (success), neg. errno (failure)
- */
-#define VI_CAPTURE_SET_COMPAND \
-	_IOW('I', 8, struct vi_capture_compand)
-
-/**
  * @brief Set up the capture progress status notifier array, which is a
  * replacement for the blocking @ref VI_CAPTURE_STATUS call; allowing for
  * out-of-order frame completion notifications.
@@ -600,18 +586,6 @@ static long vi_channel_ioctl(
 		if (err < 0)
 			dev_err(chan->dev,
 				"vi capture get status failed\n");
-		break;
-	}
-
-	case _IOC_NR(VI_CAPTURE_SET_COMPAND): {
-		struct vi_capture_compand compand;
-
-		if (copy_from_user(&compand, ptr, sizeof(compand)))
-			break;
-		err = vi_capture_set_compand(chan, &compand);
-		if (err < 0)
-			dev_err(chan->dev,
-				"setting compand failed\n");
 		break;
 	}
 

@@ -425,19 +425,6 @@
         },
 
         {
-            "Name"   : "vi_capture_set_compand",
-            "Comment": "The vi_capture_set_compand API is called",
-            "Fields" : [
-                { "Name": "class_id",        "Comment": "Engine class ID",
-                  "Type": "uint32_t",        "Format": "%x" },
-                { "Name": "pid",             "Comment": "PID",
-                  "Type": "uint32_t",        "Format": "%u" },
-                { "Name": "tid",             "Comment": "TID",
-                  "Type": "uint32_t",        "Format": "%u" }
-            ]
-        },
-
-        {
             "Name"   : "vi_capture_set_progress_status",
             "Comment": "The vi_capture_set_progress_status API is called",
             "Fields" : [

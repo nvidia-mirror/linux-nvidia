@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2017-2022 NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -446,18 +446,6 @@ int vi_capture_request(
 int vi_capture_status(
 	struct tegra_vi_channel *chan,
 	int32_t timeout_ms);
-
-/**
- * @brief Setup VI compand in RCE.
- *
- * @param[in]	chan	VI channel context
- * @param[in]	compand	VI compand setup config
- *
- * @returns	0 (success), neg. errno (failure)
- */
-int vi_capture_set_compand(
-	struct tegra_vi_channel *chan,
-	struct vi_capture_compand *compand);
 
 /**
  * @brief Setup VI channel capture status progress notifier.
