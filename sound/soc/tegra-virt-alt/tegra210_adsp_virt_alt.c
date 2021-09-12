@@ -3,7 +3,7 @@
  * tegra210_adsp_virt_alt.c - Tegra ADSP audio driver
  *
  * Author: Sumit Bhattacharya <sumitb@nvidia.com>
- * Copyright (c) 2014-2022 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  */
 
@@ -620,6 +620,12 @@ static int tegra210_adsp_send_connect_msg(struct tegra210_adsp_app *src,
 					uint32_t flags)
 {
 	apm_msg_t apm_msg;
+
+	if ((src == NULL) || (dst == NULL)) {
+		pr_err("%s: SRC = %p or DST = %p is NULL\n",
+			__func__, src, dst);
+		return -1;
+	}
 
 	apm_msg.msgq_msg.size = MSGQ_MSG_WSIZE(apm_fx_connect_params_t);
 	apm_msg.msg.call_params.size = sizeof(apm_fx_connect_params_t);
@@ -3070,8 +3076,10 @@ static int tegra210_adsp_mux_put(struct snd_kcontrol *kcontrol,
 	uint32_t cur_val = 0;
 	int ret = 0;
 
-	if (!adsp->init_done)
+	if (!adsp->init_done) {
+		dev_err(adsp->dev, "%s ADSP not initialized\n", __func__);
 		return -ENODEV;
+	}
 
 	if (e->reg >= TEGRA210_ADSP_VIRT_REG_MAX)
 		return -EINVAL;

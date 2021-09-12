@@ -631,15 +631,21 @@ nvadsp_app_info_t __must_check *nvadsp_app_init(nvadsp_app_handle_t handle,
 
 	drv_data = platform_get_drvdata(priv.pdev);
 
-	if (!drv_data->adsp_os_running)
+	if (!drv_data->adsp_os_running) {
+		pr_err("ADSP is not running\n");
 		goto err;
+	}
 
-	if (IS_ERR_OR_NULL(handle))
+	if (IS_ERR_OR_NULL(handle)) {
+		pr_err("ADSP APP handle is NULL\n");
 		goto err;
+	}
 
 	message = kzalloc(sizeof(*message), GFP_KERNEL);
-	if (!message)
+	if (!message) {
+		pr_err("Failed to allocate memory for ADSP msg\n");
 		goto err;
+	}
 
 	shared_mem = drv_data->shared_adsp_os_data;
 	msg_pool = &shared_mem->app_shared_msg_pool;
@@ -648,6 +654,7 @@ nvadsp_app_info_t __must_check *nvadsp_app_init(nvadsp_app_handle_t handle,
 
 	app = create_app_instance(handle, args, &data->app_init, NULL, 0);
 	if (IS_ERR_OR_NULL(app)) {
+		pr_err("Failed to create APP instance\n");
 		kfree(message);
 		goto err;
 	}

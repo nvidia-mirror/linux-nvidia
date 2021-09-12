@@ -658,7 +658,7 @@ int adspff_init(struct platform_device *pdev)
 		return -ENOENT;
 
 	app_info = nvadsp_app_init(handle, NULL);
-	if (!app_info) {
+	if (IS_ERR_OR_NULL(app_info)) {
 		pr_err("unable to init app adspff\n");
 		return -1;
 	}
