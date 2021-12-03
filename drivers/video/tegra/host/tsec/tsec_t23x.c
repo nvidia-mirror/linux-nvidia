@@ -217,6 +217,9 @@ static int nvhost_tsec_riscv_deinit_sw(struct platform_device *dev)
 }
 
 #define CMD_INTERFACE_TEST 0
+#if CMD_INTERFACE_TEST
+#define NUM_OF_CMDS_TO_TEST (5)
+#endif
 
 static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 {
@@ -350,6 +353,14 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 		goto clean_up;
 	}
 
+	/* Host should not receive SWGEN1, as it uses only SWGEN0 for message
+	 * communication with tsec. RISCV Fw is generating SWGEN1 for some debug
+	 * purpose at below path,, we want to ensure that this doesn't interrupt
+	 * Arm driver code.
+	 * nvriscv/drivers/src/debug/debug.c:164: irqFireSwGen(SYS_INTR_SWGEN1)
+	 */
+	host1x_writel(dev, riscv_irqmclr_r(), riscv_irqmclr_swgen1_set_f());
+
 	enable_irq(pdata->irq);
 
 	s_riscv_booted = true;
@@ -358,16 +369,16 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 
 
 #if CMD_INTERFACE_TEST
-
 	pr_debug("cmd_size=%d, cmdDataSize=%d\n", cmd_size, cmdDataSize);
 	msleep(3000);
-	for (idx = 0; idx < 5; idx++) {
+	for (idx = 0; idx < NUM_OF_CMDS_TO_TEST; idx++) {
 		hdcp22Cmd.cmdType = RM_FLCN_HDCP22_CMD_ID_MONITOR_OFF;
 		hdcp22Cmd.sorNum = -1;
 		hdcp22Cmd.dfpSublinkMask = -1;
 		cmd.cmdGen.hdr.size = cmd_size;
 		cmd.cmdGen.hdr.unitId = RM_GSP_UNIT_HDCP22WIRED;
 		cmd.cmdGen.hdr.seqNumId = idx+1;
+		cmd.cmdGen.hdr.ctrlFlags = 0;
 		memcpy(&cmd.cmdGen.cmd, &hdcp22Cmd, cmdDataSize);
 		nvhost_tsec_send_cmd((void *)&cmd, 0, NULL);
 		msleep(200);
@@ -513,6 +524,11 @@ static irqreturn_t tsec_riscv_isr(int irq, void *dev_id)
 		      flcn_thi_int_stat_clr_f());
 	host1x_writel(pdev, flcn_irqsclr_r(),
 		      flcn_irqsclr_swgen0_set_f());
+	/* Clear RISCV Mask for SWGEN0, so that no more SWGEN0
+	 * interrupts will be routed to CCPLEX, it will be re-enabled
+	 * by the bottom half
+	 */
+	host1x_writel(pdev, riscv_irqmclr_r(), riscv_irqmclr_swgen0_set_f());
 
 	spin_unlock_irqrestore(&pdata->mirq_lock, flags);
 
@@ -557,6 +573,7 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 	u32 head;
 	u32 tail;
 	u8 cmd_size;
+	u8 cmd_size_aligned;
 	u32 cmdq_head_base;
 	u32 cmdq_tail_base;
 	u32 cmdq_head_stride;
@@ -606,6 +623,7 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 
 	flcn_cmd = (union RM_FLCN_CMD *)cmd;
 	cmd_size = flcn_cmd->cmdGen.hdr.size;
+	cmd_size_aligned = ALIGN(cmd_size, 4);
 	head = host1x_readl(tsec,
 		(cmdq_head_base + (queue_id * cmdq_head_stride)));
 
@@ -616,16 +634,16 @@ check_space:
 		pr_err("***** head/tail invalid, h=0x%x,t=0x%x\n", head, tail);
 
 	if (tail > head) {
-		if ((head + cmd_size) < tail)
+		if ((head + cmd_size_aligned) < tail)
 			goto enqueue;
 		udelay(TSEC_TAIL_POLL_TIME);
 		goto check_space;
 	} else {
 
-		if ((head + cmd_size) < (cmdq_start + cmdq_size)) {
+		if ((head + cmd_size_aligned) < (cmdq_start + cmdq_size)) {
 			goto enqueue;
 		} else {
-			if ((cmdq_start + cmd_size) < tail) {
+			if ((cmdq_start + cmd_size_aligned) < tail) {
 				goto rewind;
 			} else {
 				udelay(TSEC_TAIL_POLL_TIME);
@@ -649,7 +667,7 @@ rewind:
 enqueue:
 	if (emem_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0))
 		return -EINVAL;
-	head += ALIGN(cmd_size, 4);
+	head += cmd_size_aligned;
 	host1x_writel(tsec, (cmdq_head_base +
 		(queue_id * cmdq_head_stride)), head);
 
@@ -718,12 +736,13 @@ static irqreturn_t process_msg(int irq, void *args)
 		emem_copy_from(tail, (u8 *)&gsp_msg.hdr,
 			RM_FLCN_QUEUE_HDR_SIZE, 0);
 		pr_debug("seqNumId=%d\n", gsp_msg.hdr.seqNumId);
+		/* copy msg body */
+		emem_copy_from(tail + RM_FLCN_QUEUE_HDR_SIZE, (u8 *)&gsp_msg.msg,
+			gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE, 0);
+
 		if (gsp_msg.hdr.unitId == RM_GSP_UNIT_INIT) {
 			dev_dbg(&tsec->dev, "MSGQ: %s(%d) init msg\n",
 				__func__, __LINE__);
-			/* copy msg body */
-			emem_copy_from(tail, (u8 *)&gsp_msg.msg,
-				gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE, 0);
 
 			s_init_msg_rcvd = true;
 
@@ -740,6 +759,8 @@ static irqreturn_t process_msg(int irq, void *args)
 				tail = msgq_start;
 				host1x_writel(tsec, (msgq_tail_base +
 						     (msgq_tail_stride * queue_id)), tail);
+				head = host1x_readl(tsec,
+					(msgq_head_base + (msgq_head_stride * queue_id)));
 				pr_debug("MSGQ tail rewinded\n");
 				continue;
 			} else {
@@ -760,6 +781,13 @@ FAIL:
 	}
 
 exit:
+
+	/* Set RISCV Mask for SWGEN0, so that it is re-enabled
+	 * and if it is pending the CCPLEX will be interrupted
+	 * by this the top half
+	 */
+	host1x_writel(tsec, riscv_irqmset_r(), riscv_irqmset_swgen0_set_f());
+
 	return IRQ_HANDLED;
 }
 

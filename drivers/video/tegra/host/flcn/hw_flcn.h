@@ -370,4 +370,24 @@ static inline u32 t239_cbb_ofa_sec_blf_ctl_r(void)
 {
 	return 0x00014130;
 }
+static inline u32 riscv_irqmset_r(void)
+{
+	return 0x2520;
+}
+static inline u32 riscv_irqmclr_r(void)
+{
+	return 0x2524;
+}
+static inline u32 riscv_irqmset_swgen0_set_f(void)
+{
+	return 0x40;
+}
+static inline u32 riscv_irqmclr_swgen0_set_f(void)
+{
+	return 0x40;
+}
+static inline u32 riscv_irqmclr_swgen1_set_f(void)
+{
+	return 0x80;
+}
 #endif
