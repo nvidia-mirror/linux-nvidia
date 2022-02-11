@@ -37,6 +37,15 @@
 /* UFS AUX address range in T234 */
 #define UFS_AUX_ADDR_RANGE_23X			0x20
 
+/* UFS VIRTUALIZATION address for T234 */
+#define NV_ADDRESS_MAP_T23X_UFSHC_VIRT_BASE	0x02520000
+/* UFS VIRTUALIZATION range in T234 */
+#define UFS_AUX_ADDR_VIRT_RANGE_23X			0x14f
+
+#define UFS_AUX_ADDR_VIRT_CTRL_0	0x0
+#define UFS_AUX_ADDR_VIRT_CTRL_EN	0x1
+
+#define UFS_AUX_ADDR_VIRT_REG_0		0x4
 
 /*
  * M-PHY Registers
@@ -314,6 +323,7 @@ struct ufs_tegra_host {
 	void __iomem *mphy_l0_base;
 	void __iomem *mphy_l1_base;
 	void __iomem *ufs_aux_base;
+	void __iomem *ufs_virtualization_base;
 	struct reset_control *ufs_rst;
 	struct reset_control *ufs_axi_m_rst;
 	struct reset_control *ufshc_lp_rst;
