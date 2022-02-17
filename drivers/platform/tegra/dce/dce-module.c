@@ -231,6 +231,7 @@ static int tegra_dce_probe(struct platform_device *pdev)
 #ifdef CONFIG_DEBUG_FS
 	dce_init_debug(d);
 #endif
+
 	return 0;
 
 req_intr_err:
