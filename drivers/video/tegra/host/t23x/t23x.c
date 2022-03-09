@@ -315,6 +315,7 @@ struct nvhost_device_data t23x_nvdec_info = {
 	.actmon_weight_count	= 216,
 	.actmon_setting_regs	= t23x_nvdec_actmon_registers,
 	.devfreq_governor	= "userspace",
+	.enable_timestamps	= flcn_enable_timestamps,
 };
 #endif
 
@@ -496,6 +497,7 @@ struct nvhost_device_data t23x_vic_info = {
 	.actmon_weight_count	= 216,
 	.actmon_setting_regs	= t23x_vic_actmon_registers,
 	.devfreq_governor	= "userspace",
+	.enable_timestamps	= flcn_enable_timestamps,
 };
 #endif
 
