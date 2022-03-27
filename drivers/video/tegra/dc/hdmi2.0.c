@@ -1,7 +1,7 @@
 /*
  * hdmi2.0.c: hdmi2.0 driver.
  *
- * Copyright (c) 2014-2021, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION, All rights reserved.
  * Author: Animesh Kishore <ankishore@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -3309,8 +3309,7 @@ static inline void tegra_sor_set_ref_clk_rate(struct tegra_dc_sor_data *sor)
 static long tegra_dc_hdmi_setup_clk_nvdisplay(struct tegra_dc *dc,
 					      struct clk *clk)
 {
-#define MIN_PARENT_CLK	(27000000)
-#define DIVIDER_CAP	(128)
+#define MIN_CLK(clk)	(clk_round_rate(clk, 0))
 
 	struct clk *parent_clk;
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
@@ -3348,18 +3347,7 @@ static long tegra_dc_hdmi_setup_clk_nvdisplay(struct tegra_dc *dc,
 				(yuv_flag == (FB_VMODE_Y444 | FB_VMODE_Y36)))
 			parent_clk_rate *= 3;
 
-		/*
-		 * For t18x plldx cannot go below 27MHz.
-		 * Real HW limit is lesser though.
-		 * 27Mz is chosen to have a safe margin.
-		 */
-		if (parent_clk_rate < (MIN_PARENT_CLK/DIVIDER_CAP)) {
-			dev_err(&dc->ndev->dev, "hdmi: unsupported parent clock rate (%ld).\n",
-					parent_clk_rate);
-			return -EINVAL;
-		}
-
-		while (parent_clk_rate < MIN_PARENT_CLK)
+		while (parent_clk_rate < MIN_CLK(parent_clk))
 			parent_clk_rate += parent_clk_rate;
 
 		clk_set_rate(parent_clk, parent_clk_rate);
