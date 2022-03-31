@@ -593,6 +593,37 @@ static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
 	.amc_err_war = true,
 };
 
+static struct nvadsp_chipdata tegra239_adsp_chipdata = {
+	.hwmb = {
+		.reg_idx = AHSP,
+		.hwmbox0_reg = 0x00000,
+		.hwmbox1_reg = 0X08000,
+		.hwmbox2_reg = 0X10000,
+		.hwmbox3_reg = 0X18000,
+		.hwmbox4_reg = 0X20000,
+		.hwmbox5_reg = 0X28000,
+		.hwmbox6_reg = 0X30000,
+		.hwmbox7_reg = 0X38000,
+		.empty_int_ie = 0x8,
+	},
+	.adsp_shared_mem_hwmbox = 0x18000,   /* HWMBOX3 */
+	.adsp_thread_hwmbox     = 0x20000,   /* HWMBOX4 */
+	.adsp_os_config_hwmbox  = 0X28000,   /* HWMBOX5 */
+	.adsp_state_hwmbox      = 0x30000,   /* HWMBOX6 */
+	.adsp_irq_hwmbox        = 0x38000,   /* HWMBOX7 */
+	.acast_init = nvadsp_acast_t18x_init,
+	.reset_init = nvadsp_reset_t18x_init,
+	.os_init = nvadsp_os_t18x_init,
+#ifdef CONFIG_PM
+	.pm_init = nvadsp_pm_t18x_init,
+#endif
+	.wdt_irq = INT_T18x_ATKE_WDT_IRQ,
+	.start_irq = INT_T18x_AGIC_START,
+	.end_irq   = INT_T18x_AGIC_END,
+
+	.amc_err_war = false,
+};
+
 static const struct of_device_id nvadsp_of_match[] = {
 	{
 		.compatible = "nvidia,tegra210-adsp",
@@ -600,6 +631,9 @@ static const struct of_device_id nvadsp_of_match[] = {
 	}, {
 		.compatible = "nvidia,tegra18x-adsp",
 		.data = &tegrat18x_adsp_chipdata,
+	}, {
+		.compatible = "nvidia,tegra239-adsp",
+		.data = &tegra239_adsp_chipdata,
 	}, {
 	},
 };
