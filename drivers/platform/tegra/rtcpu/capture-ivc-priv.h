@@ -17,11 +17,11 @@
 #ifndef __CAPTURE_IVC_PRIV_H__
 #define __CAPTURE_IVC_PRIV_H__
 
-/** Total number of capture channels (VI + ISP) */
-#define NUM_CAPTURE_CHANNELS 64
+/** Total number of capture channels (2 * VI + ISP). T234 has two VI units */
+#define NUM_CAPTURE_CHANNELS 88
 
 /** Temporary ids for the clients whose channel-id is not yet allocated */
-#define NUM_CAPTURE_TRANSACTION_IDS 64
+#define NUM_CAPTURE_TRANSACTION_IDS NUM_CAPTURE_CHANNELS
 
 /** Total number of channels including Temporary IDs */
 #define TOTAL_CHANNELS (NUM_CAPTURE_CHANNELS + NUM_CAPTURE_TRANSACTION_IDS)
