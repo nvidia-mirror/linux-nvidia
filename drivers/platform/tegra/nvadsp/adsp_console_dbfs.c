@@ -3,7 +3,7 @@
  *
  * adsp mailbox console driver
  *
- * Copyright (C) 2014-2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2022, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -161,6 +161,7 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 
 	if ((_IOC_NR(cmd) != _IOC_NR(ADSP_CNSL_LOAD)) &&
+		(_IOC_NR(cmd) != _IOC_NR(ADSP_CNSL_RESUME)) &&
 		(!drv_data->adsp_os_running)) {
 		dev_info(dev, "adsp_consol: os not running.");
 		return -EPERM;
@@ -196,6 +197,23 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 			break;
 		pr_err("adsp_consol: Failed to init adsp_consol send mailbox");
 		memset(mbox, 0, sizeof(struct nvadsp_mbox));
+		break;
+	case _IOC_NR(ADSP_CNSL_SUSPEND):
+		ret = nvadsp_os_suspend();
+		if (ret)
+			dev_info(dev, "adsp_consol: OS Suspend Failed.");
+		break;
+	case _IOC_NR(ADSP_CNSL_STOP):
+		nvadsp_os_stop();
+		break;
+	case _IOC_NR(ADSP_CNSL_RESUME):
+		if (!drv_data->adsp_os_suspended) {
+			dev_info(dev, "adsp_consol: OS is not suspended to perform resume.");
+			break;
+		}
+		ret = nvadsp_os_start();
+		if (ret)
+			dev_info(dev, "adsp_consol: OS Resume Failed.");
 		break;
 	case _IOC_NR(ADSP_CNSL_RUN_APP):
 		if (!ACCESS_OK(uarg, sizeof(struct adsp_consol_run_app_arg_t)))

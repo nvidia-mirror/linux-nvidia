@@ -3,7 +3,7 @@
  *
  * A header file for adsp console driver
  *
- * Copyright (C) 2016-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2016-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -51,5 +51,8 @@ struct adsp_consol_run_app_arg_t {
 #define ADSP_CNSL_CLOSE_MBX _IO(NV_ADSP_CONSOLE_MAGIC, 0x07)
 #define ADSP_CNSL_PUT_MBX _IOW(NV_ADSP_CONSOLE_MAGIC, 0x08, uint32_t *)
 #define ADSP_CNSL_GET_MBX _IOR(NV_ADSP_CONSOLE_MAGIC, 0x09, uint32_t *)
+#define ADSP_CNSL_SUSPEND _IO(NV_ADSP_CONSOLE_MAGIC, 0x0a)
+#define ADSP_CNSL_STOP _IO(NV_ADSP_CONSOLE_MAGIC, 0x0b)
+#define ADSP_CNSL_RESUME _IO(NV_ADSP_CONSOLE_MAGIC, 0x0c)
 
 #endif
