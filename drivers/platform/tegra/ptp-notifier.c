@@ -53,6 +53,15 @@ void tegra_register_hwtime_source(int (*func)(struct net_device *, void *, int),
 	unsigned long flags;
 	int index = 0;
 
+	for (index = 0; index < MAX_MAC_INSTANCES; index++) {
+		if (registered_ndev[index] == ndev) {
+			pr_debug("source is already registered for this intf\n");
+			/* Didn't call the notifier as we are not using
+			 * tegra_register_hwtime_notifier anywhere
+			 */
+			return;
+		}
+	}
 	raw_spin_lock_irqsave(&ptp_notifier_lock, flags);
 	for (index = 0; index < MAX_MAC_INSTANCES; index++) {
 		if (get_systime[index] == NULL) {
@@ -85,7 +94,7 @@ void tegra_unregister_hwtime_source(struct net_device *dev)
 			break;
 	}
 	if (index == MAX_MAC_INSTANCES) {
-		pr_err("Trying to unregister non-registered hwtime source");
+		pr_debug("Trying to unregister non-registered hwtime source");
 		raw_spin_unlock_irqrestore(&ptp_notifier_lock, flags);
 		return;
 	}

@@ -29,7 +29,9 @@
 #define PTP_TSC_HWTIME		2
 #define TSC_HIGH_SHIFT		32U
 
-#define MAX_MAC_INSTANCES	5
+/** Max of 5 interfaces created per IP multiply by number of IP */
+#define MAX_MAC_INSTANCES	25
+
 /**
  * @brief ptp_tsc_data - Struture used to store TSC and PTP time
  * information.
