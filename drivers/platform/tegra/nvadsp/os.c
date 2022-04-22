@@ -929,6 +929,167 @@ end:
 
 }
 
+#ifdef CONFIG_TEGRA_ADSP_MULTIPLE_FW
+
+#define MFW_MAX_OTHER_CORES    3
+dma_addr_t mfw_smem_iova[MFW_MAX_OTHER_CORES];
+void *mfw_hsp_va[MFW_MAX_OTHER_CORES];
+
+static int nvadsp_load_multi_fw(struct platform_device *pdev)
+{
+	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
+	struct device *dev = &pdev->dev;
+	int i, j, ret;
+	void *dram_va, *hsp_va;
+	dma_addr_t shrd_mem_iova;
+	struct device_node *hsp_node;
+	struct resource hsp_inst;
+	u32 hsp_int, hsp_int_targ;
+
+	hsp_node = of_get_child_by_name(dev->of_node, "ahsp_sm_multi");
+	if (!hsp_node) {
+		dev_err(dev, "missing ahsp_sm addr\n");
+		return -ENOENT;
+	}
+
+	for (i = 0; !of_address_to_resource(hsp_node, i, &hsp_inst); i++) {
+		if (i >= MFW_MAX_OTHER_CORES) {
+			dev_err(dev, "core out of bound\n");
+			break;
+		}
+
+		if (drv_data->adsp_os_secload) {
+			/* For front door boot MB2 would have loaded
+			 * the FW for all the cores; only shared
+			 * memory neeeds to be allocated and set
+			 */
+			size_t size = drv_data->adsp_mem[ACSR_SIZE];
+
+			dram_va = nvadsp_alloc_coherent(
+					size, &shrd_mem_iova, GFP_KERNEL);
+			if (!dram_va) {
+				dev_err(dev,
+					"mem alloc failed for adsp %d\n", i);
+				continue;
+			}
+		} else {
+			const struct firmware *fw;
+			const char *adsp_elf;
+			u32 os_mem, os_size;
+
+			ret = of_property_read_string_index(
+				dev->of_node, "nvidia,adsp_elf_multi",
+				i, &adsp_elf);
+			if (ret) {
+				dev_err(dev, "err reading adsp FW %d: %d\n",
+						(i + 1), ret);
+				continue;
+			}
+
+			if (!strcmp(adsp_elf, ""))
+				continue;
+
+			ret = request_firmware(&fw, adsp_elf, dev);
+			if (ret < 0) {
+				dev_err(dev, "request FW failed for %s: %d\n",
+						adsp_elf, ret);
+				continue;
+			}
+
+			os_size = drv_data->adsp_mem[ADSP_OS_SIZE];
+			os_mem  = drv_data->adsp_mem[ADSP_OS_ADDR] +
+						((i + 1) * os_size);
+
+#if defined(CONFIG_TEGRA_NVADSP_ON_SMMU)
+			dram_va = nvadsp_dma_alloc_and_map_at(pdev,
+					(size_t)os_size, (dma_addr_t)os_mem,
+					GFP_KERNEL);
+			if (!dram_va) {
+				dev_err(dev,
+					"dma_alloc failed for 0x%x\n", os_mem);
+				continue;
+			}
+#else
+			dram_va = ioremap((phys_addr_t)os_mem, (size_t)os_size);
+			if (!dram_va) {
+				dev_err(dev,
+					"remap failed for addr 0x%x\n", os_mem);
+				continue;
+			}
+#endif
+
+			nvadsp_add_load_mappings((phys_addr_t)os_mem,
+						dram_va, (size_t)os_size);
+
+			dev_info(dev, "Loading ADSP OS firmware %s\n", adsp_elf);
+			ret = nvadsp_os_elf_load(fw);
+			if (ret) {
+				dev_err(dev, "failed to load %s\n", adsp_elf);
+				continue;
+			}
+
+			/* Shared mem is at the start of OS memory */
+			shrd_mem_iova = (dma_addr_t)os_mem;
+		}
+
+		nvadsp_set_shared_mem(pdev, dram_va, 0);
+
+		/* Store shared mem IOVA for writing into MBOX (for ADSP) */
+		hsp_va = devm_ioremap_resource(dev, &hsp_inst);
+		if (IS_ERR(hsp_va)) {
+			dev_err(dev, "ioremap failed for HSP %d\n", (i + 1));
+			continue;
+		}
+		mfw_smem_iova[i] = shrd_mem_iova;
+		mfw_hsp_va[i]    = hsp_va;
+
+		/*
+		 * Interrupt routing of AHSP1-3 is only for the
+		 * sake of completion; CCPLEX<->ADSP communication
+		 * is limited to AHSP0, i.e. ADSP core-0
+		 */
+		for (j = 0; j < 8; j += 2) {
+			if (of_property_read_u32_index(hsp_node,
+					"nvidia,ahsp_sm_interrupts",
+					(i * 8) + j, &hsp_int)) {
+				dev_err(dev,
+					"no HSP int config for core %d\n",
+					(i + 1));
+				break;
+			}
+			if (of_property_read_u32_index(hsp_node,
+					"nvidia,ahsp_sm_interrupts",
+					(i * 8) + j + 1, &hsp_int_targ)) {
+				dev_err(dev,
+					"no HSP int_targ config for core %d\n",
+					(i + 1));
+				break;
+			}
+
+			/*
+			 * DT definition decrements SPI IRQs
+			 * by 32, so restore the same here
+			 */
+			ret = tegra_agic_route_interrupt(hsp_int + 32,
+							 hsp_int_targ);
+			if (ret) {
+				dev_err(dev,
+					"HSP routing for core %d failed: %d\n",
+					(i + 1), ret);
+				break;
+			}
+		}
+
+		if (j == 8)
+			dev_info(dev, "Setup done for core %d FW\n", (i + 1));
+	}
+
+	of_node_put(hsp_node);
+
+	return 0;
+}
+#endif // CONFIG_TEGRA_ADSP_MULTIPLE_FW
+
 int nvadsp_os_load(void)
 {
 	struct nvadsp_drv_data *drv_data;
@@ -946,6 +1107,11 @@ int nvadsp_os_load(void)
 
 	drv_data = platform_get_drvdata(priv.pdev);
 	dev = &priv.pdev->dev;
+
+#ifdef CONFIG_TEGRA_ADSP_MULTIPLE_FW
+	dev_info(dev, "Loading multiple ADSP FW....\n");
+	nvadsp_load_multi_fw(priv.pdev);
+#endif // CONFIG_TEGRA_ADSP_MULTIPLE_FW
 
 	if (drv_data->adsp_os_secload) {
 		dev_info(dev, "ADSP OS firmware already loaded\n");
@@ -1795,10 +1961,24 @@ int nvadsp_os_start(void)
 		goto unlock;
 
 	if (cold_start) {
-		if (drv_data->chip_data->adsp_shared_mem_hwmbox != 0)
+		if (drv_data->chip_data->adsp_shared_mem_hwmbox != 0) {
+#ifdef CONFIG_TEGRA_ADSP_MULTIPLE_FW
+			int i;
+			for (i = 0; i < MFW_MAX_OTHER_CORES; i++) {
+				if (mfw_hsp_va[i]) {
+					writel((uint32_t)mfw_smem_iova[i],
+						mfw_hsp_va[i] +
+							drv_data->chip_data->
+							adsp_shared_mem_hwmbox
+						);
+				}
+			}
+#endif // CONFIG_TEGRA_ADSP_MULTIPLE_FW
+
 			hwmbox_writel(
 				(uint32_t)drv_data->shared_adsp_os_data_iova,
 				drv_data->chip_data->adsp_shared_mem_hwmbox);
+		}
 
 		if (!is_tegra_hypervisor_mode() &&
 			drv_data->chip_data->adsp_os_config_hwmbox != 0) {
