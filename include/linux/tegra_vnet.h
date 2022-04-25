@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -13,6 +13,10 @@
 
 #ifndef PCIE_EPF_TEGRA_DMA_H
 #define PCIE_EPF_TEGRA_DMA_H
+
+#ifndef PCI_DEVICE_ID_NVIDIA_JETSON_AGX_NETWORK
+#define PCI_DEVICE_ID_NVIDIA_JETSON_AGX_NETWORK     0x2296
+#endif
 
 #define DMA_RD_CHNL_NUM			2
 #define DMA_WR_CHNL_NUM			4

@@ -17,8 +17,13 @@
 #include <linux/platform_device.h>
 #include <linux/kthread.h>
 #include <linux/tegra-pcie-edma-test-common.h>
+#include "pci-epf-wrapper.h"
 
 static struct pcie_epf_dma *gepfnv;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
+#define PCI_EPF_CORE_DEINIT
+#endif
 
 struct pcie_epf_dma {
 	struct pci_epf_header header;
@@ -1053,6 +1058,7 @@ fail:
 	return 0;
 }
 
+#ifdef THREAD_ON_CPU
 static int async_dma_test_fn(struct pcie_epf_dma *epfnv, int ch)
 {
 	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)
@@ -1229,7 +1235,7 @@ static int async_rd1_work(void *data)
 
 	return 0;
 }
-
+#endif
 static int async_dma_test(struct seq_file *s, void *data)
 {
 	struct pcie_epf_dma *epfnv = (struct pcie_epf_dma *)
@@ -1264,6 +1270,7 @@ static int async_dma_test(struct seq_file *s, void *data)
 			       DMA_LLP_HIGH_OFF_RDCH);
 	}
 
+#ifdef THREAD_ON_CPU
 	epfnv->wr0_task = kthread_create_on_cpu(async_wr0_work, epfnv, 0,
 						"async_wr0_work");
 	if (IS_ERR(epfnv->wr0_task)) {
@@ -1300,7 +1307,7 @@ static int async_dma_test(struct seq_file *s, void *data)
 		dev_err(epfnv->fdev, "failed to create async_rd1 thread\n");
 		goto rd1_task;
 	}
-
+#endif
 	init_waitqueue_head(&epfnv->task_wq);
 
 	wake_up_process(epfnv->wr0_task);
@@ -1322,6 +1329,7 @@ static int async_dma_test(struct seq_file *s, void *data)
 
 	return 0;
 
+#ifdef THREAD_ON_CPU
 rd1_task:
 	kthread_stop(epfnv->rd0_task);
 rd0_task:
@@ -1333,6 +1341,7 @@ wr2_task:
 wr1_task:
 	kthread_stop(epfnv->wr0_task);
 wr0_task:
+#endif
 	epfnv->async_dma = false;
 	epfnv->task_done = 0;
 
@@ -1402,14 +1411,14 @@ static int pcie_dma_epf_core_init(struct pci_epf *epf)
 	struct pci_epf_bar *epf_bar;
 	int ret;
 
-	ret = pci_epc_write_header(epc, epf->func_no, epf->header);
+	ret = lpci_epc_write_header(epc, epf->func_no, epf->header);
 	if (ret < 0) {
 		dev_err(fdev, "Failed to write PCIe header: %d\n", ret);
 		return ret;
 	}
 
 	epf_bar = &epf->bar[BAR_0];
-	ret = pci_epc_set_bar(epc, epf->func_no, epf_bar);
+	ret = lpci_epc_set_bar(epc, epf->func_no, epf_bar);
 	if (ret < 0) {
 		dev_err(fdev, "PCIe set BAR0 failed: %d\n", ret);
 		return ret;
@@ -1418,7 +1427,7 @@ static int pcie_dma_epf_core_init(struct pci_epf *epf)
 	dev_info(fdev, "BAR0 phy_addr: %llx size: %lx\n",
 		 epf_bar->phys_addr, epf_bar->size);
 
-	ret = pci_epc_set_msi(epc, epf->func_no, epf->msi_interrupts);
+	ret = lpci_epc_set_msi(epc, epf->func_no, epf->msi_interrupts);
 	if (ret) {
 		dev_err(fdev, "pci_epc_set_msi() failed: %d\n", ret);
 		return ret;
@@ -1540,6 +1549,7 @@ static int pcie_dma_epf_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+#ifdef PCI_EPF_CORE_DEINIT
 static int pcie_dma_epf_block_notifier(struct notifier_block *nb,
 				       unsigned long val, void *data)
 {
@@ -1562,6 +1572,7 @@ static int pcie_dma_epf_block_notifier(struct notifier_block *nb,
 
 	return NOTIFY_OK;
 }
+#endif
 
 static void pcie_dma_epf_unbind(struct pci_epf *epf)
 {
@@ -1577,8 +1588,8 @@ static void pcie_dma_epf_unbind(struct pci_epf *epf)
 
 	pcie_dma_epf_msi_deinit(epf);
 	pci_epc_stop(epc);
-	pci_epc_clear_bar(epc, epf->func_no, epf_bar);
-	pci_epf_free_space(epf, epfnv->bar0_virt, BAR_0);
+	lpci_epc_clear_bar(epc, epf->func_no, epf_bar);
+	lpci_epf_free_space(epf, epfnv->bar0_virt, BAR_0);
 }
 
 static int pcie_dma_epf_bind(struct pci_epf *epf)
@@ -1597,7 +1608,7 @@ static int pcie_dma_epf_bind(struct pci_epf *epf)
 	epfnv->fdev = fdev;
 	epfnv->cdev = cdev;
 
-	epfnv->bar0_virt = pci_epf_alloc_space(epf, BAR0_SIZE, BAR_0, SZ_64K);
+	epfnv->bar0_virt = lpci_epf_alloc_space(epf, BAR0_SIZE, BAR_0, SZ_64K);
 	if (!epfnv->bar0_virt) {
 		dev_err(fdev, "Failed to allocate memory for BAR0\n");
 		return -ENOMEM;
@@ -1615,8 +1626,10 @@ static int pcie_dma_epf_bind(struct pci_epf *epf)
 	epf->nb.notifier_call = pcie_dma_epf_notifier;
 	pci_epc_register_notifier(epc, &epf->nb);
 
+#ifdef PCI_EPF_CORE_DEINIT
 	epf->block_nb.notifier_call = pcie_dma_epf_block_notifier;
 	pci_epc_register_block_notifier(epc, &epf->block_nb);
+#endif
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "atu_dma");
 	if (!res) {
@@ -1677,7 +1690,7 @@ static int pcie_dma_epf_bind(struct pci_epf *epf)
 	return 0;
 
 fail_atu_dma:
-	pci_epf_free_space(epf, epfnv->bar0_virt, BAR_0);
+	lpci_epf_free_space(epf, epfnv->bar0_virt, BAR_0);
 
 	return ret;
 }

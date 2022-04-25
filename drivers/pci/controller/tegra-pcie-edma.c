@@ -5,6 +5,7 @@
  * Copyright (C) 2021-2022 NVIDIA Corporation. All rights reserved.
  */
 
+#include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/dma-iommu.h>
 #include <linux/io.h>
@@ -781,3 +782,4 @@ void tegra_pcie_edma_deinit(void *cookie)
 	kfree(prv);
 }
 EXPORT_SYMBOL(tegra_pcie_edma_deinit);
+MODULE_LICENSE("GPL v2");
