@@ -32,8 +32,6 @@ obj-y += tegra18x_la.o
 obj-y += tegra186-mc-sid.o
 endif
 
-obj-y					+= tegra_fd.o
-
 ifneq (,$(filter y,$(CONFIG_ARCH_TEGRA_19x_SOC) $(CONFIG_ARCH_TEGRA_194_SOC)))
 ccflags-y += -Werror
 
