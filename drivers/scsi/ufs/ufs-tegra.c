@@ -1467,13 +1467,29 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 
 	switch (status) {
 	case PRE_CHANGE:
-		/* If the prefetched reference clock is two and if 38Mhz is
+		/*
+		 * If the prefetched reference clock is two or one and if 38Mhz is
 		 * not enabled in DT then set the reference clock to 19Mhz
 		 */
 		if (!(ufs_tegra->enable_38mhz_clk)) {
 			if ((hba->init_prefetch_data.ref_clk_freq  == 2) ||
 					(hba->init_prefetch_data.ref_clk_freq  == 1)) {
 				ref_clk = 0;
+				ufshcd_set_refclk_value(hba, &ref_clk);
+				ufshcd_get_refclk_value(hba, &hba->init_prefetch_data.ref_clk_freq);
+				dev_info(hba->dev, "Configured ref_clk_freq = %u\n",
+					hba->init_prefetch_data.ref_clk_freq);
+			}
+		}
+
+		/*
+		 * If the prefetched reference clock is zero or one and if 38Mhz is
+		 * enabled in DT then set the reference clock to 38Mhz
+		 */
+		if (ufs_tegra->enable_38mhz_clk) {
+			if ((hba->init_prefetch_data.ref_clk_freq  == 0) ||
+					(hba->init_prefetch_data.ref_clk_freq  == 1)) {
+				ref_clk = 2;
 				ufshcd_set_refclk_value(hba, &ref_clk);
 				ufshcd_get_refclk_value(hba, &hba->init_prefetch_data.ref_clk_freq);
 				dev_info(hba->dev, "Configured ref_clk_freq = %u\n",
@@ -1496,6 +1512,10 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 
 		memcpy(dev_req_params, dev_max_params,
 			sizeof(struct ufs_pa_layer_attr));
+		if (!ufs_tegra->x2config) {
+			dev_req_params->lane_rx = 1;
+			dev_req_params->lane_tx = 1;
+		}
 		if ((hba->init_prefetch_data.ref_clk_freq != 0) &&
 			(hba->init_prefetch_data.ref_clk_freq != 1) &&
 				(hba->init_prefetch_data.ref_clk_freq != 2))
