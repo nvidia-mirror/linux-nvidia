@@ -1245,11 +1245,11 @@ static int tegra_hv_vse_safety_sha_init(struct ahash_request *req)
 	}
 
 	req_ctx->digest_size = crypto_ahash_digestsize(tfm);
-	if (strcmp(crypto_ahash_alg_name(tfm), "sha256") == 0) {
+	if (strcmp(crypto_ahash_alg_name(tfm), "sha256-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA256;
 		req_ctx->blk_size = TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_512BIT;
 		req_ctx->intermediate_digest_size = SHA256_DIGEST_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha384") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha384-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA384;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1024BIT;
@@ -1257,27 +1257,27 @@ static int tegra_hv_vse_safety_sha_init(struct ahash_request *req)
 		 * The intermediate digest size of SHA384 is same as SHA512
 		 */
 		req_ctx->intermediate_digest_size = SHA512_DIGEST_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha512") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha512-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA512;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1024BIT;
 		req_ctx->intermediate_digest_size = SHA512_DIGEST_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-256") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-256-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA3_256;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1088BIT;
 		req_ctx->intermediate_digest_size = SHA3_STATE_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-384") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-384-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA3_384;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_832BIT;
 		req_ctx->intermediate_digest_size = SHA3_STATE_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-512") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "sha3-512-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHA3_512;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_576BIT;
 		req_ctx->intermediate_digest_size = SHA3_STATE_SIZE;
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "shake128") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "shake128-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHAKE128;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1344BIT;
@@ -1285,7 +1285,7 @@ static int tegra_hv_vse_safety_sha_init(struct ahash_request *req)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		req_ctx->digest_size = req->dst_size;
 #endif
-	} else if (strcmp(crypto_ahash_alg_name(tfm), "shake256") == 0) {
+	} else if (strcmp(crypto_ahash_alg_name(tfm), "shake256-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHAKE256;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1088BIT;
@@ -3828,7 +3828,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA1_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha1",
+			.cra_name = "sha1-vse",
 			.cra_driver_name = "tegra-hv-vse-sha1",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3851,7 +3851,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA224_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha224",
+			.cra_name = "sha224-vse",
 			.cra_driver_name = "tegra-hv-vse-sha224",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3874,7 +3874,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA256_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha256",
+			.cra_name = "sha256-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha256",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3897,7 +3897,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA384_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha384",
+			.cra_name = "sha384-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha384",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3920,7 +3920,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA512_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha512",
+			.cra_name = "sha512-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha512",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3943,7 +3943,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA3_256_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha3-256",
+			.cra_name = "sha3-256-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha3-256",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3966,7 +3966,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA3_384_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha3-384",
+			.cra_name = "sha3-384-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha3-384",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -3989,7 +3989,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA3_512_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "sha3-512",
+			.cra_name = "sha3-512-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-sha3-512",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -4012,7 +4012,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA3_512_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "shake128",
+			.cra_name = "shake128-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-shake128",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,
@@ -4035,7 +4035,7 @@ static struct ahash_alg sha_algs[] = {
 		.halg.digestsize = SHA3_512_DIGEST_SIZE,
 		.halg.statesize = sizeof(struct tegra_virtual_se_req_context),
 		.halg.base = {
-			.cra_name = "shake256",
+			.cra_name = "shake256-vse",
 			.cra_driver_name = "tegra-hv-vse-safety-shake256",
 			.cra_priority = 300,
 			.cra_flags = CRYPTO_ALG_TYPE_AHASH,

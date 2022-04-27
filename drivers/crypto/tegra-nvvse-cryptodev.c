@@ -68,14 +68,14 @@
 
 /* SHA Algorithm Names */
 static const char *sha_alg_names[] = {
-	"sha256",
-	"sha384",
-	"sha512",
-	"sha3-256",
-	"sha3-384",
-	"sha3-512",
-	"shake128",
-	"shake256",
+	"sha256-vse",
+	"sha384-vse",
+	"sha512-vse",
+	"sha3-256-vse",
+	"sha3-384-vse",
+	"sha3-512-vse",
+	"shake128-vse",
+	"shake256-vse",
 };
 
 struct tnvvse_crypto_completion {
