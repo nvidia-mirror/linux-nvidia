@@ -1,7 +1,7 @@
 /*
  * Inter-VM Communication
  *
- * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -111,6 +111,46 @@ struct ivc_channel_header {
 	};
 };
 
+static inline bool is_u32_subtraction_safe(uint32_t a, uint32_t b)
+{
+	return (a >= b);
+}
+
+static inline uint32_t safe_subtract_u32(uint32_t a, uint32_t b)
+{
+	if (!is_u32_subtraction_safe(a, b))
+		BUG();
+	else
+		return (a - b);
+}
+
+static inline bool is_u64_addition_safe(uint64_t a, uint64_t b)
+{
+	return (ULLONG_MAX - a >= b);
+}
+
+static inline uint64_t safe_add_u64(uint64_t a, uint64_t b)
+{
+	if (!is_u64_addition_safe(a, b))
+		BUG();
+	else
+		return (a + b);
+}
+
+static inline bool is_u32_addition_safe(uint32_t a, uint32_t b)
+{
+	return (UINT_MAX - a >= b);
+}
+
+static inline uint32_t safe_add_u32(uint32_t a, uint32_t b)
+{
+	if (!is_u32_addition_safe(a, b))
+		BUG();
+	else
+		return (a + b);
+}
+
+
 static inline void ivc_invalidate_counter(struct ivc *ivc,
 		dma_addr_t handle)
 {
@@ -149,7 +189,7 @@ static inline int ivc_channel_empty(struct ivc *ivc,
 	 * a potentially malicious peer, so returning empty is safer, because it
 	 * gives the impression that the channel has gone silent.
 	 */
-	if (w_count - r_count > ivc->nframes)
+	if (safe_subtract_u32(w_count, r_count) > ivc->nframes)
 		return 1;
 
 	return w_count == r_count;
@@ -262,8 +302,9 @@ uint32_t tegra_ivc_tx_frames_available(struct ivc *ivc)
 {
 	ivc_invalidate_counter(ivc, ivc->tx_handle +
 			offsetof(struct ivc_channel_header, r_count));
-	return ivc->nframes - (READ_ONCE(ivc->tx_channel->w_count) -
-			READ_ONCE(ivc->tx_channel->r_count));
+	return safe_subtract_u32(ivc->nframes,
+			safe_subtract_u32(READ_ONCE(ivc->tx_channel->w_count),
+				READ_ONCE(ivc->tx_channel->r_count)));
 }
 EXPORT_SYMBOL(tegra_ivc_tx_frames_available);
 
@@ -284,17 +325,17 @@ static inline dma_addr_t ivc_frame_handle(struct ivc *ivc,
 }
 
 static inline void ivc_invalidate_frame(struct ivc *ivc,
-		dma_addr_t channel_handle, unsigned frame, int offset, int len)
+		dma_addr_t channel_handle, unsigned int frame, uint64_t offset, size_t len)
 {
 	if (!ivc->peer_device)
 		return;
 	dma_sync_single_for_cpu(ivc->peer_device,
-			ivc_frame_handle(ivc, channel_handle, frame) + offset,
+			safe_add_u64(ivc_frame_handle(ivc, channel_handle, frame), offset),
 			len, DMA_FROM_DEVICE);
 }
 
 static inline void ivc_flush_frame(struct ivc *ivc, dma_addr_t channel_handle,
-		unsigned frame, int offset, int len)
+		unsigned int frame, uint64_t offset, int len)
 {
 	if (!ivc->peer_device)
 		return;
@@ -777,19 +818,20 @@ size_t tegra_ivc_align(size_t size)
 }
 EXPORT_SYMBOL(tegra_ivc_align);
 
-unsigned tegra_ivc_total_queue_size(unsigned queue_size)
+unsigned int tegra_ivc_total_queue_size(unsigned int queue_size)
 {
+	BUILD_BUG_ON(sizeof(struct ivc_channel_header) >  (UINT_MAX * 1ULL));
 	if (queue_size & (IVC_ALIGN - 1)) {
 		pr_err("%s: queue_size (%u) must be %u-byte aligned\n",
 				__func__, queue_size, IVC_ALIGN);
 		return 0;
 	}
-	return queue_size + sizeof(struct ivc_channel_header);
+	return safe_add_u32(queue_size, sizeof(struct ivc_channel_header));
 }
 EXPORT_SYMBOL(tegra_ivc_total_queue_size);
 
 static int check_ivc_params(uintptr_t queue_base1, uintptr_t queue_base2,
-		unsigned nframes, unsigned frame_size)
+		unsigned int nframes, unsigned int frame_size)
 {
 	BUG_ON(offsetof(struct ivc_channel_header, w_count) & (IVC_ALIGN - 1));
 	BUG_ON(offsetof(struct ivc_channel_header, r_count) & (IVC_ALIGN - 1));
@@ -839,7 +881,7 @@ static int check_ivc_params(uintptr_t queue_base1, uintptr_t queue_base2,
 
 static int tegra_ivc_init_body(struct ivc *ivc, uintptr_t rx_base,
 		dma_addr_t rx_handle, uintptr_t tx_base, dma_addr_t tx_handle,
-		unsigned nframes, unsigned frame_size,
+		unsigned int nframes, unsigned int frame_size,
 		struct device *peer_device, void (*notify)(struct ivc *))
 {
 	size_t queue_size;
@@ -899,7 +941,7 @@ static int tegra_ivc_init_body(struct ivc *ivc, uintptr_t rx_base,
 }
 
 int tegra_ivc_init(struct ivc *ivc, uintptr_t rx_base, uintptr_t tx_base,
-		unsigned nframes, unsigned frame_size,
+		unsigned int nframes, unsigned int frame_size,
 		struct device *peer_device, void (*notify)(struct ivc *))
 {
 	return tegra_ivc_init_body(ivc, rx_base, 0, tx_base,
@@ -909,7 +951,7 @@ EXPORT_SYMBOL(tegra_ivc_init);
 
 int tegra_ivc_init_with_dma_handle(struct ivc *ivc, uintptr_t rx_base,
 		dma_addr_t rx_handle, uintptr_t tx_base, dma_addr_t tx_handle,
-		unsigned nframes, unsigned frame_size,
+		unsigned int nframes, unsigned int frame_size,
 		struct device *peer_device, void (*notify)(struct ivc *))
 {
 	return tegra_ivc_init_body(ivc, rx_base, rx_handle, tx_base,
