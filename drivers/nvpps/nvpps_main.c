@@ -985,7 +985,20 @@ static int nvpps_probe(struct platform_device *pdev)
 	pdev_data->evt_mode = (pdev_data->only_timer_mode) ? NVPPS_MODE_TIMER : NVPPS_MODE_GPIO;
 
 	if (pdev_data->platform_is_orin) {
-		pdev_data->tsc_reg_map_base = ioremap(TSC_CAPTURE_CONFIGURATION_PTX_0, 0x100);
+		struct resource *tsc_mem;
+
+		tsc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		if (tsc_mem == NULL) {
+			err = -ENODEV;
+			dev_err(&pdev->dev, "TSC memory resource not defined\n");
+			device_destroy(s_nvpps_class, pdev_data->dev->devt);
+#ifndef NVPPS_NO_DT
+			class_destroy(s_nvpps_class);
+#endif
+			goto error_ret;
+		}
+
+		pdev_data->tsc_reg_map_base = ioremap(tsc_mem->start, resource_size(tsc_mem));
 		if (!pdev_data->tsc_reg_map_base) {
 		    dev_err(&pdev->dev, "TSC register ioremap failed\n");
 			    device_destroy(s_nvpps_class, pdev_data->dev->devt);
