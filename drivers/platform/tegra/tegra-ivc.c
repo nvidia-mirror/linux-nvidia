@@ -150,6 +150,13 @@ static inline uint32_t safe_add_u32(uint32_t a, uint32_t b)
 		return (a + b);
 }
 
+static inline bool is_u32_multiplication_safe(uint32_t a, uint32_t b)
+{
+	if (a == 0U || b == 0U)
+		return true;
+	return ((UINT_MAX / b) >= a);
+}
+
 
 static inline void ivc_invalidate_counter(struct ivc *ivc,
 		dma_addr_t handle)
@@ -202,7 +209,7 @@ static inline int ivc_channel_full(struct ivc *ivc,
 	 * Invalid cases where the counters indicate that the queue is over
 	 * capacity also appear full.
 	 */
-	return READ_ONCE(ch->w_count) - READ_ONCE(ch->r_count)
+	return safe_subtract_u32(READ_ONCE(ch->w_count), READ_ONCE(ch->r_count))
 		>= ivc->nframes;
 }
 
@@ -215,7 +222,7 @@ static inline uint32_t ivc_channel_avail_count(struct ivc *ivc,
 	 * comment in ivc_channel_empty() for an explanation about special
 	 * over-full considerations.
 	 */
-	return READ_ONCE(ch->w_count) - READ_ONCE(ch->r_count);
+	return safe_subtract_u32(READ_ONCE(ch->w_count), READ_ONCE(ch->r_count));
 }
 
 static inline void ivc_advance_tx(struct ivc *ivc)
@@ -339,8 +346,9 @@ static inline void ivc_flush_frame(struct ivc *ivc, dma_addr_t channel_handle,
 {
 	if (!ivc->peer_device)
 		return;
+
 	dma_sync_single_for_device(ivc->peer_device,
-			ivc_frame_handle(ivc, channel_handle, frame) + offset,
+			safe_add_u64(ivc_frame_handle(ivc, channel_handle, frame), offset),
 			len, DMA_TO_DEVICE);
 }
 
@@ -477,7 +485,17 @@ int tegra_ivc_read_advance(struct ivc *ivc)
 	if (result)
 		return result;
 
+	BUILD_BUG_ON(offsetof(struct ivc_channel_header, r_count) >  (UINT_MAX * 1ULL));
+	BUILD_BUG_ON(offsetof(struct ivc_channel_header, w_count) >  (UINT_MAX * 1ULL));
+	if (!is_u32_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, r_count)))
+		return -EFAULT;
+	if (!is_u32_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, w_count)))
+		return -EFAULT;
+	if (!is_u32_subtraction_safe(ivc->nframes, 1))
+		return -EFAULT;
+
 	ivc_advance_rx(ivc);
+
 	ivc_flush_counter(ivc, ivc->rx_handle +
 			offsetof(struct ivc_channel_header, r_count));
 
@@ -584,6 +602,9 @@ int tegra_ivc_write_poke(struct ivc *ivc, const void *buf, size_t off,
 	void *dest;
 	int result;
 
+	if (!is_u64_addition_safe(off, count))
+		return -EFAULT;
+
 	if (off > ivc->frame_size || off + count > ivc->frame_size)
 		return -E2BIG;
 
@@ -637,6 +658,11 @@ int tegra_ivc_write_advance(struct ivc *ivc)
 	 * The available count can only asynchronously decrease, so the
 	 * worst possible side-effect will be a spurious notification.
 	 */
+
+	BUILD_BUG_ON(offsetof(struct ivc_channel_header, r_count) >  (UINT_MAX * 1ULL));
+	if (!is_u32_addition_safe(ivc->tx_handle, offsetof(struct ivc_channel_header, r_count)))
+		return -EFAULT;
+
 	ivc_invalidate_counter(ivc, ivc->tx_handle +
 		offsetof(struct ivc_channel_header, r_count));
 
@@ -814,7 +840,7 @@ EXPORT_SYMBOL(tegra_ivc_channel_sync);
 
 size_t tegra_ivc_align(size_t size)
 {
-	return (size + (IVC_ALIGN - 1)) & ~(IVC_ALIGN - 1);
+	return (safe_add_u64(size, IVC_ALIGN - 1ULL)) & ~(IVC_ALIGN - 1ULL);
 }
 EXPORT_SYMBOL(tegra_ivc_align);
 
@@ -892,6 +918,9 @@ static int tegra_ivc_init_body(struct ivc *ivc, uintptr_t rx_base,
 
 	BUG_ON(!ivc);
 	BUG_ON(!notify);
+
+	if (!is_u32_multiplication_safe(nframes, frame_size))
+		return -EFAULT;
 
 	queue_size = tegra_ivc_total_queue_size(nframes * frame_size);
 
