@@ -1792,6 +1792,8 @@ static int tegra210_adsp_pcm_open(struct snd_soc_component *component,
 	int i, ret = 0;
 
 	dev_vdbg(adsp->dev, "%s", __func__);
+	if (substream->stream < 0)
+		return -EINVAL;
 
 	if (!adsp->pcm_path[fe_reg][substream->stream].fe_reg ||
 		!adsp->pcm_path[fe_reg][substream->stream].be_reg) {
@@ -2084,6 +2086,8 @@ static int tegra210_adsp_send_hv_state_msg(
 		return 0;
 
 	apm_in_id = app->reg - APM_IN_START;
+	if (apm_in_id < 0)
+		return 0;
 
 	/*
 	 * For IO to IO path, APM-IN input should be ADSP-ADMAIF
@@ -5283,7 +5287,8 @@ static int tegra210_adsp_audio_probe(struct platform_device *pdev)
 	for (i = 0; i < (APM_IN_END - APM_IN_START + 1); i++) {
 		apm_stack_size[i] = 0;
 		memset((void *)apm_info, '\0', 20);
-		sprintf(apm_info, "apm%d-stack-size", i+1);
+		if ((sprintf(apm_info, "apm%d-stack-size", i+1)) < 0)
+			goto err_unregister_component;
 		if (of_property_read_u32(pdev->dev.of_node, apm_info,
 				&apm_stack_size[i]))
 			continue;

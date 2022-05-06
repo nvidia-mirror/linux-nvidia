@@ -60,7 +60,7 @@ unsigned int cmd, unsigned long arg)
 {
 	struct eqos_ape_cmd __user *_eqos_ape =
 				(struct eqos_ape_cmd __user *)arg;
-	struct eqos_ape_cmd eqos_ape;
+	struct eqos_ape_cmd eqos_ape = {0};
 	struct eqos_ape_sync_cmd __user *_eqos_ape_sync =
 				(struct eqos_ape_sync_cmd __user *)arg;
 	struct eqos_ape_sync_cmd eqos_ape_sync;
@@ -154,26 +154,25 @@ unsigned int cmd, unsigned long arg)
 		break;
 	case EQOS_APE_TEST_FREQ_ADJ:
 
-		if (arg && copy_from_user(&eqos_ape,
+		if (!(arg && copy_from_user(&eqos_ape,
 			_eqos_ape,
-			sizeof(eqos_ape)))
+			sizeof(eqos_ape)))) {
+			dev_dbg(dev, "Applied freq adj %d\n", eqos_ape.ppm);
+			cur_rate = amisc_plla_get_rate();
+			dev_dbg(dev, "current rate %d\n", cur_rate);
+
+			num = ONE_MILLION + eqos_ape.ppm;
+			den = ONE_MILLION;
+
+			new_rate = (int)((num * cur_rate)/den);
+
+			dev_dbg(dev, "new rate %d\n", new_rate);
+			amisc_plla_set_rate(new_rate);
+
+			set_rate = amisc_plla_get_rate();
+			dev_dbg(dev, "applied rate %d\n", set_rate);
+		} else
 			return -EFAULT;
-
-		dev_dbg(dev, "Applied freq adj %d\n", eqos_ape.ppm);
-		cur_rate = amisc_plla_get_rate();
-		dev_dbg(dev, "current rate %d\n", cur_rate);
-
-		num = ONE_MILLION + eqos_ape.ppm;
-		den = ONE_MILLION;
-
-		new_rate = (int)((num * cur_rate)/den);
-
-		dev_dbg(dev, "new rate %d\n", new_rate);
-		amisc_plla_set_rate(new_rate);
-
-		set_rate = amisc_plla_get_rate();
-		dev_dbg(dev, "applied rate %d\n", set_rate);
-
 		break;
 	case EQOS_APE_AMISC_PHASE_SYNC:
 
