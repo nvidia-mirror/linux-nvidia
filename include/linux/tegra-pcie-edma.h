@@ -2,7 +2,7 @@
 /*
  * PCIe DMA EPF Library for Tegra PCIe
  *
- * Copyright (C) 2021 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2021-2022 NVIDIA Corporation. All rights reserved.
  */
 
 #ifndef TEGRA_PCIE_EDMA_H
@@ -150,6 +150,13 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info);
  */
 edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 						struct tegra_pcie_edma_xfer_info *tx_info);
+
+/**
+ * @brief: API to stop EDMA engine,.
+ * @param[in] cookie : cookie data returned in tegra_pcie_edma_initialize() call.
+ * @retVal: Returns true on success and false on failure.
+ */
+bool tegra_pcie_edma_stop(void *cookie);
 
 /**
  * @brief: API to perform de-init of EDMA library.

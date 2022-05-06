@@ -694,15 +694,11 @@ unlock:
 }
 EXPORT_SYMBOL(tegra_pcie_edma_submit_xfer);
 
-void tegra_pcie_edma_deinit(void *cookie)
+static void edma_stop(struct edma_prv *prv, edma_xfer_status_t st)
 {
-	struct edma_prv *prv = (struct edma_prv *)cookie;
 	struct edma_chan *chan[2], *ch;
 	int i, j;
 	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
-
-	if (cookie == NULL)
-		return;
 
 	chan[0] = &prv->tx[0];
 	chan[1] = &prv->rx[0];
@@ -711,7 +707,7 @@ void tegra_pcie_edma_deinit(void *cookie)
 	for (j = 0; j < 2; j++) {
 		for (i = 0; i < mode_cnt[j]; i++) {
 			ch = chan[j] + i;
-			ch->st = EDMA_XFER_DEINIT;
+			ch->st = st;
 			if ((ch->type == EDMA_CHAN_XFER_SYNC) && ch->busy) {
 				ch->busy = false;
 				wake_up(&ch->wq);
@@ -722,19 +718,53 @@ void tegra_pcie_edma_deinit(void *cookie)
 		}
 	}
 
-	edma_hw_deinit(cookie, false);
-	edma_hw_deinit(cookie, true);
+	edma_hw_deinit(prv, false);
+	edma_hw_deinit(prv, true);
 
 	synchronize_irq(prv->irq);
-	free_irq(prv->irq, prv);
-	kfree(prv->irq_name);
 
 	for (j = 0; j < 2; j++) {
 		for (i = 0; i < mode_cnt[j]; i++) {
 			ch = chan[j] + i;
 
 			if (prv->ch_init & OSI_BIT(i))
-				process_r_idx(ch, EDMA_XFER_DEINIT, ch->w_idx);
+				process_r_idx(ch, st, ch->w_idx);
+		}
+	}
+}
+
+bool tegra_pcie_edma_stop(void *cookie)
+{
+	struct edma_prv *prv = (struct edma_prv *)cookie;
+
+	if (cookie == NULL)
+		return false;
+
+	edma_stop(prv, EDMA_XFER_ABORT);
+	return true;
+}
+EXPORT_SYMBOL(tegra_pcie_edma_stop);
+
+void tegra_pcie_edma_deinit(void *cookie)
+{
+	struct edma_prv *prv = (struct edma_prv *)cookie;
+	struct edma_chan *chan[2], *ch;
+	int i, j;
+	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
+
+	if (cookie == NULL)
+		return;
+
+	edma_stop(prv, EDMA_XFER_DEINIT);
+
+	free_irq(prv->irq, prv);
+	kfree(prv->irq_name);
+
+	chan[0] = &prv->tx[0];
+	chan[1] = &prv->rx[0];
+	for (j = 0; j < 2; j++) {
+		for (i = 0; i < mode_cnt[j]; i++) {
+			ch = chan[j] + i;
 
 			if (prv->is_remote_dma && ch->desc)
 				devm_iounmap(prv->dev, ch->remap_desc);
