@@ -13,6 +13,7 @@
 #include <linux/tegra-pcie-edma.h>
 
 #define EDMA_ABORT_TEST_EN	(edma->edma_ch & 0x40000000)
+#define EDMA_STOP_TEST_EN	(edma->edma_ch & 0x20000000)
 #define IS_EDMA_CH_ENABLED(i)	(edma->edma_ch & ((BIT(i) << 4)))
 #define IS_EDMA_CH_ASYNC(i)	(edma->edma_ch & BIT(i))
 #define REMOTE_EDMA_TEST_EN	(edma->edma_ch & 0x80000000)
@@ -122,7 +123,7 @@ static int edmalib_common_test(struct edmalib_common *edma)
 
 	l_edma = edma;
 
-	if (EDMA_ABORT_TEST_EN) {
+	if (EDMA_ABORT_TEST_EN || EDMA_STOP_TEST_EN) {
 		edma->edma_ch &= ~0xFF;
 		/* only channel 0, 2 is ASYNC, where chan 0 async gets aborted */
 		edma->edma_ch |= 0xF5;
@@ -257,7 +258,9 @@ static int edmalib_common_test(struct edmalib_common *edma)
 			} else if ((ret != EDMA_XFER_SUCCESS) && (ret != EDMA_XFER_FAIL_NOMEM)) {
 				dev_err(edma->fdev, "%s: LL %d, SZ: %u B CH: %d failed. %d at iter %d ret: %d\n",
 					__func__, xfer_type, edma->dma_size, ch, ret, k, ret);
-				if (EDMA_ABORT_TEST_EN) {
+				if (EDMA_STOP_TEST_EN) {
+					break;
+				} else if (EDMA_ABORT_TEST_EN) {
 					msleep(5000);
 					break;
 				}
@@ -266,16 +269,27 @@ static int edmalib_common_test(struct edmalib_common *edma)
 			dev_dbg(edma->fdev, "%s: LL EDMA LIB %d, SZ: %u B CH: %d iter %d\n",
 				__func__, xfer_type, edma->dma_size, ch, i);
 		}
-		if (EDMA_ABORT_TEST_EN && i == 0) {
-			msleep(edma->stress_count);
-			dma_common_wr(edma->dma_base, DMA_WRITE_DOORBELL_OFF_WR_STOP,
-				      db_off);
+		if (i == 0) {
+			if (EDMA_ABORT_TEST_EN) {
+				msleep(edma->stress_count);
+				dma_common_wr(edma->dma_base, DMA_WRITE_DOORBELL_OFF_WR_STOP,
+					      db_off);
+			} else if (EDMA_STOP_TEST_EN) {
+				bool stop_status;
+
+				msleep(edma->stress_count);
+				stop_status = tegra_pcie_edma_stop(edma->cookie);
+				dev_info(edma->fdev, "%s: EDMA LIB, status of stop DMA is %d",
+					 __func__, stop_status);
+			}
 		}
 		diff = ktime_to_ns(ktime_get()) - ktime_to_ns(edma->edma_start_time[i]);
-		if (ch_info->ch_type == EDMA_CHAN_XFER_SYNC)
-			dev_info(edma->fdev, "%s: EDMA LIB %s-%s-SYNC done for %d iter on channel %d. Total Size %llu bytes, time %llu nsec. Perf is %llu Mbps\n",
-				 __func__, xfer_str[xfer_type], l_r_str[l_r], edma->stress_count, i,
-				 edma->tsz, diff, EDMA_PERF);
+		if (ch_info->ch_type == EDMA_CHAN_XFER_SYNC) {
+			if (ret == EDMA_XFER_SUCCESS)
+				dev_info(edma->fdev, "%s: EDMA LIB %s-%s-SYNC done for %d iter on channel %d. Total Size %llu bytes, time %llu nsec. Perf is %llu Mbps\n",
+				__func__, xfer_str[xfer_type], l_r_str[l_r], edma->stress_count, i,
+				edma->tsz, diff, EDMA_PERF);
+		}
 	}
 	dev_info(edma->fdev, "%s: EDMA LIB submit done\n", __func__);
 
