@@ -47,9 +47,14 @@
 #define RM_RISCV_BOOTLDR_VERSION	1
 
 #define DO_IPC_OVER_GSC_CO (1)
-
+/*
+ * Uncomment below when RM is running on CCPLEX and GSC has been
+ * configured via BCT files to allow access via CCPLEX to GSC-CO
+ */
+// #define TSEC_RM_ON_DCE (1)
 static bool s_init_msg_rcvd;
 static bool s_riscv_booted;
+static struct RM_FLCN_MSG_GSP s_gsp_init_msg;
 
 #ifdef DO_IPC_OVER_GSC_CO
 static u64 s_ipc_gscco_base;
@@ -64,7 +69,25 @@ struct TSEC_BOOT_INFO {
 
 /* Pointer to this device */
 static struct platform_device *tsec;
-static void (*cmd_resp_callback)(void *);
+
+/* Struct to register client callback function */
+struct callback_t {
+	callback_func_t cb_func;
+	void            *cb_ctx;
+};
+static struct callback_t s_callbacks[RM_GSP_UNIT_END];
+
+DEFINE_MUTEX(sCommsMutex);
+
+void plat_acquire_comms_mutex(void)
+{
+	mutex_lock(&sCommsMutex);
+}
+
+void plat_release_comms_mutex(void)
+{
+	mutex_unlock(&sCommsMutex);
+}
 
 /* Configuration for bootloader */
 typedef struct {
@@ -81,13 +104,44 @@ typedef struct {
 	 */
 } NV_RISCV_BOOTLDR_PARAMS;
 
+typedef void (*work_cb_t)(void *);
+
 struct tsec_t23x_device {
 	struct platform_device *pdev;
 	struct delayed_work poweron_work;
 	u32 fwreq_retry_interval_ms;
 	u32 fwreq_duration_ms;
 	u32 fwreq_fail_threshold_ms;
+	struct work_struct  initmsg_work;
+	work_cb_t           initmsg_cb;
+	void               *initmsg_cb_ctx;
 };
+
+void initmsg_work_handler(struct work_struct *work)
+{
+	struct tsec_t23x_device *tsec_dev;
+	work_cb_t cb;
+	void *cb_ctx;
+
+	tsec_dev = container_of(work, struct tsec_t23x_device,
+		initmsg_work);
+	cb = tsec_dev->initmsg_cb;
+	cb_ctx = tsec_dev->initmsg_cb_ctx;
+	tsec_dev->initmsg_cb = NULL;
+	tsec_dev->initmsg_cb_ctx = NULL;
+	if (cb)
+		cb(cb_ctx);
+}
+
+void plat_queue_work(work_cb_t cb, void *ctx)
+{
+	struct nvhost_device_data *pdata = nvhost_get_devdata(tsec);
+	struct tsec_t23x_device *tsec_dev = (struct tsec_t23x_device *)pdata->private_data;
+
+	tsec_dev->initmsg_cb = cb;
+	tsec_dev->initmsg_cb_ctx = ctx;
+	schedule_work(&tsec_dev->initmsg_work);
+}
 
 static int tsec_read_riscv_bin(struct platform_device *dev,
 			const char *desc_name,
@@ -450,7 +504,7 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 		cmd.cmdGen.hdr.seqNumId = idx+1;
 		cmd.cmdGen.hdr.ctrlFlags = 0;
 		memcpy(&cmd.cmdGen.cmd, &hdcp22Cmd, cmdDataSize);
-		nvhost_tsec_send_cmd((void *)&cmd, 0, NULL);
+		nvhost_tsec_send_cmd((void *)&cmd, 0, NULL, NULL);
 		msleep(200);
 	}
 #endif //CMD_INTERFACE_TEST
@@ -712,7 +766,7 @@ static int validate_cmd(union RM_FLCN_CMD *flcn_cmd,  u32 queue_id)
  *
  */
 int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
-	void (*callback_func)(void *))
+	callback_func_t cb_func, void *cb_ctx)
 {
 	int i;
 	int placeholder;
@@ -729,7 +783,7 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 	union RM_FLCN_CMD *flcn_cmd;
 	struct RM_FLCN_QUEUE_HDR hdr;
 
-	if (!s_riscv_booted) {
+	if (!s_init_msg_rcvd) {
 		pr_err_once("TSEC RISCV hasn't booted successfully\n");
 		return -ENODEV;
 	}
@@ -757,17 +811,15 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 		return -EINVAL;
 	}
 
-	if ((cmd_resp_callback == NULL) && (callback_func == NULL)) {
-		dev_dbg(&tsec->dev, "CMD: %s: %d No Callback set up. Can't notify client\n",
-			__func__, __LINE__);
-	} else if ((cmd_resp_callback != NULL) && (callback_func != NULL)) {
-		dev_dbg(&tsec->dev, "CMD: %s: %d callback function already setup.\n",
-			__func__, __LINE__);
-	} else {
-		cmd_resp_callback = callback_func;
-	}
-
 	flcn_cmd = (union RM_FLCN_CMD *)cmd;
+	plat_acquire_comms_mutex();
+	if (s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func) {
+		plat_release_comms_mutex();
+		dev_err(&tsec->dev, "CMD: %s: %d More than 1 outstanding cmd for unit 0x%x\n",
+			__func__, __LINE__, flcn_cmd->cmdGen.hdr.unitId);
+		return -EINVAL;
+	}
+	plat_release_comms_mutex();
 	cmd_size = flcn_cmd->cmdGen.hdr.size;
 	placeholder = ALIGN(cmd_size, 4);
 	if (placeholder < 0) {
@@ -783,7 +835,10 @@ check_space:
 				   (queue_id * cmdq_tail_stride)));
 	if (head < cmdq_start || tail < cmdq_start)
 		pr_err("***** head/tail invalid, h=0x%x,t=0x%x\n", head, tail);
-
+	if (UINT_MAX - head < cmd_size_aligned) {
+		pr_err("addition of head and offset wraps\n");
+		return -EINVAL;
+	}
 	if (tail > head) {
 		if ((head + cmd_size_aligned) < tail)
 			goto enqueue;
@@ -816,16 +871,60 @@ rewind:
 	pr_debug("CMDQ: rewind h=%x,t=%x\n", head, tail);
 
 enqueue:
-	if (ipc_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0))
+	plat_acquire_comms_mutex();
+	s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func = cb_func;
+	s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_ctx  = cb_ctx;
+	plat_release_comms_mutex();
+	if (ipc_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0)) {
+		plat_acquire_comms_mutex();
+		s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func = NULL;
+		s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_ctx  = NULL;
+		plat_release_comms_mutex();
 		return -EINVAL;
+	}
 	head += cmd_size_aligned;
 	host1x_writel(tsec, (cmdq_head_base +
 		(queue_id * cmdq_head_stride)), head);
 
+	dev_dbg(&tsec->dev, "Cmd sent to unit 0x%x\n", flcn_cmd->cmdGen.hdr.unitId);
+
 	return 0;
 }
+EXPORT_SYMBOL(nvhost_tsec_send_cmd);
 
-static irqreturn_t process_msg(int irq, void *args)
+#ifdef DO_IPC_OVER_GSC_CO
+#define TSEC_BOOT_POLL_TIME_US     (100000)
+#define TSEC_BOOT_POLL_INTERVAL_US (50)
+#define TSEC_BOOT_POLL_COUNT       (TSEC_BOOT_POLL_TIME_US / TSEC_BOOT_POLL_INTERVAL_US)
+#define TSEC_BOOT_FLAG_MAGIC       (0xA5A5A5A5)
+#endif
+
+#ifdef DO_IPC_OVER_GSC_CO
+static u32 tsec_get_boot_flag(void)
+{
+	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
+
+	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
+		dev_err(&tsec->dev, "%s: Invalid GSC-CO address/size\n", __func__);
+		return 0;
+	} else {
+		return bootInfo->bootFlag;
+	}
+}
+
+static void tsec_reset_boot_flag(void)
+{
+	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
+
+	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
+		dev_err(&tsec->dev, "%s: Invalid GSC-CO address/size\n", __func__);
+	} else {
+		bootInfo->bootFlag = 0;
+	}
+}
+#endif
+
+static void drain_msg(bool invoke_cb)
 {
 	int i;
 	u32 tail = 0;
@@ -838,6 +937,12 @@ static irqreturn_t process_msg(int irq, void *args)
 	static u32 msgq_start;
 	struct RM_FLCN_MSG_GSP gsp_msg;
 	struct RM_GSP_INIT_MSG_GSP_INIT *gsp_init_msg;
+	callback_func_t cb_func;
+	void *cb_ctx;
+
+#ifndef TSEC_RM_ON_DCE
+	return;
+#endif
 
 	msgq_head_base = tsec_msgq_head_r(TSEC_MSG_QUEUE_PORT);
 	msgq_tail_base = tsec_msgq_tail_r(TSEC_MSG_QUEUE_PORT);
@@ -896,15 +1001,48 @@ static irqreturn_t process_msg(int irq, void *args)
 		if (gsp_msg.hdr.unitId == RM_GSP_UNIT_INIT) {
 			dev_dbg(&tsec->dev, "MSGQ: %s(%d) init msg\n",
 				__func__, __LINE__);
-
-			s_init_msg_rcvd = true;
-
 			if (gsp_init_msg->numQueues < 2) {
 				dev_err(&tsec->dev, "MSGQ: Initing less queues than expected %d\n",
 					gsp_init_msg->numQueues);
-			goto FAIL;
+				goto FAIL;
 			}
-		} else {
+#ifdef DO_IPC_OVER_GSC_CO
+			/* DCE can access the GSC-CO hence can poll for the Tsec
+			 * booted flag and also reset it
+			 */
+			for (i = 0; i < TSEC_BOOT_POLL_COUNT; i++) {
+				if (tsec_get_boot_flag() == TSEC_BOOT_FLAG_MAGIC)
+					break;
+				udelay(TSEC_BOOT_POLL_INTERVAL_US);
+			}
+			if (i >= TSEC_BOOT_POLL_COUNT) {
+				dev_err(&tsec->dev, "Tsec GSC-CO Boot Flag not set\n");
+				goto FAIL;
+			} else {
+				tsec_reset_boot_flag();
+				dev_dbg(&tsec->dev, "Tsec GSC-CO Boot Flag reset done\n");
+			}
+#endif
+			memcpy(&s_gsp_init_msg.hdr, &gsp_msg.hdr, RM_FLCN_QUEUE_HDR_SIZE);
+			memcpy(&s_gsp_init_msg.msg, &gsp_msg.msg,
+				gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE);
+
+			/* Invoke the callback and clear it */
+			plat_acquire_comms_mutex();
+			s_init_msg_rcvd = true;
+			if (invoke_cb) {
+				cb_func = s_callbacks[gsp_msg.hdr.unitId].cb_func;
+				cb_ctx  = s_callbacks[gsp_msg.hdr.unitId].cb_ctx;
+				s_callbacks[gsp_msg.hdr.unitId].cb_func = NULL;
+				s_callbacks[gsp_msg.hdr.unitId].cb_ctx = NULL;
+			}
+			plat_release_comms_mutex();
+			if (cb_func && invoke_cb) {
+				cb_func(cb_ctx, (void *)&gsp_msg);
+			}
+		} else if (gsp_msg.hdr.unitId < RM_GSP_UNIT_END) {
+			dev_dbg(&tsec->dev, "Msg received from unit 0x%x\n", gsp_msg.hdr.unitId);
+
 			if (gsp_msg.hdr.unitId == RM_GSP_UNIT_HDCP22WIRED) {
 				dev_dbg(&tsec->dev, "MSGQ: %s(%d) RM_GSP_UNIT_HDCP22WIRED\n",
 					__func__, __LINE__);
@@ -921,8 +1059,20 @@ static irqreturn_t process_msg(int irq, void *args)
 					__func__, __LINE__, gsp_msg.hdr.unitId);
 			}
 
-			if (cmd_resp_callback != NULL)
-				cmd_resp_callback((void *)&gsp_msg);
+			/* Invoke the callback and clear it */
+			if (invoke_cb) {
+				plat_acquire_comms_mutex();
+				cb_func = s_callbacks[gsp_msg.hdr.unitId].cb_func;
+				cb_ctx  = s_callbacks[gsp_msg.hdr.unitId].cb_ctx;
+				s_callbacks[gsp_msg.hdr.unitId].cb_func = NULL;
+				s_callbacks[gsp_msg.hdr.unitId].cb_ctx = NULL;
+				plat_release_comms_mutex();
+				if (cb_func)
+					cb_func(cb_ctx, (void *)&gsp_msg);
+			}
+		} else {
+			dev_err(&tsec->dev, "MSGQ: %s(%d) invalid msg uintId 0x%x?\n",
+				__func__, __LINE__, gsp_msg.hdr.unitId);
 		}
 
 FAIL:
@@ -934,6 +1084,12 @@ FAIL:
 	}
 
 exit:
+	return;
+}
+
+static irqreturn_t process_msg(int irq, void *args)
+{
+	drain_msg(true);
 
 	/* Set RISCV Mask for SWGEN0, so that it is re-enabled
 	 * and if it is pending the CCPLEX will be interrupted
@@ -943,6 +1099,68 @@ exit:
 
 	return IRQ_HANDLED;
 }
+
+static void invoke_init_cb(void *unused)
+{
+	callback_func_t cb_func;
+	void *cb_ctx;
+
+	plat_acquire_comms_mutex();
+	cb_func = s_callbacks[RM_GSP_UNIT_INIT].cb_func;
+	cb_ctx  = s_callbacks[RM_GSP_UNIT_INIT].cb_ctx;
+	s_callbacks[RM_GSP_UNIT_INIT].cb_func = NULL;
+	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx  = NULL;
+	plat_release_comms_mutex();
+
+	if (cb_func)
+		cb_func(cb_ctx, &s_gsp_init_msg);
+}
+
+int nvhost_tsec_set_init_cb(callback_func_t cb_func, void *cb_ctx)
+{
+	int err = 0;
+
+	plat_acquire_comms_mutex();
+
+	if (s_callbacks[RM_GSP_UNIT_INIT].cb_func) {
+		dev_err(&tsec->dev, "%s: %d: INIT unit cb_func already set\n",
+			__func__, __LINE__);
+		err = -EINVAL;
+		goto FAIL;
+	}
+	if (!cb_func) {
+		dev_err(&tsec->dev, "%s: %d: Init CallBack NULL\n",
+			__func__, __LINE__);
+		err = -EINVAL;
+		goto FAIL;
+	}
+
+	s_callbacks[RM_GSP_UNIT_INIT].cb_func = cb_func;
+	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx = cb_ctx;
+
+	if (s_init_msg_rcvd) {
+		dev_dbg(&tsec->dev, "Init msg already received invoking callback\n");
+		plat_queue_work(invoke_init_cb, NULL);
+	}
+#ifdef DO_IPC_OVER_GSC_CO
+	else if (tsec_get_boot_flag() == TSEC_BOOT_FLAG_MAGIC) {
+		dev_dbg(&tsec->dev, "Doorbell missed tsec booted first, invoke init callback\n");
+		/* Interrupt missed as tsec booted first
+		 * Explicitly call drain_msg
+		 */
+		plat_release_comms_mutex();
+		drain_msg(false);
+		plat_acquire_comms_mutex();
+		/* Init message is drained now, hence queue the work item to invoke init callback*/
+		plat_queue_work(invoke_init_cb, NULL);
+	}
+#endif
+
+FAIL:
+	plat_release_comms_mutex();
+	return err;
+}
+EXPORT_SYMBOL(nvhost_tsec_set_init_cb);
 
 static void tsec_poweron_handler(struct work_struct *work)
 {
@@ -986,6 +1204,7 @@ int nvhost_t23x_tsec_intr_init(struct platform_device *pdev)
 		return -ENOMEM;
 	tsec_dev->pdev = pdev;
 	INIT_DELAYED_WORK(&tsec_dev->poweron_work, tsec_poweron_handler);
+	INIT_WORK(&tsec_dev->initmsg_work, initmsg_work_handler);
 	tsec_dev->fwreq_retry_interval_ms = 10;
 	tsec_dev->fwreq_duration_ms = 0;
 	tsec_dev->fwreq_fail_threshold_ms = tsec_dev->fwreq_retry_interval_ms * 100;
@@ -1042,42 +1261,6 @@ void nvhost_tsec_free_payload_mem(size_t size, void *cpu_addr, dma_addr_t dma_ad
 	dma_free_attrs(&tsec->dev, size, cpu_addr, dma_addr, 0);
 }
 EXPORT_SYMBOL(nvhost_tsec_free_payload_mem);
-
-u32 nvhost_tsec_get_boot_flag(void)
-{
-#ifdef DO_IPC_OVER_GSC_CO
-	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
-
-	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
-		dev_err(&tsec->dev,
-			"%s: Invalid GSC-CO address/size\n", __func__);
-		return 0;
-	} else {
-		return bootInfo->bootFlag;
-	}
-#else
-	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
-	return 0;
-#endif
-}
-EXPORT_SYMBOL(nvhost_tsec_get_boot_flag);
-
-void nvhost_tsec_reset_boot_flag(void)
-{
-#ifdef DO_IPC_OVER_GSC_CO
-	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
-
-	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
-		dev_err(&tsec->dev,
-			"%s: Invalid GSC-CO address/size\n", __func__);
-	} else {
-		bootInfo->bootFlag = 0;
-	}
-#else
-	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
-#endif
-}
-EXPORT_SYMBOL(nvhost_tsec_reset_boot_flag);
 
 void *nvhost_tsec_get_gscco_page(u32 page_number, u32 *gscco_offset)
 {
