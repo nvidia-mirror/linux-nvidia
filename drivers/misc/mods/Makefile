@@ -19,6 +19,7 @@ mods-$(CONFIG_DEBUG_FS)            += mods_debugfs.o
 mods-$(CONFIG_DMA_ENGINE)          += mods_dma.o
 mods-$(CONFIG_NET)                 += mods_netdevice.o
 mods-$(CONFIG_ARCH_TEGRA)          += mods_oist.o
+mods-$(CONFIG_OPTEE)               += mods_optee.o
 mods-$(CONFIG_PCI)                 += mods_pci.o
 mods-$(CONFIG_ARCH_TEGRA_19x_SOC)  += mods_ras.o
 mods-$(CONFIG_ARCH_TEGRA)          += mods_smmu_drv.o

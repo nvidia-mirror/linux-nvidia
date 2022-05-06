@@ -2585,6 +2585,13 @@ static long mods_krnl_ioctl(struct file  *fp,
 		break;
 #endif
 
+#ifdef CONFIG_OPTEE
+	case MODS_ESC_INVOKE_OPTEE_TA:
+		MODS_IOCTL(MODS_ESC_INVOKE_OPTEE_TA,
+			esc_mods_invoke_optee_ta, MODS_OPTEE_PARAMS);
+		break;
+#endif
+
 	case MODS_ESC_OIST_STATUS:
 		MODS_IOCTL(MODS_ESC_OIST_STATUS,
 			   esc_mods_oist_status, MODS_TEGRA_OIST_STATUS);

@@ -1806,6 +1806,23 @@ struct MODS_TZ_PARAMS {
 	int status;
 };
 
+#define MAX_OPTEE_BUFFER_SIZE 512
+/* Used by MODS_ESC_INVOKE_OPTEE_TA.
+ *
+ * Available only on Tegra.
+ */
+struct MODS_OPTEE_PARAMS {
+	/* IN */
+	__u8 buf[MAX_OPTEE_BUFFER_SIZE];
+	__u32 buf_size;
+	__u32 command_id;
+
+	/* OUT */
+	__u32 tee_ret;
+	__u32 out_a;
+	__u32 out_b;
+};
+
 /* Used by MODS_ESC_OIST_STATUS ioctl.
  *
  * Available only on Tegra.
@@ -2023,5 +2040,6 @@ struct MODS_TEGRA_OIST_STATUS {
 #define MODS_ESC_GET_ACPI_DEV_CHILDREN MODSIO(WR, 138, MODS_GET_ACPI_DEV_CHILDREN)
 #define MODS_ESC_SEND_TZ_MSG MODSIO(WR, 139, MODS_TZ_PARAMS)
 #define MODS_ESC_OIST_STATUS MODSIO(WR, 140, MODS_TEGRA_OIST_STATUS)
+#define MODS_ESC_INVOKE_OPTEE_TA MODSIO(WR, 141, MODS_OPTEE_PARAMS)
 
 #endif /* _UAPI_MODS_H_  */
