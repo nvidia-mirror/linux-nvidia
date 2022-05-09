@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -337,5 +337,13 @@ static inline u32 cbb_sec_blf_write_ctl_mstrid_1_f(void)
 static inline u32 cbb_sec_blf_ctl_blf_lck_f(void)
 {
 	return 0x80000000;
+}
+static inline u32 t239_cbb_vic_sec_blf_write_ctl_r(void)
+{
+	return 0x00015b68;
+}
+static inline u32 t239_cbb_vic_sec_blf_ctl_r(void)
+{
+	return 0x00015b70;
 }
 #endif
