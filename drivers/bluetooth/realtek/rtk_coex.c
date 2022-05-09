@@ -1,7 +1,5 @@
 /*
 *
-* Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
-*
 *  Realtek Bluetooth USB driver
 *
 *
@@ -59,13 +57,10 @@
 
 #define RTK_VERSION "1.2"
 
-#define RTKBT_DBG(fmt, arg...) \
-			printk(KERN_DEBUG "rtk_btcoex: " fmt "\n" ,## arg)
+#define RTKBT_DBG(fmt, arg...) printk(KERN_DEBUG "rtk_btcoex: " fmt "\n" , ## arg)
 #define RTKBT_INFO(fmt, arg...) printk(KERN_INFO "rtk_btcoex: " fmt "\n" , ## arg)
-#define RTKBT_WARN(fmt, arg...) \
-			printk( KERN_DEBUG "rtk_btcoex: " fmt "\n" ,## arg)
-#define RTKBT_ERR(fmt, arg...) \
-			printk(KERN_DEBUG "rtk_btcoex: " fmt "\n", ## arg)
+#define RTKBT_WARN(fmt, arg...) printk(KERN_DEBUG "rtk_btcoex: " fmt "\n", ## arg)
+#define RTKBT_ERR(fmt, arg...) printk(KERN_DEBUG "rtk_btcoex: " fmt "\n", ## arg)
 
 static struct rtl_coex_struct btrtl_coex;
 
@@ -458,10 +453,11 @@ static uint8_t list_allocate_add(uint16_t handle, uint16_t psm,
 
 static void delete_profile_from_hash(rtk_prof_info * desc)
 {
-	RTKBT_DBG("Delete profile: hndl 0x%04x, psm 0x%04x, dcid 0x%04x, "
-		  "scid 0x%04x", desc->handle, desc->psm, desc->dcid,
-		  desc->scid);
 	if (desc) {
+		RTKBT_DBG("Delete profile: hndl 0x%04x, psm 0x%04x, dcid 0x%04x, "
+			"scid 0x%04x", desc->handle, desc->psm, desc->dcid,
+			desc->scid);
+
 		list_del(&desc->list);
 		kfree(desc);
 		desc = NULL;
@@ -1140,13 +1136,22 @@ static int udpsocket_send(char *tx_msg, int msg_size)
 		iov.iov_len = msg_size;
 		udpmsg.msg_name = &btrtl_coex.wifi_addr;
 		udpmsg.msg_namelen = sizeof(struct sockaddr_in);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0)
+		udpmsg.msg_iov = &iov;
+		udpmsg.msg_iovlen = 1;
+#else
 		iov_iter_init(&udpmsg.msg_iter, WRITE, &iov, 1, msg_size);
+#endif
 		udpmsg.msg_control = NULL;
 		udpmsg.msg_controllen = 0;
 		udpmsg.msg_flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)
+		error = sock_sendmsg(btrtl_coex.udpsock, &udpmsg, msg_size);
+#else
 		error = sock_sendmsg(btrtl_coex.udpsock, &udpmsg);
+#endif
 		set_fs(oldfs);
 
 		if (error < 0)
@@ -1267,7 +1272,11 @@ static void udpsocket_recv_data(void)
 	spin_unlock(&btrtl_coex.spin_lock_sock);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0)
+static void udpsocket_recv(struct sock *sk, int bytes)
+#else
 static void udpsocket_recv(struct sock *sk)
+#endif
 {
 	spin_lock(&btrtl_coex.spin_lock_sock);
 	btrtl_coex.sk = sk;
@@ -1878,7 +1887,7 @@ static void rtk_handle_connection_complete_evt(u8 * p)
 	}
 }
 
-static void rtk_handle_le_connection_complete_evt(u8 * p)
+static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 * p)
 {
 	u16 handle, interval;
 	u8 status;
@@ -1886,7 +1895,10 @@ static void rtk_handle_le_connection_complete_evt(u8 * p)
 
 	status = *p++;
 	STREAM_TO_UINT16(handle, p);
-	p += 8;			//role, address type, address
+	if (!enhanced)
+		p += 8;	/* role, address type, address */
+	else
+		p += (8 + 12); /* plus two bluetooth addresses */
 	STREAM_TO_UINT16(interval, p);
 
 	RTKBT_INFO("LE connected, handle %04x, status 0x%02x, interval %u",
@@ -1957,7 +1969,10 @@ static void rtk_handle_le_meta_evt(u8 * p)
 	u8 sub_event = *p++;
 	switch (sub_event) {
 	case HCI_EV_LE_CONN_COMPLETE:
-		rtk_handle_le_connection_complete_evt(p);
+		rtk_handle_le_connection_complete_evt(0, p);
+		break;
+	case HCI_EV_LE_ENHANCED_CONN_COMPLETE:
+		rtk_handle_le_connection_complete_evt(1, p);
 		break;
 
 	case HCI_EV_LE_CONN_UPDATE_COMPLETE:
@@ -2023,8 +2038,7 @@ static void disconn_acl(u16 handle, struct rtl_hci_conn *conn)
 
 	list_for_each_safe(iter, temp, &coex->profile_list) {
 		prof_info = list_entry(iter, rtk_prof_info, list);
-		if (handle == prof_info->handle && prof_info->scid
-		    && prof_info->dcid) {
+		if (handle == prof_info->handle) {
 			RTKBT_DBG("hci disconn, hndl %x, psm %x, dcid %x, "
 				  "scid %x, profile %u", prof_info->handle,
 				  prof_info->psm, prof_info->dcid,
@@ -2360,23 +2374,66 @@ static void rtl_ev_work(struct work_struct *work)
 	spin_unlock_irqrestore(&coex->buff_lock, flags);
 }
 
-int ev_filter_out(u8 ev_code)
+static inline int cmd_cmplt_filter_out(u8 *buf)
 {
-	switch (ev_code) {
+	u16 opcode;
+
+	opcode = buf[3] | (buf[4] << 8);
+	switch (opcode) {
+	case HCI_OP_PERIODIC_INQ:
+	case HCI_OP_READ_LOCAL_VERSION:
+#ifdef RTB_SOFTWARE_MAILBOX
+	case HCI_VENDOR_MAILBOX_CMD:
+#endif
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+static inline int cmd_status_filter_out(u8 *buf)
+{
+	u16 opcode;
+
+	opcode = buf[4] | (buf[5] << 8);
+	switch (opcode) {
+	case HCI_OP_INQUIRY:
+	case HCI_OP_CREATE_CONN:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+int ev_filter_out(u8 *buf)
+{
+	switch (buf[0]) {
 	case HCI_EV_INQUIRY_COMPLETE:
 	case HCI_EV_PIN_CODE_REQ:
 	case HCI_EV_IO_CAPA_REQUEST:
 	case HCI_EV_AUTH_COMPLETE:
 	case HCI_EV_LINK_KEY_NOTIFY:
 	case HCI_EV_MODE_CHANGE:
-	case HCI_EV_CMD_COMPLETE:
-	case HCI_EV_CMD_STATUS:
 	case HCI_EV_CONN_COMPLETE:
 	case HCI_EV_SYNC_CONN_COMPLETE:
 	case HCI_EV_DISCONN_COMPLETE:
-	case HCI_EV_LE_META:
 	case HCI_EV_VENDOR_SPECIFIC:
 		return 0;
+	case HCI_EV_LE_META:
+		/* Ignore frequent but not useful events that result in
+		 * costing too much space.
+		 */
+		switch (buf[2]) {
+		case HCI_EV_LE_CONN_COMPLETE:
+		case HCI_EV_LE_ENHANCED_CONN_COMPLETE:
+		case HCI_EV_LE_CONN_UPDATE_COMPLETE:
+			return 0;
+		}
+		return 1;
+	case HCI_EV_CMD_COMPLETE:
+		return cmd_cmplt_filter_out(buf);
+	case HCI_EV_CMD_STATUS:
+		return cmd_status_filter_out(buf);
 	default:
 		return 1;
 	}
@@ -2386,7 +2443,7 @@ static void rtk_btcoex_evt_enqueue(__u8 *s, __u16 count)
 {
 	struct rtl_hci_ev *ev;
 
-	if (ev_filter_out(s[0]))
+	if (ev_filter_out(s))
 		return;
 
 	ev = rtl_ev_node_get(&btrtl_coex);

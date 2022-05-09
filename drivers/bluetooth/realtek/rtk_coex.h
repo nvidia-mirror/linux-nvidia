@@ -47,6 +47,7 @@
 #define HCI_EV_LE_META			                        0x3e
 #define HCI_EV_LE_CONN_COMPLETE		                    0x01
 #define HCI_EV_LE_CONN_UPDATE_COMPLETE	                0x03
+#define HCI_EV_LE_ENHANCED_CONN_COMPLETE    0x0a
 
 //vendor cmd to fw
 #define HCI_VENDOR_ENABLE_PROFILE_REPORT_COMMAND        0xfc18

@@ -1,7 +1,5 @@
 /*
  *
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
- *
  *  Realtek Bluetooth USB download firmware driver
  *
  *
@@ -34,24 +32,29 @@
  * Download normal patch when host resume or power on */
 /* #define RTKBT_SWITCH_PATCH */
 
+/* RTKBT Power-on Whitelist for sideband wake-up by LE Advertising from Remote.
+ * Note that it's necessary to apply TV FW Patch. */
+/* #define RTKBT_TV_POWERON_WHITELIST */
+
 #if 1
-#define RTKBT_DBG(fmt, arg...) \
-			printk(KERN_DEBUG "rtk_btusb: " fmt "\n" ,## arg)
+#define RTKBT_DBG(fmt, arg...) printk(KERN_DEBUG "rtk_btusb: " fmt "\n" , ## arg)
 #define RTKBT_INFO(fmt, arg...) printk(KERN_INFO "rtk_btusb: " fmt "\n" , ## arg)
-#define RTKBT_WARN(fmt, arg...) \
-			printk(KERN_DEBUG "rtk_btusb: " fmt "\n" ,## arg)
+#define RTKBT_WARN(fmt, arg...) printk(KERN_DEBUG "rtk_btusb: " fmt "\n", ## arg)
 #else
 #define RTKBT_DBG(fmt, arg...)
 #endif
 
 #if 1
-#define RTKBT_ERR(fmt, arg...) \
-			printk(KERN_DEBUG "rtk_btusb: " fmt "\n", ## arg)
+#define RTKBT_ERR(fmt, arg...) printk(KERN_DEBUG "rtk_btusb: " fmt "\n" , ## arg)
 #else
 #define RTKBT_ERR(fmt, arg...)
 #endif
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 33)
 #define USB_RPM			1
+#else
+#define USB_RPM			0
+#endif
 
 #define CONFIG_NEEDS_BINDING
 
@@ -73,6 +76,12 @@ extern int download_patch(struct usb_interface *intf);
 extern void print_event(struct sk_buff *skb);
 extern void print_command(struct sk_buff *skb);
 extern void print_acl(struct sk_buff *skb, int dataOut);
+
+#if defined RTKBT_SWITCH_PATCH || defined RTKBT_TV_POWERON_WHITELIST
+int __rtk_send_hci_cmd(struct usb_device *udev, u8 *buf, u16 size);
+int __rtk_recv_hci_evt(struct usb_device *udev, u8 *buf, u8 len, u16 opcode);
+#endif
+
 #ifdef RTKBT_SWITCH_PATCH
 #define RTLBT_CLOSE	(1 << 0)
 struct api_context {
@@ -81,9 +90,6 @@ struct api_context {
 	int			status;
 };
 
-int __rtk_send_hci_cmd(struct usb_device *udev, u8 *buf, u16 size);
-int __rtk_recv_hci_evt(struct usb_device *udev, u8 *buf, u8 len,
-		       u16 opcode);
 int download_lps_patch(struct usb_interface *intf);
 int set_scan(struct usb_interface *intf);
 
