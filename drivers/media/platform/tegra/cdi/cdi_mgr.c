@@ -534,7 +534,7 @@ static int __cdi_create_dev(
 		cdi_dev->cfg.reg_bits, cdi_dev->cfg.val_bits);
 
 	cdi_dev->pdata.drv_name[sizeof(cdi_dev->pdata.drv_name) - 1] = '\0';
-	err = snprintf(cdi_dev->pdata.drv_name, sizeof(cdi_dev->pdata.drv_name),
+	err = snprintf(cdi_dev->pdata.drv_name, sizeof(cdi_dev->pdata.drv_name) - 1,
 		       "%s.%u.%02x", cdi_dev->cfg.drv_name,
 		       cdi_mgr->adap->nr, cdi_dev->cfg.addr);
 
