@@ -328,13 +328,22 @@ static ssize_t show_coeff(struct device *dev,
 
 	for (i = 0; i < est->ndevs; i++) {
 		len = snprintf(buf + total_len, PAGE_SIZE, "[%d]", i);
+		if (len < 0)
+			return -EINVAL;
+
 		total_len += len;
 		for (j = 0; j < HIST_LEN; j++) {
 			len = snprintf(buf + total_len, PAGE_SIZE, " %d",
 					est->devs[i].coeffs[j]);
+			if (len < 0)
+				return -EINVAL;
+
 			total_len += len;
 		}
 		len = snprintf(buf + total_len, PAGE_SIZE, "\n");
+		if (len < 0)
+			return -EINVAL;
+
 		total_len += len;
 	}
 	return strlen(buf);
@@ -376,8 +385,12 @@ static ssize_t show_offset(struct device *dev,
 				char *buf)
 {
 	struct therm_fan_estimator *est = dev_get_drvdata(dev);
+	int err;
 
-	snprintf(buf, PAGE_SIZE, "%ld\n", est->toffset);
+	err = snprintf(buf, PAGE_SIZE, "%ld\n", est->toffset);
+	if (err < 0)
+		return -EINVAL;
+
 	return strlen(buf);
 }
 
