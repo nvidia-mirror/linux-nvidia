@@ -291,6 +291,8 @@ static ssize_t fan_pwm_rpm_table_show(struct device *dev,
 		return -EINVAL;
 	bytes_written = sprintf(buf + bytes_written, "%s\n",
 				"(Index, RPM, PWM, RRU, RRD)");
+	if (bytes_written < 0)
+		return -EINVAL;
 	mutex_lock(&fan_data->fan_state_lock);
 	for (i = 0; i < fan_data->active_steps; ++i) {
 		bytes_written += sprintf(buf + bytes_written,
@@ -658,10 +660,12 @@ static ssize_t fan_available_profiles_show(struct device *dev,
 			return -EINVAL;
 		total_count += count;
 	} else {
-		count = sprintf(buf, "N/A\n");
+		total_count = sprintf(buf, "N/A\n");
+		if (total_count < 0)
+			return -EINVAL;
 	}
 
-	return count;
+	return total_count;
 }
 
 static ssize_t fan_profile_store(struct device *dev,
