@@ -386,7 +386,6 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 	struct tegra_channel *tegra_chan =
 		v4l2_get_subdev_hostdata(&chan->subdev);
 	int err = 0;
-	int vi_port = 0;
 	struct CAPTURE_CONTROL_MSG msg;
 
 	if (!chan->pg_mode) {
@@ -409,9 +408,8 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 		port->virtual_channel_id;
 	msg.csi_stream_tpg_apply_gain_req.gain_ratio =
 		get_tpg_gain_ratio_setting(gain_ratio_tpg);
-	vi_port = (tegra_chan->valid_ports > 1) ? port->stream_id : 0;
 
-	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[vi_port], &msg,
+	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[0], &msg,
 			&msg.csi_stream_tpg_apply_gain_resp.result);
 	if (err < 0) {
 		dev_err(csi->dev, "%s: Error in setting TPG gain stream_id=%u, csi_port=%u\n",
