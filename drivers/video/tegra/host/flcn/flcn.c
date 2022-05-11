@@ -540,6 +540,34 @@ static void configure_intf_crc_ctrl(struct platform_device *pdev)
 	if (enable_crc)
 		host1x_writel(pdev, sec_intf_crc_ctrl_r(), 1u);
 }
+
+static void t239_configure_intf_crc_ctrl(struct platform_device *pdev)
+{
+	const char *name = dev_name(&pdev->dev);
+	bool enable_crc = false;
+
+	if (strstr(name, "nvjpg"))
+		return;
+
+	if (strstr(name, "vic"))
+		return;
+
+	if (tegra_platform_is_silicon()) {
+		if (strstr(name, "nvenc"))
+			enable_crc =
+				sec_is_writable(t239_cbb_nvenc_sec_blf_write_ctl_r(),
+						t239_cbb_nvenc_sec_blf_ctl_r());
+		if (strstr(name, "ofa"))
+			enable_crc =
+				sec_is_writable(t239_cbb_ofa_sec_blf_write_ctl_r(),
+						t239_cbb_ofa_sec_blf_ctl_r());
+	} else {
+		enable_crc = true;
+	}
+
+	if (enable_crc)
+		host1x_writel(pdev, sec_intf_crc_ctrl_r(), 1u);
+}
 #endif
 
 int nvhost_flcn_finalize_poweron(struct platform_device *pdev)
@@ -580,6 +608,8 @@ int nvhost_flcn_finalize_poweron(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_ARCH_TEGRA_23x_SOC)
 	if (nvhost_is_234())
 		configure_intf_crc_ctrl(pdev);
+	if (nvhost_is_239())
+		t239_configure_intf_crc_ctrl(pdev);
 #endif
 
 	return err;

@@ -346,4 +346,20 @@ static inline u32 t239_cbb_vic_sec_blf_ctl_r(void)
 {
 	return 0x00015b70;
 }
+static inline u32 t239_cbb_nvenc_sec_blf_write_ctl_r(void)
+{
+	return 0x000140a8;
+}
+static inline u32 t239_cbb_nvenc_sec_blf_ctl_r(void)
+{
+	return 0x000140b0;
+}
+static inline u32 t239_cbb_ofa_sec_blf_write_ctl_r(void)
+{
+	return 0x00014128;
+}
+static inline u32 t239_cbb_ofa_sec_blf_ctl_r(void)
+{
+	return 0x00014130;
+}
 #endif
