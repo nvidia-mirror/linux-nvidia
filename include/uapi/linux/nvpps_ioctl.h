@@ -55,7 +55,7 @@ struct nvpps_timeevent {
 	__u32	evt_nb;
 	__u64	tsc;
 	__u64	ptp;
-	__s64	ptp_offset;
+	__u64	secondary_ptp;
 	__u64	tsc_res_ns;
 	__u32	evt_mode;
 	__u32	tsc_mode;

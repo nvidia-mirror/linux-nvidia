@@ -68,6 +68,7 @@ struct nvpps_device_data {
 	u32			actual_evt_mode;
 	u64			tsc;
 	u64			phc;
+	u64			secondary_phc;
 	u64			irq_latency;
 	u64			tsc_res_ns;
 	raw_spinlock_t		lock;
@@ -95,7 +96,6 @@ struct nvpps_device_data {
 	bool		platform_is_orin;
 	u32			tsc_ptp_src;
 	bool		only_timer_mode;
-	s64			ptp_offset;
 };
 
 
@@ -215,13 +215,13 @@ static inline u64 get_systime(struct nvpps_device_data *pdev_data, u64 *tsc)
  */
 static void nvpps_get_ts(struct nvpps_device_data *pdev_data, bool in_isr)
 {
-	u64		tsc;
+	u64		tsc = 0;
 	u64		irq_tsc = 0;
 	u64		phc = 0;
-	s64		ptp_offset = 0;
+	u64		secondary_phc = 0;
 	u64		irq_latency = 0;
 	unsigned long	flags;
-	struct ptp_tsc_data ptp_tsc_ts, sec_ptp_tsc_ts;
+	struct ptp_tsc_data ptp_tsc_ts = {0}, sec_ptp_tsc_ts = {0};
 
 	if (in_isr) {
 		/* initialize irq_tsc to the current TSC just in case the
@@ -285,8 +285,8 @@ static void nvpps_get_ts(struct nvpps_device_data *pdev_data, bool in_isr)
 						 "failed to get PTP_TSC concurrent timestamp for secondary interface(%s)\nMake sure ptp is running\n",
 						 pdev_data->sec_iface_nm);
 
-			/* offset between primary ptp inteface & secondary interface */
-			ptp_offset = (s64)(sec_ptp_tsc_ts.ptp_ts - phc);
+			/* Adjust secondary iface's PTP TS to primary iface's concurrent PTP_TSC TS */
+			secondary_phc = sec_ptp_tsc_ts.ptp_ts - (sec_ptp_tsc_ts.tsc_ts - ptp_tsc_ts.tsc_ts);
 		}
 	}
 
@@ -333,7 +333,10 @@ static void nvpps_get_ts(struct nvpps_device_data *pdev_data, bool in_isr)
 #endif /* NVPPS_ARM_COUNTER_PROFILING || NVPPS_EQOS_REG_PROFILING */
 	pdev_data->irq_latency = irq_latency;
 	pdev_data->actual_evt_mode = in_isr ? NVPPS_MODE_GPIO : NVPPS_MODE_TIMER;
-	pdev_data->ptp_offset = ptp_offset;
+	/* Re-adjust secondary iface's PTP TS to irq_tsc TS,
+	 * irq_latency will be 0 if TIMER mode,  >0 if GPIO mode
+	 */
+	pdev_data->secondary_phc = secondary_phc ? secondary_phc - irq_latency : secondary_phc;
 	raw_spin_unlock_irqrestore(&pdev_data->lock, flags);
 
 	/* event notification */
@@ -575,7 +578,7 @@ static long nvpps_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			time_event.evt_nb = pdev_data->pps_event_id;
 			time_event.tsc = pdev_data->tsc;
 			time_event.ptp = pdev_data->phc;
-			time_event.ptp_offset = pdev_data->ptp_offset;
+			time_event.secondary_ptp = pdev_data->secondary_phc;
 			time_event.irq_latency = pdev_data->irq_latency;
 			raw_spin_unlock_irqrestore(&pdev_data->lock, flags);
 			if (NVPPS_TSC_NSEC == pdev_data->tsc_mode) {
