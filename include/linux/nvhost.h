@@ -435,6 +435,11 @@ struct nvhost_device_data {
 	/* name of riscv image binary */
 	char *riscv_image_bin;
 
+	/* Flag to enable the debugfs to query module usage */
+	bool enable_usage_debugfs;
+
+	/* Module clock cycles per actmon sample */
+	u32 cycles_per_actmon_sample;
 };
 
 

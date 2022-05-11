@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Client Module
  *
- * Copyright (c) 2010-2021, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1657,9 +1657,6 @@ int nvhost_client_device_init(struct platform_device *dev)
 
 	nvhost_client_devfs_name_init(dev);
 
-	/* Create debugfs directory for the device */
-	nvhost_device_debug_init(dev);
-
 	err = nvhost_client_user_init(dev);
 	if (err)
 		goto fail;
@@ -1667,9 +1664,6 @@ int nvhost_client_device_init(struct platform_device *dev)
 	err = nvhost_device_list_add(dev);
 	if (err)
 		goto fail;
-
-	if (pdata->scaling_init)
-		pdata->scaling_init(dev);
 
 #ifdef CONFIG_EVENTLIB
 	pdata->eventlib_id = keventlib_register(4 * PAGE_SIZE,
@@ -1704,6 +1698,12 @@ int nvhost_client_device_init(struct platform_device *dev)
 	if (pdata->hw_init)
 		return pdata->hw_init(dev);
 
+	/* Create debugfs directory for the device */
+	nvhost_device_debug_init(dev);
+
+	if (pdata->scaling_init)
+		pdata->scaling_init(dev);
+
 	return 0;
 
 fail_busy:
@@ -1713,7 +1713,6 @@ fail:
 	/* Add clean-up */
 	dev_err(&dev->dev, "failed to init client device\n");
 	nvhost_client_user_deinit(dev);
-	nvhost_device_debug_deinit(dev);
 	return err;
 }
 EXPORT_SYMBOL(nvhost_client_device_init);

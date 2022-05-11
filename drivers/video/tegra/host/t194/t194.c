@@ -241,6 +241,7 @@ struct nvhost_device_data t19_msenc_info = {
 	.isolate_contexts	= true,
 	.enable_timestamps	= flcn_enable_timestamps,
 	.mlock_timeout_factor   = 4,
+	.enable_usage_debugfs	= true,
 };
 
 struct nvhost_device_data t19_nvenc1_info = {
@@ -284,6 +285,7 @@ struct nvhost_device_data t19_nvenc1_info = {
 	.isolate_contexts	= true,
 	.enable_timestamps	= flcn_enable_timestamps,
 	.mlock_timeout_factor   = 4,
+	.enable_usage_debugfs	= true,
 };
 #endif
 
@@ -331,6 +333,7 @@ struct nvhost_device_data t19_nvdec_info = {
 	.isolate_contexts	= true,
 	.enable_timestamps	= flcn_enable_timestamps,
 	.mlock_timeout_factor   = 4,
+	.enable_usage_debugfs	= true,
 };
 
 struct nvhost_device_data t19_nvdec1_info = {
@@ -376,6 +379,7 @@ struct nvhost_device_data t19_nvdec1_info = {
 	.isolate_contexts	= true,
 	.enable_timestamps	= flcn_enable_timestamps,
 	.mlock_timeout_factor   = 4,
+	.enable_usage_debugfs	= false, /* pending enabling of actmon page in HV */
 };
 #endif
 
@@ -514,6 +518,7 @@ struct nvhost_device_data t19_vic_info = {
 	.actmon_weight_count	= 216,
 	.actmon_setting_regs	= t19x_vic_actmon_registers,
 	.devfreq_governor	= "userspace",
+	.enable_usage_debugfs	= true,
 };
 #endif
 
@@ -701,6 +706,7 @@ static void t194_init_regs(struct platform_device *pdev, bool prod)
 int nvhost_init_t194_support(struct nvhost_master *host,
 			     struct nvhost_chip_support *op)
 {
+	struct platform_device *dev = host->dev;
 	int err;
 
 	op->soc_name = "tegra19x";
@@ -714,6 +720,7 @@ int nvhost_init_t194_support(struct nvhost_master *host,
 	op->push_buffer = host1x_pushbuffer_ops;
 	op->debug = host1x_debug_ops;
 
+	host->actmon_aperture = get_aperture(dev, HOST1X_ACTMON_APERTURE);
 	host->sync_aperture = host->aperture;
 	op->syncpt = host1x_syncpt_ops;
 	op->intr = host1x_intr_ops;
@@ -722,6 +729,7 @@ int nvhost_init_t194_support(struct nvhost_master *host,
 #if IS_ENABLED(CONFIG_TEGRA_GRHOST_SCALE)
 	op->actmon = host1x_actmon_ops;
 #endif
+	op->obs_actmon = host1x_actmon_obs_ops;
 	op->nvhost_dev.load_gating_regs = t194_init_regs;
 
 	/* WAR to bugs 200094901 and 200082771: enable protection

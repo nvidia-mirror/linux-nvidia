@@ -586,5 +586,55 @@ static const struct nvhost_actmon_ops host1x_actmon_ops = {
 	.debug_init = t18x_actmon_debug_init,
 	.set_high_wmark = host1x_set_high_wmark,
 	.set_low_wmark = host1x_set_low_wmark,
+};
 
+/* Sample period need to be same as the one programmed in NvHost Server
+ * TODO - Move the attribute readable from DT if supported post
+ *        server migration to HVRTOS
+ */
+#define ACTMON_SAMPLE_PERIOD_US 100U
+static void host1x_actmon_obs_init(struct platform_device *pdev)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	unsigned long freq = 0;
+	struct clk *c;
+
+	/*
+	 * Fetch the module rate in Hz, convert to MHz and
+	 * calculate device cycles per sample
+	 */
+	c = devm_clk_get(&pdev->dev, pdata->clocks[0].name);
+	freq = clk_get_rate(c);
+
+	pdata->cycles_per_actmon_sample = ((freq / 1000000) *
+					   ACTMON_SAMPLE_PERIOD_US);
+}
+
+static void host1x_actmon_obs_avg_norm(struct platform_device *pdev, u32 *avg)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	struct nvhost_master *host = nvhost_get_host(pdev);
+	long val;
+
+	if (!pdata || !host || !host->actmon_aperture ||
+			(pdata->cycles_per_actmon_sample == 0)) {
+		*avg = 0;
+		return;
+	}
+
+	/* Read the average usage count for the engine */
+	val = readl(host->actmon_aperture + pdata->actmon_regs +
+		    actmon_local_avg_count_r());
+
+	/* Should not happen, adding just in case */
+	if (val > pdata->cycles_per_actmon_sample)
+		val = pdata->cycles_per_actmon_sample;
+
+	*avg = (val * 100) / pdata->cycles_per_actmon_sample;
+}
+
+/* Operations on actmon just for reading the usage, programming taken care by Server */
+static const struct nvhost_actmon_obs_ops host1x_actmon_obs_ops = {
+	.init = host1x_actmon_obs_init,
+	.read_avg_norm = host1x_actmon_obs_avg_norm,
 };

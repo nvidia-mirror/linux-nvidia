@@ -266,6 +266,7 @@ struct nvhost_device_data t23x_msenc_info = {
 	.actmon_weight_count	= 216,
 	.actmon_setting_regs	= t23x_nvenc_actmon_registers,
 	.devfreq_governor	= "userspace",
+	.enable_usage_debugfs	= true,
 };
 #endif
 
@@ -316,6 +317,7 @@ struct nvhost_device_data t23x_nvdec_info = {
 	.actmon_setting_regs	= t23x_nvdec_actmon_registers,
 	.devfreq_governor	= "userspace",
 	.enable_timestamps	= flcn_enable_timestamps,
+	.enable_usage_debugfs	= true,
 };
 #endif
 
@@ -498,6 +500,7 @@ struct nvhost_device_data t23x_vic_info = {
 	.actmon_setting_regs	= t23x_vic_actmon_registers,
 	.devfreq_governor	= "userspace",
 	.enable_timestamps	= flcn_enable_timestamps,
+	.enable_usage_debugfs	= true,
 };
 #endif
 
@@ -696,6 +699,7 @@ static void host1x08_intr_resume(struct nvhost_intr *intr)
 int nvhost_init_t23x_support(struct nvhost_master *host,
 			     struct nvhost_chip_support *op)
 {
+	struct platform_device *dev = host->dev;
 	int err;
 
 	op->soc_name = "tegra23x";
@@ -709,6 +713,7 @@ int nvhost_init_t23x_support(struct nvhost_master *host,
 	op->push_buffer = host1x_pushbuffer_ops;
 	op->debug = host1x_debug_ops;
 
+	host->actmon_aperture = get_aperture(dev, HOST1X_ACTMON_APERTURE);
 	host->sync_aperture = host->aperture;
 	op->syncpt = host1x_syncpt_ops;
 	op->intr = host1x_intr_ops;
@@ -719,6 +724,7 @@ int nvhost_init_t23x_support(struct nvhost_master *host,
 #if IS_ENABLED(CONFIG_TEGRA_GRHOST_SCALE)
 	op->actmon = host1x_actmon_ops;
 #endif
+	op->obs_actmon = host1x_actmon_obs_ops;
 	op->nvhost_dev.load_gating_regs = t23x_init_gating_regs;
 	op->nvhost_dev.load_map_regs = t23x_init_map_regs;
 

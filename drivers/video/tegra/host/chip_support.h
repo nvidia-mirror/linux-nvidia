@@ -160,6 +160,12 @@ struct nvhost_actmon_ops {
 	int (*set_low_wmark)(struct host1x_actmon *actmon, u32 val);
 };
 
+/* Actmon operations just to query the usage of the engines */
+struct nvhost_actmon_obs_ops {
+	void (*init)(struct platform_device *pdev);
+	void (*read_avg_norm)(struct platform_device *pdev, u32 *val);
+};
+
 struct nvhost_chip_support {
 	const char * soc_name;
 	struct nvhost_cdma_ops cdma;
@@ -169,6 +175,7 @@ struct nvhost_chip_support {
 	struct nvhost_intr_ops intr;
 	struct nvhost_dev_ops nvhost_dev;
 	struct nvhost_actmon_ops actmon;
+	struct nvhost_actmon_obs_ops obs_actmon;
 	struct nvhost_vm_ops vm;
 	void (*remove_support)(struct nvhost_chip_support *op);
 	void *priv;
@@ -227,6 +234,7 @@ struct nvhost_chip_support *nvhost_get_chip_ops(void);
 #define vm_op()			(nvhost_get_chip_ops()->vm)
 
 #define actmon_op()		(nvhost_get_chip_ops()->actmon)
+#define actmon_obs_op()		(nvhost_get_chip_ops()->obs_actmon)
 #define tickctrl_op()		(nvhost_get_chip_ops()->tickctrl)
 
 int nvhost_init_chip_support(struct nvhost_master *);

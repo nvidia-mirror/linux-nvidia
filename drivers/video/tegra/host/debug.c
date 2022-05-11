@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (C) 2011-2018, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2011-2022, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -29,6 +29,7 @@
 #include "nvhost_acm.h"
 #include "nvhost_channel.h"
 #include "chip_support.h"
+#include "host1x/host1x_actmon.h"
 
 unsigned int nvhost_debug_trace_cmdbuf;
 unsigned int nvhost_debug_trace_actmon;
@@ -218,14 +219,53 @@ static const struct file_operations nvhost_debug_fops = {
 	.release	= single_release,
 };
 
+/* Sample period need to be same as the one programmed in NvHost Server
+ * TODO - Move the attribute readable from DT if supported post
+ *        server migration to HVRTOS
+ */
+#define ACTMON_SAMPLE_PERIOD_US 100U
+static int actmon_avg_show(struct seq_file *s, void *unused)
+{
+	struct platform_device *dev = s->private;
+	u32 avg_norm = 0;
+
+	if (actmon_obs_op().read_avg_norm)
+		actmon_obs_op().read_avg_norm(dev, &avg_norm);
+
+	seq_printf(s, "%d\n", avg_norm);
+	return 0;
+}
+
+static int nvhost_debug_actmon_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, actmon_avg_show, inode->i_private);
+}
+
+
+static const struct file_operations nvhost_debug_actmon_fops = {
+	.open		= nvhost_debug_actmon_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 void nvhost_device_debug_init(struct platform_device *dev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
 	const char *debugfs_name;
 
-	debugfs_name = pdata->devfs_name ? pdata->devfs_name : dev->name;
 
+	debugfs_name = pdata->devfs_name ? pdata->devfs_name : dev->name;
 	pdata->debugfs = debugfs_create_dir(debugfs_name, pdata->debugfs);
+
+	if (nvhost_dev_is_virtual(dev) && (pdata->enable_usage_debugfs)) {
+
+		if (actmon_obs_op().init)
+			actmon_obs_op().init(dev);
+
+		debugfs_create_file("usage", S_IRUGO, pdata->debugfs,
+				     dev, &nvhost_debug_actmon_fops);
+	}
 }
 
 void nvhost_device_debug_deinit(struct platform_device *dev)
