@@ -96,6 +96,8 @@ struct nvpps_device_data {
 	bool		platform_is_orin;
 	u32			tsc_ptp_src;
 	bool		only_timer_mode;
+	bool		pri_ptp_failed;
+	bool 		sec_ptp_failed;
 };
 
 
@@ -265,13 +267,20 @@ static void nvpps_get_ts(struct nvpps_device_data *pdev_data, bool in_isr)
 		/*TODO : support fetching ptp offset using memmap method */
 	} else {
 		/* get PTP_TSC concurrent timestamp(using ptp notifier) from MAC driver */
-		if (tegra_get_hwtime(pdev_data->iface_nm, &ptp_tsc_ts, PTP_TSC_HWTIME))
-			dev_warn_ratelimited(pdev_data->dev,
-					 "failed to get PTP_TSC concurrent timestamp from interface(%s)\nMake sure ptp is running\n",
-					 pdev_data->iface_nm);
+		if (tegra_get_hwtime(pdev_data->iface_nm, &ptp_tsc_ts, PTP_TSC_HWTIME)) {
+			/* check flag to print ptp failure msg */
+			if (!pdev_data->pri_ptp_failed) {
+				dev_warn_ratelimited(pdev_data->dev,
+					"failed to get PTP_TSC concurrent timestamp from interface(%s)\nMake sure ptp is running\n",
+					pdev_data->iface_nm);
+				pdev_data->pri_ptp_failed = true;
+			}
+		} else {
+			pdev_data->pri_ptp_failed = false;
+			phc = ptp_tsc_ts.ptp_ts;
+			tsc = ptp_tsc_ts.tsc_ts / pdev_data->tsc_res_ns;
+		}
 
-		phc = ptp_tsc_ts.ptp_ts;
-		tsc = ptp_tsc_ts.tsc_ts / pdev_data->tsc_res_ns;
 
 		if ((pdev_data->platform_is_orin) &&
 			/* primary & secondary ptp interface are not same */
@@ -280,13 +289,20 @@ static void nvpps_get_ts(struct nvpps_device_data *pdev_data, bool in_isr)
 			/* get PTP_TSC concurrent timestamp(using ptp notifier) from MAC
 			 * driver for secondary interface
 			 */
-			if (tegra_get_hwtime(pdev_data->sec_iface_nm, &sec_ptp_tsc_ts, PTP_TSC_HWTIME))
-				dev_warn_ratelimited(pdev_data->dev,
+			if (tegra_get_hwtime(pdev_data->sec_iface_nm, &sec_ptp_tsc_ts, PTP_TSC_HWTIME)) {
+				/* check flag to print ptp failure msg */
+				if (!pdev_data->sec_ptp_failed) {
+					dev_warn_ratelimited(pdev_data->dev,
 						 "failed to get PTP_TSC concurrent timestamp for secondary interface(%s)\nMake sure ptp is running\n",
 						 pdev_data->sec_iface_nm);
+					pdev_data->sec_ptp_failed = true;
+				}
+			} else {
+				pdev_data->sec_ptp_failed = false;
 
-			/* Adjust secondary iface's PTP TS to primary iface's concurrent PTP_TSC TS */
-			secondary_phc = sec_ptp_tsc_ts.ptp_ts - (sec_ptp_tsc_ts.tsc_ts - ptp_tsc_ts.tsc_ts);
+				/* Adjust secondary iface's PTP TS to primary iface's concurrent PTP_TSC TS */
+				secondary_phc = sec_ptp_tsc_ts.ptp_ts - (sec_ptp_tsc_ts.tsc_ts - ptp_tsc_ts.tsc_ts);
+			}
 		}
 	}
 
