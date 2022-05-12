@@ -255,6 +255,20 @@ MDIO node
 - compatible:			Should be "nvidia,eqos-mdio"
 PHY nodes
 - reg:				PHY ID number.
+- aquantia,led-mode		LED mode values to set for PHY LED's.
+				Format is <LED number (valid values: 0,1,2)
+				LED mode value>;
+				Example #1:
+				led-mode = <0 0x40 1 0x80 2 0x100>;
+				Here:
+				configure LED0 with value 0x40,
+				LED2 with value 0x80 and
+				LED3 with value 0x100.
+
+				Example #2:
+				led-mode = <0 0x40>;
+				Here:
+				configure only LED0 with value 0x40.
 - marvell,copper-mode:		Mode of PHY is copper mode.
 - marvell,reg-init:		Override some configuration registers based
 				on this setting. Format is
