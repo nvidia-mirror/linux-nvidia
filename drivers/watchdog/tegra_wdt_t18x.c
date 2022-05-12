@@ -456,6 +456,7 @@ static int tegra_wdt_t18x_probe(struct platform_device *pdev)
 	int timer_id, wdt_id;
 	int skip_count = 0;
 	u32 pval = 0;
+	u32 error_threshold;
 	int ret;
 
 	twdt_t18x = devm_kzalloc(&pdev->dev, sizeof(*twdt_t18x), GFP_KERNEL);
@@ -625,10 +626,23 @@ static int tegra_wdt_t18x_probe(struct platform_device *pdev)
 		/*
 		 * 'ErrorThreshold' field @ TKE_TOP_WDT1_WDTCR_0 decides the
 		 * indication to HSM. The WDT logic asserts an error signal to
-		 * HSM when ExpirationLevel >= ErrorThreshold. Retain the POR
-		 * value to avoid nuisance trigger to HSM.
+		 * HSM when ExpirationLevel >= ErrorThreshold. Update the error
+		 * threshold value, if provided in the device tree.
+		 *
+		 * Else retain the POR value to avoid nuisance trigger to HSM.
 		 */
-		twdt_t18x->config |= WDT_CFG_ERR_THRESHOLD;
+		ret = of_property_read_u32(np, "nvidia,wdt-error-threshold",
+				&error_threshold);
+		if (!ret) {
+			if (error_threshold > 7) {
+				dev_warn(&pdev->dev, "Invalid error threshold value\n");
+				twdt_t18x->config |= WDT_CFG_ERR_THRESHOLD;
+			} else {
+				twdt_t18x->config |= (error_threshold << 20);
+			}
+		} else {
+			twdt_t18x->config |= WDT_CFG_ERR_THRESHOLD;
+		}
 
 		/* Enable local FIQ and remote interrupt for debug dump */
 		twdt_t18x->config |= WDT_CFG_FINT_EN;
