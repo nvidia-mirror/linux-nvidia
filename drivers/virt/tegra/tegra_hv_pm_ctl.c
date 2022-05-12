@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -22,6 +22,13 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 
+#ifdef CONFIG_PM_SLEEP
+#include <linux/suspend.h>
+#include <net/sock.h>
+#include <linux/netlink.h>
+#include <linux/skbuff.h>
+#endif
+
 #include <linux/tegra-ivc.h>
 #include <linux/tegra-ivc-instance.h>
 
@@ -39,6 +46,20 @@
 #define DRV_NAME	"tegra_hv_pm_ctl"
 #define CHAR_DEV_COUNT	1
 #define MAX_GUESTS_NUM	8
+
+#ifdef CONFIG_PM_SLEEP
+#define NETLINK_USERSPACE_PM	30
+#define MAX_USER_CLIENT		32
+struct sock *nl_sk;
+struct completion netlink_complete;
+static spinlock_t netlink_lock;
+
+static struct {
+	int client_pid;
+	bool suspend_response;
+} user_client[MAX_USER_CLIENT];
+static int user_client_count;
+#endif
 
 struct tegra_hv_pm_ctl {
 	struct device *dev;
@@ -755,10 +776,265 @@ static int tegra_hv_pm_ctl_parse_dt(struct tegra_hv_pm_ctl *data)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+
+static void pm_recv_msg(struct sk_buff *skb)
+{
+	struct tegra_hv_pm_ctl *data = tegra_hv_pm_ctl_data;
+	struct nlmsghdr *nlh;
+	static uint32_t i;
+
+	nlh = (struct nlmsghdr *)skb->data;
+
+	/*process messages coming from User Space only*/
+	if (nlh->nlmsg_pid != 0) {
+		if (strcmp((char *)nlmsg_data(nlh), "PM Register") == 0) {
+
+			bool hole = false;
+			uint32_t loc = 0;
+
+			/*regiter userspace Client with kernel*/
+			spin_lock(&netlink_lock);
+			for (i = 0; i < user_client_count; i++) {
+				if (user_client[i].client_pid == nlh->nlmsg_pid) {
+					dev_warn(data->dev, "Client already registered \
+								with pid:%d\n", nlh->nlmsg_pid);
+					spin_unlock(&netlink_lock);
+					return;
+				}
+				if (user_client[i].client_pid == 0 && hole == false) {
+					hole = true;
+					loc = i;
+					break;
+				}
+			}
+
+			dev_dbg(data->dev, "Registering UserSpace Client \
+							with pid:%d\n", nlh->nlmsg_pid);
+			if (hole == true) {
+				user_client[loc].client_pid = nlh->nlmsg_pid;
+			} else {
+				if (user_client_count < MAX_USER_CLIENT - 1)
+					user_client[user_client_count++].client_pid = nlh->nlmsg_pid;
+				else
+					dev_err(data->dev, "Client Registration failed for pid:%d \
+						due to resource exhaustion\n", nlh->nlmsg_pid);
+			}
+			spin_unlock(&netlink_lock);
+
+		} else if (strcmp((char *)nlmsg_data(nlh), "PM Deregister") == 0) {
+			/*regiter userspace Client with kernel*/
+			bool deregistered = false;
+
+			spin_lock(&netlink_lock);
+			for (i = 0; i < user_client_count; i++) {
+				if (user_client[i].client_pid == nlh->nlmsg_pid) {
+					dev_dbg(data->dev, "Deregistering UserSpace Client \
+								with pid:%d\n", nlh->nlmsg_pid);
+					user_client[i].client_pid = 0;
+					deregistered = true;
+					break;
+				}
+			}
+			spin_unlock(&netlink_lock);
+
+			if (deregistered == false) {
+				dev_warn(data->dev, "Client already deregistered \
+								with pid:%d\n", nlh->nlmsg_pid);
+			}
+
+		} else if (strcmp((char *)nlmsg_data(nlh), "Suspend Response") == 0) {
+			/*update suspend response state for Client*/
+			bool active = false;
+
+			spin_lock(&netlink_lock);
+			for (i = 0; i < user_client_count; i++) {
+				if (user_client[i].client_pid == nlh->nlmsg_pid
+						&& user_client[i].suspend_response == false) {
+					dev_dbg(data->dev, "Received Suspend Response \
+								from pid:%d\n", nlh->nlmsg_pid);
+					user_client[i].suspend_response = true;
+					active = true;
+					break;
+				} else if (user_client[i].client_pid == nlh->nlmsg_pid
+						&& user_client[i].suspend_response == true) {
+					dev_warn(data->dev, "Already Received Suspend Response \
+								from pid:%d\n", nlh->nlmsg_pid);
+					active = true;
+					break;
+				}
+			}
+			spin_unlock(&netlink_lock);
+
+			if (active == false) {
+				dev_err(data->dev, "Client is not active \
+								with pid:%d\n", nlh->nlmsg_pid);
+			}
+
+		} else if (strcmp((char *)nlmsg_data(nlh), "Resume Response") == 0) {
+			/*update resume response state for Client*/
+			bool active = false;
+
+			spin_lock(&netlink_lock);
+			for (i = 0; i < user_client_count; i++) {
+				if (user_client[i].client_pid == nlh->nlmsg_pid
+						&& user_client[i].suspend_response == false) {
+					dev_warn(data->dev, "Already Received Resume Response \
+								from pid:%d\n", nlh->nlmsg_pid);
+					active = true;
+					break;
+				} else if (user_client[i].client_pid == nlh->nlmsg_pid
+						&& user_client[i].suspend_response == true) {
+					dev_dbg(data->dev, "Received Resume Response \
+								from pid:%d\n", nlh->nlmsg_pid);
+					user_client[i].suspend_response = false;
+					active = true;
+					break;
+				}
+			}
+			spin_unlock(&netlink_lock);
+
+			if (active == false) {
+				dev_err(data->dev, "Client is not active with pid:%d\n",
+						nlh->nlmsg_pid);
+			}
+
+		} else {
+			dev_err(data->dev, "Error: Wrong request coming from User Space\n");
+		}
+	} else {
+		dev_warn(data->dev, "Data being sent from KernelSpace to KernelSpace\n");
+	}
+
+	/*invoke blocked task if got suspend response from all clients*/
+	spin_lock(&netlink_lock);
+	if (strcmp((char *)nlmsg_data(nlh), "Suspend Response") == 0) {
+		for (i = 0; i < user_client_count && user_client_count > 0; i++) {
+			if (user_client[i].client_pid > 0
+					&& user_client[i].suspend_response == false) {
+				spin_unlock(&netlink_lock);
+				return;
+			}
+		}
+	}
+
+	/*invoke blocked task if got resume response from all clients*/
+	if (strcmp((char *)nlmsg_data(nlh), "Resume Response") == 0) {
+		for (i = 0; i < user_client_count && user_client_count > 0; i++) {
+			if (user_client[i].client_pid > 0
+					&& user_client[i].suspend_response == true) {
+				spin_unlock(&netlink_lock);
+				return;
+			}
+		}
+	}
+	spin_unlock(&netlink_lock);
+
+	if (strcmp((char *)nlmsg_data(nlh), "Suspend Response") == 0
+			|| strcmp((char *)nlmsg_data(nlh), "Resume Response") == 0) {
+		dev_dbg(data->dev, "invoke sleeping thread\n");
+		complete(&netlink_complete);
+	}
+}
+
+static int notify_client(char *msg, int msg_size)
+{
+	struct tegra_hv_pm_ctl *data = tegra_hv_pm_ctl_data;
+	struct sk_buff *skb_out;
+	struct nlmsghdr *nlh;
+	uint32_t i;
+	int ret = 0;
+
+	spin_lock(&netlink_lock);
+	for (i = 0; i < user_client_count; i++) {
+		skb_out = nlmsg_new(msg_size, 0);
+		if (!skb_out) {
+			dev_err(data->dev, "Failed to allocate new skb\n");
+			ret = -ENOMEM;
+			goto fail;
+		}
+
+		nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+		strncpy(nlmsg_data(nlh), msg, msg_size);
+
+		if (user_client[i].client_pid > 0) {
+			dev_dbg(data->dev, "Sending to client id: %d\n", user_client[i].client_pid);
+			ret = nlmsg_unicast(nl_sk, skb_out, user_client[i].client_pid);
+			if (ret < 0)
+				goto fail;
+		}
+	}
+
+fail:
+	spin_unlock(&netlink_lock);
+	return ret;
+}
+
+static int netlink_pm_notify(struct notifier_block *nb,
+			     unsigned long mode, void *_unused)
+{
+	struct tegra_hv_pm_ctl *data = tegra_hv_pm_ctl_data;
+	char *suspend_req = "Suspend Request";
+	char *resume_req = "Resume Request";
+	int msg_size;
+	int ret;
+
+	switch (mode) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_RESTORE_PREPARE:
+	case PM_SUSPEND_PREPARE:
+
+		/*Send the message to userspace*/
+		msg_size = strlen(suspend_req);
+
+		ret = notify_client(suspend_req, msg_size);
+		if (ret != 0)
+			dev_err(data->dev, "Error while notifying clients %d\n", ret);
+		else
+			dev_dbg(data->dev, "all client notified successful\n");
+
+		/*Receive the message from userspace*/
+		wait_for_completion(&netlink_complete);
+		break;
+
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+	case PM_POST_SUSPEND:
+
+		/*Send the message to userspace*/
+		msg_size = strlen(resume_req);
+
+		ret = notify_client(suspend_req, msg_size);
+		if (ret != 0)
+			dev_err(data->dev, "Error while notifying clients %d\n", ret);
+		else
+			dev_dbg(data->dev, "all client notified successful\n");
+
+		/*Receive the message from userspace*/
+		wait_for_completion(&netlink_complete);
+		break;
+
+	default:
+		break;
+	}
+	return 0;
+}
+
+static struct notifier_block netlink_pm_nb = {
+	.notifier_call = netlink_pm_notify,
+};
+#endif
+
 static int tegra_hv_pm_ctl_probe(struct platform_device *pdev)
 {
 	struct tegra_hv_pm_ctl *data;
 	int ret;
+
+#ifdef CONFIG_PM_SLEEP
+	struct netlink_kernel_cfg cfg = {
+		.input = pm_recv_msg,
+	};
+#endif
 
 	if (!is_tegra_hypervisor_mode()) {
 		dev_err(&pdev->dev, "%s: Hypervisor is not present\n",
@@ -810,6 +1086,25 @@ static int tegra_hv_pm_ctl_probe(struct platform_device *pdev)
 
 	tegra_hv_pm_ctl_data = data;
 
+#ifdef CONFIG_PM_SLEEP
+
+	init_completion(&netlink_complete);
+	spin_lock_init(&netlink_lock);
+
+	/*Creating netlink socket to communicate to Userspace*/
+	nl_sk = netlink_kernel_create(&init_net, NETLINK_USERSPACE_PM, &cfg);
+	if (!nl_sk) {
+		dev_err(data->dev, "Error while creating socket.\n");
+		ret = -EAGAIN;
+		goto error_sysfs_remove_group;
+	}
+
+	/*register pm notifier for suspend/resume */
+	ret = register_pm_notifier(&netlink_pm_nb);
+	if (ret)
+		dev_dbg(data->dev, "Couldn't register suspend notifier, return %d\n", ret);
+
+#endif
 	dev_info(&pdev->dev, "%s: Probed\n", __func__);
 
 	return 0;
