@@ -535,7 +535,8 @@ static int nvhost_module_update_rate(struct platform_device *dev, int index)
 	struct nvhost_module_client *m;
 	int ret = -EINVAL;
 
-	if (!nvhost_is_bw_clk(pdata, index) && !pdata->clk[index]) {
+	if (index < 0 || index >= NVHOST_MODULE_MAX_CLOCKS ||
+	    (!nvhost_is_bw_clk(pdata, index) && !pdata->clk[index])) {
 		nvhost_err(&dev->dev, "invalid clk index %d", index);
 		return -EINVAL;
 	}
