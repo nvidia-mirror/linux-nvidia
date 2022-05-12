@@ -37,6 +37,8 @@ struct edma_chan {
 	struct tegra_pcie_edma_xfer_info *ring;
 	dma_addr_t dma_iova;
 	uint32_t desc_sz;
+	/* descriptor size that is allocated for a channel */
+	u64 edma_desc_size;
 	/** Index from where cleanup needs to be done */
 	volatile uint32_t r_idx;
 	/** Index from where descriptor update is needed */
@@ -54,7 +56,6 @@ struct edma_chan {
 };
 
 struct edma_prv {
-	u32 edma_desc_size;
 	int irq;
 	char *irq_name;
 	bool is_remote_dma;
@@ -486,9 +487,9 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 					goto dma_iounmap;
 				}
 			} else {
-				ch->desc = dma_alloc_coherent(prv->dev,
-							      (sizeof(struct edma_dblock)) *
-							      ((ch->desc_sz / 2) + 1),
+				ch->edma_desc_size = (sizeof(struct edma_dblock)) *
+						   ((ch->desc_sz / 2) + 1);
+				ch->desc = dma_alloc_coherent(prv->dev, ch->edma_desc_size,
 							      &ch->dma_iova, GFP_KERNEL);
 				if (!ch->desc) {
 					dev_err(prv->dev, "Cannot allocate required descriptos(%d) of size (%lu) for channel:%d type: %d\n",
@@ -552,8 +553,7 @@ free_dma_desc:
 			if (prv->is_remote_dma && ch->desc)
 				devm_iounmap(prv->dev, ch->remap_desc);
 			else if (ch->desc)
-				dma_free_coherent(prv->dev,
-						  (sizeof(struct edma_hw_desc) * ch->desc_sz),
+				dma_free_coherent(prv->dev, ch->edma_desc_size,
 						  ch->desc, ch->dma_iova);
 		}
 	}
@@ -739,8 +739,7 @@ void tegra_pcie_edma_deinit(void *cookie)
 			if (prv->is_remote_dma && ch->desc)
 				devm_iounmap(prv->dev, ch->remap_desc);
 			else if (ch->desc)
-				dma_free_coherent(prv->dev,
-						  (sizeof(struct edma_hw_desc) * ch->desc_sz),
+				dma_free_coherent(prv->dev, ch->edma_desc_size,
 						  ch->desc, ch->dma_iova);
 			kfree(ch->ring);
 		}
