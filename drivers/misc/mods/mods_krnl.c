@@ -471,7 +471,9 @@ static int __init mods_init_module(void)
 #endif
 
 #if defined(CONFIG_DMA_ENGINE)
-	mods_init_dma();
+	rc = mods_init_dma();
+	if (rc < 0)
+		return rc;
 #endif
 #endif
 
@@ -2409,6 +2411,11 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_dma_request_channel,
 			   MODS_DMA_HANDLE);
 		break;
+	case MODS_ESC_DMA_REQUEST_HANDLE_2:
+		MODS_IOCTL(MODS_ESC_DMA_REQUEST_HANDLE_2,
+			   esc_mods_dma_request_channel_2,
+			   MODS_DMA_HANDLE_2);
+		break;
 	case MODS_ESC_DMA_RELEASE_HANDLE:
 		MODS_IOCTL_NORETVAL(MODS_ESC_DMA_RELEASE_HANDLE,
 			   esc_mods_dma_release_channel,
@@ -2430,7 +2437,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   MODS_DMA_TX_DESC);
 		break;
 	case MODS_ESC_DMA_TX_WAIT:
-		MODS_IOCTL(MODS_MODS_ESC_DMA_TX_WAIT,
+		MODS_IOCTL(MODS_ESC_DMA_TX_WAIT,
 			   esc_mods_dma_wait,
 			   MODS_DMA_WAIT_DESC);
 		break;

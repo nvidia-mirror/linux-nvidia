@@ -1616,8 +1616,29 @@ struct MODS_DMA_HANDLE {
 	/* IN */
 	__u32 dma_type; /* Indicate the DMA Type*/
 	/* OUT */
-	__u32	dma_id; /* Inditify for the DMA */
+	__u32 dma_id; /* Identifier for the DMA */
 };
+
+#define MODS_DMA_HANDLE_CTRL_DIR_LEN 20
+
+/* Used by ioctls:
+ * - MODS_ESC_DMA_REQUEST_HANDLE_2
+ *
+ * Available only on Tegra.
+ */
+struct MODS_DMA_HANDLE_2 {
+	/* IN */
+	__u32 dma_type; /* Indicate the DMA Type*/
+	/* OUT */
+	__u32 dma_id; /* Identifier for the DMA */
+
+	/* ctrl#index_dir
+	 * for example, spi0_tx, i2c1_rx
+	 * to keep back-compatibility, strlen of ctrl_dir is allowed to be zero
+	 */
+	char ctrl_dir[MODS_DMA_HANDLE_CTRL_DIR_LEN];
+};
+
 
 enum MODS_DMA_TRANSFER_DIRECTION {
 	MODS_DMA_MEM_TO_MEM,
@@ -1962,6 +1983,7 @@ struct MODS_TEGRA_OIST_STATUS {
 /* Deprecated */
 #define MODS_ESC_PCI_UNMAP_RESOURCE MODSIO(W, 79, MODS_PCI_UNMAP_RESOURCE)
 #define MODS_ESC_DMA_REQUEST_HANDLE MODSIO(R,  80, MODS_DMA_HANDLE)
+#define MODS_ESC_DMA_REQUEST_HANDLE_2 MODSIO(R,  80, MODS_DMA_HANDLE_2)
 #define MODS_ESC_DMA_RELEASE_HANDLE MODSIO(W,  81, MODS_DMA_HANDLE)
 #define MODS_ESC_DMA_SET_CONFIG MODSIO(W,  82, MODS_DMA_CHANNEL_CONFIG)
 #define MODS_ESC_DMA_TX_SUBMIT MODSIO(W,  83, MODS_DMA_TX_DESC)

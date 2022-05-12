@@ -631,10 +631,12 @@ int esc_mods_oist_status(struct mods_client             *client,
 			     struct MODS_TEGRA_OIST_STATUS  *p);
 
 #ifdef CONFIG_DMA_ENGINE
-void mods_init_dma(void);
+int mods_init_dma(void);
 void mods_exit_dma(void);
 int esc_mods_dma_request_channel(struct mods_client     *client,
 				 struct MODS_DMA_HANDLE *p);
+int esc_mods_dma_request_channel_2(struct mods_client *client,
+				 struct MODS_DMA_HANDLE_2 *p_handle_2);
 int esc_mods_dma_release_channel(struct mods_client     *client,
 				 struct MODS_DMA_HANDLE *p);
 int esc_mods_dma_set_config(struct mods_client             *client,
