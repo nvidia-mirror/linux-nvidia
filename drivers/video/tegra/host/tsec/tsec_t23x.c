@@ -68,6 +68,13 @@ typedef struct {
 	 */
 } NV_RISCV_BOOTLDR_PARAMS;
 
+struct tsec_t23x_device {
+	struct platform_device *pdev;
+	struct delayed_work poweron_work;
+	u32 fwreq_retry_interval_ms;
+	u32 fwreq_duration_ms;
+	u32 fwreq_fail_threshold_ms;
+};
 
 static int tsec_read_riscv_bin(struct platform_device *dev,
 			const char *desc_name,
@@ -413,11 +420,19 @@ int nvhost_tsec_finalize_poweron_t23x(struct platform_device *dev)
 
 int nvhost_tsec_prepare_poweroff_t23x(struct platform_device *dev)
 {
+	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
+
+	if (!pdata) {
+		dev_err(&dev->dev, "no platform data\n");
+		return -ENODATA;
+	}
+
 	/*
 	 * Below call is redundant, but there are something statically declared
 	 * in $(srctree.nvidia)/drivers/video/tegra/host/tsec/tsec.c,
 	 * which needs to be reset.
 	 */
+	disable_irq(pdata->irq);
 	nvhost_tsec_prepare_poweroff(dev);
 	return 0;
 }
@@ -570,10 +585,11 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 	void (*callback_func)(void *))
 {
 	int i;
+	int placeholder;
 	u32 head;
 	u32 tail;
 	u8 cmd_size;
-	u8 cmd_size_aligned;
+	u32 cmd_size_aligned;
 	u32 cmdq_head_base;
 	u32 cmdq_tail_base;
 	u32 cmdq_head_stride;
@@ -623,7 +639,12 @@ int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
 
 	flcn_cmd = (union RM_FLCN_CMD *)cmd;
 	cmd_size = flcn_cmd->cmdGen.hdr.size;
-	cmd_size_aligned = ALIGN(cmd_size, 4);
+	placeholder = ALIGN(cmd_size, 4);
+	if (placeholder < 0) {
+		dev_err(&tsec->dev, "Alignment found to be negative\n");
+		return -EINVAL;
+	}
+	cmd_size_aligned = (unsigned int) placeholder;
 	head = host1x_readl(tsec,
 		(cmdq_head_base + (queue_id * cmdq_head_stride)));
 
@@ -791,15 +812,58 @@ exit:
 	return IRQ_HANDLED;
 }
 
+static void tsec_poweron_handler(struct work_struct *work)
+{
+	struct tsec_t23x_device *tsec_dev;
+	struct nvhost_device_data *pdata;
+	const struct firmware *tsec_fw_desc;
+
+	tsec_dev = container_of(to_delayed_work(work), struct tsec_t23x_device,
+			    poweron_work);
+	pdata = nvhost_get_devdata(tsec_dev->pdev);
+	tsec_fw_desc = nvhost_client_request_firmware(tsec_dev->pdev, pdata->riscv_desc_bin, false);
+	tsec_dev->fwreq_duration_ms += tsec_dev->fwreq_retry_interval_ms;
+
+	if (tsec_fw_desc) {
+		dev_info(&(tsec_dev->pdev->dev),
+			"tsec fw req success in %d ms\n",
+			tsec_dev->fwreq_duration_ms);
+		release_firmware(tsec_fw_desc);
+		nvhost_module_busy(tsec_dev->pdev);
+	} else if (tsec_dev->fwreq_duration_ms < tsec_dev->fwreq_fail_threshold_ms) {
+		dev_info(&(tsec_dev->pdev->dev),
+			"retry tsec fw req, total retry duration %d ms\n",
+			tsec_dev->fwreq_duration_ms);
+		schedule_delayed_work(&tsec_dev->poweron_work,
+			msecs_to_jiffies(tsec_dev->fwreq_retry_interval_ms));
+	} else {
+		dev_err(&(tsec_dev->pdev->dev),
+			"tsec boot failure, fw not available within %d ms\n",
+			tsec_dev->fwreq_fail_threshold_ms);
+	}
+}
+
 int nvhost_t23x_tsec_intr_init(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct nvhost_device_data *pdata = nvhost_get_devdata(pdev);
+	struct tsec_t23x_device *tsec_dev = NULL;
+
+	tsec_dev = devm_kzalloc(&pdev->dev, sizeof(*tsec_dev), GFP_KERNEL);
+	if (!tsec_dev)
+		return -ENOMEM;
+	tsec_dev->pdev = pdev;
+	INIT_DELAYED_WORK(&tsec_dev->poweron_work, tsec_poweron_handler);
+	tsec_dev->fwreq_retry_interval_ms = 10;
+	tsec_dev->fwreq_duration_ms = 0;
+	tsec_dev->fwreq_fail_threshold_ms = tsec_dev->fwreq_retry_interval_ms * 100;
+	pdata->private_data = tsec_dev;
 
 	tsec = pdev;
 	pdata->irq = platform_get_irq(pdev, 0);
 	if (pdata->irq < 0) {
 		dev_err(&pdev->dev, "CMD: failed to get irq %d\n", -pdata->irq);
+		devm_kfree(&pdev->dev, tsec_dev);
 		return -ENXIO;
 	}
 
@@ -808,11 +872,16 @@ int nvhost_t23x_tsec_intr_init(struct platform_device *pdev)
 				   process_msg, 0, "tsec_riscv_irq", pdev);
 	if (ret) {
 		dev_err(&pdev->dev, "CMD: failed to request irq %d\n", ret);
+		devm_kfree(&pdev->dev, tsec_dev);
 		return ret;
 	}
 
 	/* keep irq disabled */
 	disable_irq(pdata->irq);
+
+	/* schedule work item to turn on tsec */
+	schedule_delayed_work(&tsec_dev->poweron_work,
+		msecs_to_jiffies(tsec_dev->fwreq_retry_interval_ms));
 
 	return 0;
 }
