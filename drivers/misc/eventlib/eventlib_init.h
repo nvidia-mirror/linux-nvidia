@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -103,6 +103,9 @@ static inline void *subsys_shm_area(shmptr struct eventlib_shared *sh,
 	if (sh == NULL)
 		return NULL;
 
+	if (subsys < 0 || subsys >= EVENTLIB_SUBSYS_MAX)
+		return NULL;
+
 	return ((void *)((uintptr_t)sh + copy->subsys[subsys].offset));
 }
 
@@ -115,6 +118,9 @@ static inline void *subsys_shm_area(shmptr struct eventlib_shared *sh,
 
 static inline uint32_t subsys_shm_size(struct eventlib_shared *copy, int subsys)
 {
+	if (subsys < 0 || subsys >= EVENTLIB_SUBSYS_MAX)
+		return U32_MAX;
+
 	return copy->subsys[subsys].size;
 }
 
@@ -128,6 +134,9 @@ static inline int subsys_shm_carve(struct eventlib_shared *copy,
 {
 	if (size > *shm_size - *shm_offset)
 		return -ENOSPC;
+
+	if (subsys < 0 || subsys >= EVENTLIB_SUBSYS_MAX)
+		return -EINVAL;
 
 	copy->subsys[subsys].offset = *shm_offset;
 	copy->subsys[subsys].size = size;

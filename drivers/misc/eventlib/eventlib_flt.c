@@ -438,7 +438,7 @@ int eventlib_get_filter_mask(struct eventlib_ctx *ctx,
 	if (!flt->inited)
 		return -EPROTO;
 
-	if (domain >= EVENTLIB_FILTER_DOMAIN_MAX)
+	if (domain < 0 || domain >= EVENTLIB_FILTER_DOMAIN_MAX)
 		return -EINVAL;
 
 	if (ctx->direction == EVENTLIB_DIRECTION_WRITER) {
@@ -461,7 +461,7 @@ int eventlib_check_filter_bit(struct eventlib_ctx *ctx,
 	if (!flt->inited)
 		return -EPROTO;
 
-	if (domain >= EVENTLIB_FILTER_DOMAIN_MAX)
+	if (domain < 0 || domain >= EVENTLIB_FILTER_DOMAIN_MAX)
 		return -EINVAL;
 
 	if (bit >= flt->geo[domain].bits)
@@ -489,7 +489,7 @@ int eventlib_check_filter_mask(struct eventlib_ctx *ctx,
 	if (!flt->inited)
 		return -EPROTO;
 
-	if (domain >= EVENTLIB_FILTER_DOMAIN_MAX)
+	if (domain < 0 || domain >= EVENTLIB_FILTER_DOMAIN_MAX)
 		return -EINVAL;
 
 	if (ctx->direction == EVENTLIB_DIRECTION_WRITER) {
@@ -538,7 +538,7 @@ int eventlib_set_filter_bit(struct eventlib_ctx *ctx,
 	if (!flt->inited)
 		return -EPROTO;
 
-	if (domain >= EVENTLIB_FILTER_DOMAIN_MAX)
+	if (domain < 0 || domain >= EVENTLIB_FILTER_DOMAIN_MAX)
 		return -EINVAL;
 
 	if (bit >= flt->geo[domain].bits)
@@ -570,7 +570,7 @@ int eventlib_set_filter_mask(struct eventlib_ctx *ctx,
 	if (!flt->inited)
 		return -EPROTO;
 
-	if (domain >= EVENTLIB_FILTER_DOMAIN_MAX)
+	if (domain < 0 || domain >= EVENTLIB_FILTER_DOMAIN_MAX)
 		return -EINVAL;
 
 	memcpy(flt->r.mask + flt->geo[domain].offset, mask,
