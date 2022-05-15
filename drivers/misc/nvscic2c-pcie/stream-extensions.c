@@ -136,6 +136,10 @@ struct copy_request {
 };
 
 struct stream_ext_obj {
+	/* book-keeping for cleanup.*/
+	struct list_head node;
+	s32 handle;
+
 	/* back-reference to vmap handle, required during free/unmap.*/
 	void *vmap_h;
 
@@ -210,6 +214,9 @@ struct stream_ext_ctx_t {
 	struct mutex free_lock;
 	atomic_t transfer_count;
 	wait_queue_head_t transfer_waitq;
+
+	/* allocated stream obj list for book-keeping.*/
+	struct list_head obj_list;
 };
 
 static int
@@ -272,6 +279,9 @@ fops_mmap(struct file *filep, struct vm_area_struct *vma)
 	if (WARN_ON(!filep))
 		return -EFAULT;
 
+	if (WARN_ON(!filep->private_data))
+		return -EFAULT;
+
 	if (WARN_ON(!(vma)))
 		return -EFAULT;
 
@@ -293,9 +303,8 @@ fops_mmap(struct file *filep, struct vm_area_struct *vma)
 	vma->vm_pgoff  = 0;
 	vma->vm_flags |= (VM_DONTCOPY);
 	vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
-	ret = remap_pfn_range(vma, vma->vm_start,
-					PFN_DOWN(memaddr),
-					memsize, vma->vm_page_prot);
+	ret = remap_pfn_range(vma, vma->vm_start, PFN_DOWN(memaddr),
+			      memsize, vma->vm_page_prot);
 	if (ret)
 		pr_err("mmap() failed for Imported sync object\n");
 
@@ -315,7 +324,7 @@ streamobj_free(struct kref *kref)
 		if (stream_obj->import_obj_map)
 			iounmap(stream_obj->import_obj_map);
 		vmap_obj_unmap(stream_obj->vmap_h, stream_obj->vmap.type,
-					stream_obj->vmap.id);
+			       stream_obj->vmap.id);
 		kfree(stream_obj);
 	}
 }
@@ -325,17 +334,17 @@ fops_release(struct inode *inode, struct file *filep)
 {
 	struct stream_ext_obj *stream_obj =
 				(struct stream_ext_obj *)(filep->private_data);
-
-	if (WARN_ON(!stream_obj))
-		return -EFAULT;
-
+	if (!stream_obj)
+		return 0;
 	/*
 	 * actual free happens when the refcount reaches zero. This is done to
 	 * accommodate: out of order free while copy isin progress use-case.
 	 */
+	list_del(&stream_obj->node);
 	stream_obj->marked_for_del = true;
 	kref_put(&stream_obj->refcount, streamobj_free);
 
+	filep->private_data = NULL;
 	return 0;
 }
 
@@ -352,11 +361,24 @@ ioctl_free_obj(struct stream_ext_ctx_t *ctx,
 	       struct nvscic2c_pcie_free_obj_args *args)
 {
 	int ret = 0;
+	struct file *filep = NULL;
+	struct stream_ext_obj *stream_obj = NULL;
 
 	/* validate the input handle for correctness.*/
 	ret = validate_handle(ctx, args->handle, args->obj_type);
 	if (ret)
 		return ret;
+
+	filep = fget(args->handle);
+	stream_obj = filep->private_data;
+	filep->private_data = NULL;
+	fput(filep);
+
+	if (stream_obj) {
+		list_del(&stream_obj->node);
+		stream_obj->marked_for_del = true;
+		kref_put(&stream_obj->refcount, streamobj_free);
+	}
 
 	/* this shall close the handle: resulting in fops_release().*/
 	ksys_close(args->handle);
@@ -404,7 +426,7 @@ ioctl_export_obj(struct stream_ext_ctx_t *ctx,
 	 * corresponding import stream obj.
 	 */
 	ret = vmap_obj_getref(stream_obj->vmap_h, stream_obj->vmap.type,
-				stream_obj->vmap.id);
+			      stream_obj->vmap.id);
 	if (ret) {
 		pr_err("(%s): Failed ref counting an object\n", ctx->ep_name);
 		fput(filep);
@@ -414,7 +436,7 @@ ioctl_export_obj(struct stream_ext_ctx_t *ctx,
 	/* generate export desc.*/
 	peer = &ctx->peer_node;
 	exp_desc = gen_desc(peer->board_id, peer->soc_id, peer->cntrlr_id,
-				ctx->ep_id, export_type, stream_obj->vmap.id);
+			    ctx->ep_id, export_type, stream_obj->vmap.id);
 
 	/*share it with peer for peer for corresponding import.*/
 	pr_debug("Exporting descriptor = (%llu)\n", exp_desc);
@@ -451,10 +473,10 @@ ioctl_import_obj(struct stream_ext_ctx_t *ctx,
 
 	/* validate the incoming descriptor.*/
 	ret = validate_desc(args->in.desc, local->board_id, local->soc_id,
-				local->cntrlr_id, ctx->ep_id);
+			    local->cntrlr_id, ctx->ep_id);
 	if (ret) {
 		pr_err("(%s): Invalid descriptor: (%llu) received\n",
-				ctx->ep_name, args->in.desc);
+		       ctx->ep_name, args->in.desc);
 		return ret;
 	}
 
@@ -470,10 +492,11 @@ ioctl_import_obj(struct stream_ext_ctx_t *ctx,
 	filep = fget(handle);
 	if (!filep)
 		return -ENOMEM;
+
 	stream_obj = filep->private_data;
 	stream_obj->import_type = get_handle_type_from_desc(args->in.desc);
 	ret = pci_client_get_peer_aper(ctx->pci_client_h, stream_obj->vmap.offsetof,
-				stream_obj->vmap.size, &stream_obj->aper);
+				       stream_obj->vmap.size, &stream_obj->aper);
 	if (ret) {
 		pr_err("(%s): PCI Client Get Peer Aper Failed\n", ctx->ep_name);
 		fput(filep);
@@ -493,7 +516,7 @@ ioctl_import_obj(struct stream_ext_ctx_t *ctx,
 /* implement NVSCIC2C_PCIE_IOCTL_MAP ioctl call. */
 static int
 ioctl_map_obj(struct stream_ext_ctx_t *ctx,
-				struct nvscic2c_pcie_map_obj_args *args)
+	      struct nvscic2c_pcie_map_obj_args *args)
 {
 	int ret = 0;
 	s32 handle = -1;
@@ -514,7 +537,7 @@ ioctl_map_obj(struct stream_ext_ctx_t *ctx,
 /* implement NVSCIC2C_PCIE_IOCTL_SUBMIT_COPY_REQUEST ioctl call. */
 static int
 ioctl_submit_copy_request(struct stream_ext_ctx_t *ctx,
-				struct nvscic2c_pcie_submit_copy_args *args)
+			  struct nvscic2c_pcie_submit_copy_args *args)
 {
 	int ret = 0;
 	struct copy_request *cr = NULL;
@@ -573,7 +596,7 @@ ioctl_submit_copy_request(struct stream_ext_ctx_t *ctx,
 	/* schedule asynchronous eDMA.*/
 	atomic_inc(&ctx->transfer_count);
 	edma_status = schedule_edma_xfer(ctx->edma_h, (void *)cr,
-					cr->num_edma_desc, cr->edma_desc);
+					 cr->num_edma_desc, cr->edma_desc);
 	if (edma_status != EDMA_XFER_SUCCESS) {
 		ret = -EIO;
 		atomic_dec(&ctx->transfer_count);
@@ -601,14 +624,14 @@ ioctl_set_max_copy_requests(struct stream_ext_ctx_t *ctx,
 	struct list_head *curr = NULL, *next = NULL;
 
 	if (WARN_ON(!args->max_copy_requests ||
-			!args->max_flush_ranges ||
-			!args->max_post_fences))
+		    !args->max_flush_ranges ||
+		    !args->max_post_fences))
 		return -EINVAL;
 
 	/* limits already set.*/
 	if (WARN_ON(ctx->cr_limits.max_copy_requests ||
-			ctx->cr_limits.max_flush_ranges ||
-			ctx->cr_limits.max_post_fences))
+		    ctx->cr_limits.max_flush_ranges ||
+		    ctx->cr_limits.max_post_fences))
 		return -EINVAL;
 
 	ctx->cr_limits.max_copy_requests = args->max_copy_requests;
@@ -695,7 +718,7 @@ stream_extension_ioctl(void *stream_ext_h, unsigned int cmd, void *args)
 		break;
 	default:
 		pr_err("(%s): unrecognised nvscic2c-pcie ioclt cmd: 0x%x\n",
-		    ctx->ep_name, cmd);
+		       ctx->ep_name, cmd);
 		ret = -ENOTTY;
 		break;
 	}
@@ -731,28 +754,32 @@ stream_extension_init(struct stream_ext_params *params, void **stream_ext_h)
 	atomic_set(&ctx->transfer_count, 0);
 	init_waitqueue_head(&ctx->transfer_waitq);
 
+	/* bookkeeping of stream objs. */
+	INIT_LIST_HEAD(&ctx->obj_list);
+
 	*stream_ext_h = (void *)ctx;
 
 	return 0;
 }
 
-#define MAX_TRANSFER_TIMEOUT_US	(5000000)
+#define MAX_TRANSFER_TIMEOUT_MS	(5000)
 void
 stream_extension_deinit(void **stream_ext_h)
 {
 	int ret = 0;
-	struct stream_ext_ctx_t *ctx = (struct stream_ext_ctx_t *)*stream_ext_h;
-	struct list_head *curr = NULL, *next = NULL;
+	struct file *filep = NULL;
 	struct copy_request *cr = NULL;
+	struct stream_ext_obj *stream_obj = NULL;
+	struct list_head *curr = NULL, *next = NULL;
+	struct stream_ext_ctx_t *ctx = (struct stream_ext_ctx_t *)*stream_ext_h;
 
 	if (!ctx)
 		return;
 
 	/* wait for any on-going eDMA/copy(ies). */
-	ret = wait_event_interruptible_timeout
-			(ctx->transfer_waitq,
-			 !(atomic_read(&ctx->transfer_count)),
-			 msecs_to_jiffies(MAX_TRANSFER_TIMEOUT_US));
+	ret = wait_event_timeout(ctx->transfer_waitq,
+				 !(atomic_read(&ctx->transfer_count)),
+				 msecs_to_jiffies(MAX_TRANSFER_TIMEOUT_MS));
 	if (ret <= 0)
 		pr_err("eDMA transfers are still in progress\n");
 
@@ -763,27 +790,25 @@ stream_extension_deinit(void **stream_ext_h)
 		free_copy_request(&cr);
 	}
 	mutex_unlock(&ctx->free_lock);
-
 	free_copy_req_params(&ctx->cr_params);
-
 	mutex_destroy(&ctx->free_lock);
+
+	/*
+	 * clean-up the non freed stream objs. Descriptor shall be freed when
+	 * application exits.
+	 */
+	list_for_each_safe(curr, next, &ctx->obj_list) {
+		stream_obj = list_entry(curr, struct stream_ext_obj, node);
+		filep = fget(stream_obj->handle);
+		filep->private_data = NULL;
+		fput(filep);
+		list_del(curr);
+		stream_obj->marked_for_del = true;
+		kref_put(&stream_obj->refcount, streamobj_free);
+	}
 
 	kfree(ctx);
 	*stream_ext_h = NULL;
-}
-
-/*
- * Clear edma handle associated with stream extension.
- */
-void
-stream_extension_edma_deinit(void *stream_ext_h)
-{
-	struct stream_ext_ctx_t *ctx = (struct stream_ext_ctx_t *)stream_ext_h;
-
-	if (!ctx)
-		return;
-
-	ctx->edma_h = NULL;
 }
 
 static int
@@ -857,7 +882,7 @@ allocate_handle(struct stream_ext_ctx_t *ctx, enum nvscic2c_pcie_obj_type type,
 	 * O_RDWR is required only for ImportedSyncObjs mmap() from user-space.
 	 */
 	handle = anon_inode_getfd("nvscic2c-pcie-stream-ext", &fops_default,
-				stream_obj, (O_RDWR | O_CLOEXEC));
+				  stream_obj, (O_RDWR | O_CLOEXEC));
 	if (handle < 0) {
 		pr_err("(%s): Failed to get stream obj handle\n", ctx->ep_name);
 		vmap_obj_unmap(ctx->vmap_h, vmap_attrib.type, vmap_attrib.id);
@@ -865,6 +890,8 @@ allocate_handle(struct stream_ext_ctx_t *ctx, enum nvscic2c_pcie_obj_type type,
 		return -EFAULT;
 	}
 
+	list_add_tail(&stream_obj->node, &ctx->obj_list);
+	stream_obj->handle = handle;
 	stream_obj->vmap_h = ctx->vmap_h;
 	stream_obj->type = type;
 	stream_obj->soc_id = ctx->local_node.soc_id;
@@ -898,10 +925,11 @@ schedule_edma_xfer(void *edma_h, void *priv, u64 num_desc,
 /* Callback with each async eDMA submit xfer.*/
 static void
 callback_edma_xfer(void *priv, edma_xfer_status_t status,
-			struct tegra_pcie_edma_desc *desc)
+		   struct tegra_pcie_edma_desc *desc)
 {
 	struct copy_request *cr = (struct copy_request *)priv;
 
+	mutex_lock(&cr->ctx->free_lock);
 	/* increment num_local_fences.*/
 	if (status == EDMA_XFER_SUCCESS) {
 		/* X86 remote end fences are signaled through CPU */
@@ -916,17 +944,16 @@ callback_edma_xfer(void *priv, edma_xfer_status_t status,
 	release_copy_request_handles(cr);
 
 	/* reclaim the copy_request for reuse.*/
-	mutex_lock(&cr->ctx->free_lock);
 	list_add_tail(&cr->node, &cr->ctx->free_list);
 	mutex_unlock(&cr->ctx->free_lock);
 
 	atomic_dec(&cr->ctx->transfer_count);
-	wake_up_interruptible_all(&cr->ctx->transfer_waitq);
+	wake_up_all(&cr->ctx->transfer_waitq);
 }
 
 static int
 prepare_edma_desc(enum drv_mode_t drv_mode, struct copy_req_params *params,
-		struct tegra_pcie_edma_desc *desc, u64 *num_desc, enum peer_cpu_t peer_cpu)
+		  struct tegra_pcie_edma_desc *desc, u64 *num_desc, enum peer_cpu_t peer_cpu)
 {
 	u32 i = 0;
 	int ret = 0;
@@ -1116,8 +1143,8 @@ validate_handle(struct stream_ext_ctx_t *ctx, s32 handle,
 		goto err;
 
 	if (stream_obj->soc_id != ctx->local_node.soc_id ||
-		stream_obj->cntrlr_id != ctx->local_node.cntrlr_id ||
-		stream_obj->ep_id != ctx->ep_id)
+	    stream_obj->cntrlr_id != ctx->local_node.cntrlr_id ||
+	    stream_obj->ep_id != ctx->ep_id)
 		goto err;
 
 	if (stream_obj->type != type)
@@ -1133,7 +1160,7 @@ exit:
 
 static int
 validate_import_handle(struct stream_ext_ctx_t *ctx, s32 handle,
-			u32 import_type)
+		       u32 import_type)
 {
 	int ret = 0;
 	struct stream_ext_obj *stream_obj = NULL;
@@ -1172,12 +1199,12 @@ validate_flush_range(struct stream_ext_ctx_t *ctx,
 		return -EINVAL;
 
 	ret = validate_handle(ctx, flush_range->src_handle,
-					NVSCIC2C_PCIE_OBJ_TYPE_SOURCE_MEM);
+			      NVSCIC2C_PCIE_OBJ_TYPE_SOURCE_MEM);
 	if (ret)
 		return ret;
 
 	ret = validate_import_handle(ctx, flush_range->dst_handle,
-					STREAM_OBJ_TYPE_MEM);
+				     STREAM_OBJ_TYPE_MEM);
 	if (ret)
 		return ret;
 
@@ -1202,7 +1229,7 @@ validate_flush_range(struct stream_ext_ctx_t *ctx,
 
 static int
 validate_copy_req_params(struct stream_ext_ctx_t *ctx,
-				struct copy_req_params *params)
+			 struct copy_req_params *params)
 {
 	u32 i = 0;
 	int ret = 0;
@@ -1213,7 +1240,7 @@ validate_copy_req_params(struct stream_ext_ctx_t *ctx,
 
 		handle = params->local_post_fences[i];
 		ret = validate_handle(ctx, handle,
-					NVSCIC2C_PCIE_OBJ_TYPE_LOCAL_SYNC);
+				      NVSCIC2C_PCIE_OBJ_TYPE_LOCAL_SYNC);
 		if (ret)
 			return ret;
 	}

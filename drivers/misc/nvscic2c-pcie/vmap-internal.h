@@ -15,7 +15,6 @@
 #ifndef __VMAP_INTERNAL_H__
 #define __VMAP_INTERNAL_H__
 
-
 #include <linux/dma-iommu.h>
 #include <linux/dma-buf.h>
 #include <linux/pci.h>

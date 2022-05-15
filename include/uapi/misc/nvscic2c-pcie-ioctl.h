@@ -19,7 +19,6 @@
 
 #if !defined(__KERNEL__)
 #define __user
-#include <stdbool.h>
 #endif
 
 #define MAX_NAME_SZ		(32)
@@ -195,10 +194,6 @@ struct nvscic2c_pcie_max_copy_args {
 	__u64 max_post_fences;
 };
 
-struct nvscic2c_link_change_ack {
-	bool done;
-};
-
 /* Only to facilitate calculation of maximum size of ioctl arguments.*/
 union nvscic2c_pcie_ioctl_arg_max_size {
 	struct nvscic2c_pcie_max_copy_args mc;
@@ -208,7 +203,6 @@ union nvscic2c_pcie_ioctl_arg_max_size {
 	struct nvscic2c_pcie_export_obj_args eo;
 	struct nvscic2c_pcie_map_obj_args mp;
 	struct nvscic2c_pcie_endpoint_info ep;
-	struct nvscic2c_link_change_ack ack;
 };
 
 /* IOCTL magic number - seen available in ioctl-number.txt*/
@@ -266,10 +260,6 @@ union nvscic2c_pcie_ioctl_arg_max_size {
 	_IOW(NVSCIC2C_PCIE_IOCTL_MAGIC, 8,\
 	      struct nvscic2c_pcie_max_copy_args)
 
-#define NVSCIC2C_PCIE_LINK_STATUS_CHANGE_ACK \
-	_IOW(NVSCIC2C_PCIE_IOCTL_MAGIC, 9,\
-	     struct nvscic2c_link_change_ack)
-
-#define NVSCIC2C_PCIE_IOCTL_NUMBER_MAX 9
+#define NVSCIC2C_PCIE_IOCTL_NUMBER_MAX 8
 
 #endif /*__UAPI_NVSCIC2C_PCIE_IOCTL_H__*/

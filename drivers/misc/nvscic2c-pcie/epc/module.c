@@ -72,6 +72,16 @@ edma_module_init(struct driver_ctx_t *drv_ctx)
 	return ret;
 }
 
+/* should stop any ongoing eDMA transfers.*/
+static void
+edma_module_stop(struct driver_ctx_t *drv_ctx)
+{
+	if (!drv_ctx || !drv_ctx->edma_h)
+		return;
+
+	tegra_pcie_edma_stop(drv_ctx->edma_h);
+}
+
 /* should not have any ongoing eDMA transfers.*/
 static void
 edma_module_deinit(struct driver_ctx_t *drv_ctx)
@@ -171,9 +181,11 @@ nvscic2c_pcie_epc_remove(struct pci_dev *pdev)
 
 	pci_client_change_link_status(drv_ctx->pci_client_h,
 				      NVSCIC2C_PCIE_LINK_DOWN);
-	endpoints_core_deinit(drv_ctx->endpoints_h);
-	edma_module_deinit(drv_ctx);
+	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
+				       COMM_MSG_TYPE_LINK);
+	edma_module_stop(drv_ctx);
 	endpoints_release(&drv_ctx->endpoints_h);
+	edma_module_deinit(drv_ctx);
 	vmap_deinit(&drv_ctx->vmap_h);
 	comm_channel_deinit(&drv_ctx->comm_channel_h);
 	pci_client_deinit(&drv_ctx->pci_client_h);

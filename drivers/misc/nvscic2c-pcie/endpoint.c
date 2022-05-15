@@ -124,8 +124,6 @@ struct endpoint_t {
 	/* serialise access to fops.*/
 	struct mutex fops_lock;
 	atomic_t in_use;
-	bool link_status_ack_frm_usr;
-	wait_queue_head_t ack_waitq;
 	wait_queue_head_t close_waitq;
 
 	/* pci client handle.*/
@@ -160,7 +158,7 @@ static void
 link_event_callback(void *event_type, void *ctx);
 
 /* prototype. */
-static int
+static void
 enable_event_handling(struct endpoint_t *endpoint);
 
 /* prototype. */
@@ -170,10 +168,6 @@ disable_event_handling(struct endpoint_t *endpoint);
 /* prototype. */
 static int
 ioctl_notify_remote_impl(struct endpoint_t *endpoint);
-
-static int
-link_change_ack(struct endpoint_t *endpoint,
-		struct nvscic2c_link_change_ack *ack);
 
 /* prototype. */
 static int
@@ -190,10 +184,17 @@ static int
 endpoint_fops_open(struct inode *inode, struct file *filp)
 {
 	int ret = 0;
+	enum nvscic2c_pcie_link link = NVSCIC2C_PCIE_LINK_DOWN;
 	struct endpoint_t *endpoint =
 		container_of(inode->i_cdev, struct endpoint_t, cdev);
 
 	mutex_lock(&endpoint->fops_lock);
+
+	link = pci_client_query_link_status(endpoint->pci_client_h);
+	if (link != NVSCIC2C_PCIE_LINK_UP) {
+		mutex_unlock(&endpoint->fops_lock);
+		return -ENOLINK;
+	}
 	if (atomic_read(&endpoint->in_use)) {
 		/* already in use.*/
 		mutex_unlock(&endpoint->fops_lock);
@@ -210,17 +211,10 @@ endpoint_fops_open(struct inode *inode, struct file *filp)
 	}
 
 	/* start link, data event handling.*/
-	ret = enable_event_handling(endpoint);
-	if (ret) {
-		pr_err("(%s): Failed to enable link, syncpt event handling\n",
-		       endpoint->name);
-		stream_extension_deinit(&endpoint->stream_ext_h);
-		goto err;
-	}
+	enable_event_handling(endpoint);
 
-	filp->private_data = endpoint;
-	endpoint->link_status_ack_frm_usr = true;
 	atomic_set(&endpoint->in_use, 1);
+	filp->private_data = endpoint;
 err:
 	mutex_unlock(&endpoint->fops_lock);
 	return ret;
@@ -231,22 +225,17 @@ static int
 endpoint_fops_release(struct inode *inode, struct file *filp)
 {
 	int ret = 0;
-	struct nvscic2c_link_change_ack ack = {0};
 	struct endpoint_t *endpoint = filp->private_data;
 
 	if (!endpoint)
 		return ret;
 
 	mutex_lock(&endpoint->fops_lock);
-	if (atomic_read(&endpoint->in_use)) {
-		disable_event_handling(endpoint);
-		stream_extension_deinit(&endpoint->stream_ext_h);
-		ack.done = false;
-		link_change_ack(endpoint, &ack);
-		atomic_set(&endpoint->in_use, 0);
-		wake_up_interruptible_all(&endpoint->close_waitq);
-	}
 	filp->private_data = NULL;
+	atomic_set(&endpoint->in_use, 0);
+	disable_event_handling(endpoint);
+	stream_extension_deinit(&endpoint->stream_ext_h);
+	wake_up_interruptible_all(&endpoint->close_waitq);
 	mutex_unlock(&endpoint->fops_lock);
 
 	return ret;
@@ -279,6 +268,10 @@ endpoint_fops_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EFAULT;
 
 	mutex_lock(&endpoint->fops_lock);
+	if (!atomic_read(&endpoint->in_use)) {
+		mutex_unlock(&endpoint->fops_lock);
+		return -EBADF;
+	}
 
 	switch (mmap_type) {
 	case PEER_MEM_MMAP:
@@ -345,6 +338,10 @@ endpoint_fops_poll(struct file *filp, poll_table *wait)
 		return POLLNVAL;
 
 	mutex_lock(&endpoint->fops_lock);
+	if (!atomic_read(&endpoint->in_use)) {
+		mutex_unlock(&endpoint->fops_lock);
+		return POLLNVAL;
+	}
 
 	/* add all waitq if they are different for read, write & link+state.*/
 	poll_wait(filp, &endpoint->waitq, wait);
@@ -392,6 +389,10 @@ endpoint_fops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 
 	mutex_lock(&endpoint->fops_lock);
+	if (!atomic_read(&endpoint->in_use)) {
+		mutex_unlock(&endpoint->fops_lock);
+		return -EBADF;
+	}
 	switch (cmd) {
 	case NVSCIC2C_PCIE_IOCTL_GET_INFO:
 		ret = ioctl_get_info_impl
@@ -399,10 +400,6 @@ endpoint_fops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 	case NVSCIC2C_PCIE_IOCTL_NOTIFY_REMOTE:
 		ret = ioctl_notify_remote_impl(endpoint);
-		break;
-	case NVSCIC2C_PCIE_LINK_STATUS_CHANGE_ACK:
-		link_change_ack(endpoint,
-				(struct nvscic2c_link_change_ack *)buf);
 		break;
 	default:
 		ret = stream_extension_ioctl(endpoint->stream_ext_h, cmd, buf);
@@ -471,21 +468,9 @@ ioctl_notify_remote_impl(struct endpoint_t *endpoint)
 	return ret;
 }
 
-static int
-link_change_ack(struct endpoint_t *endpoint,
-		struct nvscic2c_link_change_ack *ack)
-{
-	endpoint->link_status_ack_frm_usr = ack->done;
-	wake_up_interruptible_all(&endpoint->ack_waitq);
-
-	return 0;
-}
-
-static int
+static void
 enable_event_handling(struct endpoint_t *endpoint)
 {
-	int ret = 0;
-
 	/*
 	 * propagate link and state change events that occur after the device
 	 * is opened and not the stale ones.
@@ -493,8 +478,6 @@ enable_event_handling(struct endpoint_t *endpoint)
 	atomic_set(&endpoint->dataevent_count, 0);
 	atomic_set(&endpoint->linkevent_count, 0);
 	atomic_set(&endpoint->event_handling, 1);
-
-	return ret;
 }
 
 static int
@@ -811,21 +794,25 @@ remove_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 	if (!eps_ctx || !endpoint)
 		return ret;
 
-	wait_event_interruptible(endpoint->close_waitq, !(atomic_read(&endpoint->in_use)));
+	/* allow, open() or close() to complete.*/
+	mutex_lock(&endpoint->fops_lock);
+	mutex_unlock(&endpoint->fops_lock);
+
+	/* wait for user-land to close the device.*/
+	wait_event_interruptible(endpoint->close_waitq,
+				 !(atomic_read(&endpoint->in_use)));
 
 	pci_client_unregister_for_link_event(endpoint->pci_client_h,
 					     endpoint->linkevent_id);
 	free_syncpoint(eps_ctx, endpoint);
 	free_memory(eps_ctx, endpoint);
-	atomic_set(&endpoint->in_use, 0);
-	mutex_destroy(&endpoint->fops_lock);
-
 	if (endpoint->device) {
+		device_destroy(eps_ctx->class, endpoint->dev);
 		cdev_del(&endpoint->cdev);
-		device_del(endpoint->device);
 		endpoint->device = NULL;
 	}
-
+	atomic_set(&endpoint->in_use, 0);
+	mutex_destroy(&endpoint->fops_lock);
 	return ret;
 }
 
@@ -841,6 +828,12 @@ create_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 	int ret = 0;
 	struct callback_ops ops = {0};
 
+	/* initialise the endpoint internals.*/
+	mutex_init(&endpoint->fops_lock);
+	atomic_set(&endpoint->in_use, 0);
+	init_waitqueue_head(&endpoint->waitq);
+	init_waitqueue_head(&endpoint->close_waitq);
+
 	/* create the nvscic2c endpoint char device.*/
 	endpoint->dev = MKDEV(MAJOR(eps_ctx->char_dev), endpoint->minor);
 	cdev_init(&endpoint->cdev, &endpoint_fops);
@@ -855,19 +848,12 @@ create_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 					 endpoint->dev, endpoint,
 					 endpoint->name);
 	if (IS_ERR(endpoint->device)) {
+		cdev_del(&endpoint->cdev);
 		ret = PTR_ERR(endpoint->device);
 		pr_err("(%s): device_create() failed\n", endpoint->name);
 		goto err;
 	}
 	dev_set_drvdata(endpoint->device, endpoint);
-
-	/* initialise the endpoint internals.*/
-	mutex_init(&endpoint->fops_lock);
-	atomic_set(&endpoint->in_use, 0);
-	init_waitqueue_head(&endpoint->waitq);
-	endpoint->link_status_ack_frm_usr = false;
-	init_waitqueue_head(&endpoint->ack_waitq);
-	init_waitqueue_head(&endpoint->close_waitq);
 
 	/* allocate physical pages for the endpoint PCIe BAR (rx) area.*/
 	ret = allocate_memory(eps_ctx, endpoint);
@@ -893,6 +879,7 @@ create_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 	if (ret) {
 		pr_err("(%s): Failed to register for PCIe link events\n",
 		       endpoint->name);
+		goto err;
 	}
 
 	/* all okay.*/
@@ -1030,37 +1017,6 @@ endpoints_release(void **endpoints_h)
 
 	kfree(eps_ctx);
 	*endpoints_h = NULL;
-
-	return ret;
-}
-
-int
-endpoints_core_deinit(void *endpoints_h)
-{
-	u32 i = 0;
-	int ret = 0;
-	struct endpoint_drv_ctx_t *eps_ctx =
-				 (struct endpoint_drv_ctx_t *)endpoints_h;
-	if (!eps_ctx)
-		return ret;
-
-	if (eps_ctx->endpoints) {
-		for (i = 0; i < eps_ctx->nr_endpoint; i++) {
-			struct endpoint_t *endpoint =
-						 &eps_ctx->endpoints[i];
-
-			mutex_lock(&endpoint->fops_lock);
-			stream_extension_edma_deinit(endpoint->stream_ext_h);
-			mutex_unlock(&endpoint->fops_lock);
-			(void)wait_event_interruptible_timeout(endpoint->ack_waitq,
-							       !endpoint->link_status_ack_frm_usr,
-							       msecs_to_jiffies(
-							       PCIE_STATUS_CHANGE_ACK_TIMEOUT));
-
-			pci_client_unregister_for_link_event(endpoint->pci_client_h,
-							     endpoint->linkevent_id);
-		}
-	}
 
 	return ret;
 }

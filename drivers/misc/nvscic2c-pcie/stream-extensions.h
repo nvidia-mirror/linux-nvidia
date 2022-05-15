@@ -48,7 +48,4 @@ stream_extension_init(struct stream_ext_params *params, void **handle);
 
 void
 stream_extension_deinit(void **handle);
-
-void
-stream_extension_edma_deinit(void *stream_ext_h);
 #endif //__STREAM_EXTENSIONS_H__

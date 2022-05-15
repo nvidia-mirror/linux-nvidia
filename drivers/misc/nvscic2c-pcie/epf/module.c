@@ -83,6 +83,16 @@ edma_module_init(struct driver_ctx_t *drv_ctx)
 	return ret;
 }
 
+/* should stop any ongoing eDMA transfers.*/
+static void
+edma_module_stop(struct driver_ctx_t *drv_ctx)
+{
+	if (!drv_ctx || !drv_ctx->edma_h)
+		return;
+
+	tegra_pcie_edma_stop(drv_ctx->edma_h);
+}
+
 /* should not have any ongoing eDMA transfers.*/
 static void
 edma_module_deinit(struct driver_ctx_t *drv_ctx)
@@ -315,11 +325,14 @@ init_work(struct work_struct *work)
 	/* inidicate link-up to application and peer.*/
 	pci_client_change_link_status(drv_ctx->pci_client_h,
 				      NVSCIC2C_PCIE_LINK_UP);
+
 	msg.type = COMM_MSG_TYPE_LINK;
 	msg.u.link.status = NVSCIC2C_PCIE_LINK_UP;
 	ret = comm_channel_msg_send(drv_ctx->comm_channel_h, &msg);
 	if (ret)
 		pr_err("Failed to send COMM_MSG_TYPE_LINK message\n");
+
+	atomic_set(&epf_ctx->initialized, 1);
 }
 
 static int
@@ -348,24 +361,6 @@ nvscic2c_pcie_epf_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static void
-nvscic2c_pcie_core_deinit(struct pci_epf *epf)
-{
-	struct driver_ctx_t *drv_ctx = NULL;
-
-	if (!epf)
-		return;
-
-	drv_ctx = epf_get_drvdata(epf);
-	if (!drv_ctx)
-		return;
-
-	pci_client_change_link_status(drv_ctx->pci_client_h,
-				      NVSCIC2C_PCIE_LINK_DOWN);
-	endpoints_core_deinit(drv_ctx->endpoints_h);
-	edma_module_deinit(drv_ctx);
-}
-
 /*
  * PCIe subsystem sends CORE_DEINIT when RP controller goes down.
  */
@@ -374,14 +369,33 @@ nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
 				 unsigned long val, void *data)
 {
 	struct pci_epf *epf = NULL;
+	struct driver_ctx_t *drv_ctx = NULL;
+	struct epf_context_t *epf_ctx = NULL;
 
 	if (WARN_ON(!nb))
 		return -EINVAL;
 	epf = container_of(nb, struct pci_epf, block_nb);
 
+	drv_ctx = epf_get_drvdata(epf);
+	if (!drv_ctx)
+		return -EINVAL;
+
+	epf_ctx = drv_ctx->epf_ctx;
+
 	switch (val) {
 	case CORE_DEINIT:
-		nvscic2c_pcie_core_deinit(epf);
+		if (atomic_read(&epf_ctx->initialized)) {
+			pci_client_change_link_status(drv_ctx->pci_client_h,
+						      NVSCIC2C_PCIE_LINK_DOWN);
+			edma_module_stop(drv_ctx);
+			endpoints_release(&drv_ctx->endpoints_h);
+			edma_module_deinit(drv_ctx);
+			vmap_deinit(&drv_ctx->vmap_h);
+			clear_outbound_translation(epf, &drv_ctx->peer_mem);
+			clear_inbound_translation(epf);
+		}
+		atomic_set(&epf_ctx->initialized, 0);
+		wake_up_all(&epf_ctx->initialized_waitq);
 		break;
 
 	default:
@@ -389,7 +403,6 @@ nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
 	}
 
 	return NOTIFY_OK;
-
 }
 
 /*
@@ -400,6 +413,7 @@ static void
 nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 {
 	struct driver_ctx_t *drv_ctx = NULL;
+	struct epf_context_t *epf_ctx = NULL;
 
 	if (!epf)
 		return;
@@ -408,13 +422,11 @@ nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 	if (!drv_ctx)
 		return;
 
-	pci_client_change_link_status(drv_ctx->pci_client_h,
-				      NVSCIC2C_PCIE_LINK_DOWN);
-	endpoints_release(&drv_ctx->endpoints_h);
-	edma_module_deinit(drv_ctx);
-	clear_inbound_translation(epf);
-	clear_outbound_translation(epf, &drv_ctx->peer_mem);
-	vmap_deinit(&drv_ctx->vmap_h);
+	epf_ctx = drv_ctx->epf_ctx;
+	wait_event(epf_ctx->initialized_waitq,
+		   !(atomic_read(&epf_ctx->initialized)));
+	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
+				       COMM_MSG_TYPE_BOOTSTRAP);
 	comm_channel_deinit(&drv_ctx->comm_channel_h);
 	pci_client_deinit(&drv_ctx->pci_client_h);
 	free_outbound_area(epf, &drv_ctx->peer_mem);
@@ -611,6 +623,10 @@ nvscic2c_pcie_epf_probe(struct pci_epf *epf)
 	epf_ctx->drv_ctx = drv_ctx;
 	epf_ctx->epf = epf;
 	INIT_WORK(&epf_ctx->initialization_work, init_work);
+
+	/* to synchronize deinit and unbind.*/
+	atomic_set(&epf_ctx->initialized, 0);
+	init_waitqueue_head(&epf_ctx->initialized_waitq);
 
 	return ret;
 

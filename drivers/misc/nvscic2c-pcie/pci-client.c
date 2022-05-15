@@ -82,6 +82,7 @@ struct pci_client_t {
 	 * the iova region and thereby marking it as unusable.
 	 */
 	dma_addr_t edma_ch_desc_iova;
+	bool edma_ch_desc_iova_mapped;
 	void *skip_iova;
 	void *skip_meta;
 	void *edma_ch_desc_iova_h;
@@ -138,6 +139,7 @@ pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
 	void *pva;
 	u64 phys_addr;
 	struct pci_client_t *ctx = (struct pci_client_t *)pci_client_h;
+
 	if (WARN_ON(!ctx))
 		return -EINVAL;
 
@@ -149,34 +151,37 @@ pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
 	 *next 64K resered for sys-sw
 	 */
 	ret = iova_mngr_block_reserve(ctx->mem_mngr_h, SZ_4K,
-				NULL, NULL, &ctx->skip_meta);
+				      NULL, NULL, &ctx->skip_meta);
 	if (ret) {
 		pr_err("Failed to skip the 4K reserved iova region\n");
 		return ret;
 	}
-	pva = alloc_pages_exact(60*SZ_1K, (GFP_KERNEL | __GFP_ZERO));
+	pva = alloc_pages_exact(60 * SZ_1K, (GFP_KERNEL | __GFP_ZERO));
 	if (!pva) {
 		pr_err("Failed to allocate a page with size of 60K\n");
 		return -ENOMEM;
 	}
 	phys_addr = page_to_phys(virt_to_page(pva));
-	ret = pci_client_alloc_iova(ctx, 60*SZ_1K,
-				&ctx->edma_ch_desc_iova, NULL,
-				&ctx->edma_ch_desc_iova_h);
+	ret = iova_mngr_block_reserve(ctx->mem_mngr_h, (60 * SZ_1K),
+				      &ctx->edma_ch_desc_iova, NULL,
+				      &ctx->edma_ch_desc_iova_h);
 	if (ret) {
-		pr_err("pci client failed to allocate iova with size of 60k\n");
+		pr_err("Failed to reserve 60K iova space for remote edma desc\n");
 		return ret;
 	}
+
 	prot = (IOMMU_CACHE | IOMMU_READ | IOMMU_WRITE);
 	ret = pci_client_map_addr(ctx, ctx->edma_ch_desc_iova,
-				phys_addr, 60*SZ_1K, prot);
+				  phys_addr, 60 * SZ_1K, prot);
 	if (ret) {
 		pr_err("ci client failed to map iova to 60K physical backing\n");
 		return ret;
 	}
+	ctx->edma_ch_desc_iova_mapped = true;
+
 	/* bar0+64K - bar0+126K  reserved for sys-sw  */
 	ret = iova_mngr_block_reserve(ctx->mem_mngr_h, SZ_64K,
-				NULL, NULL, &ctx->skip_iova);
+				      NULL, NULL, &ctx->skip_iova);
 	if (ret) {
 		pr_err("Failed to skip the 64K reserved iova region\n");
 		return ret;
@@ -192,9 +197,9 @@ pci_client_init(struct pci_client_params *params, void **pci_client_h)
 	struct pci_client_t *ctx = NULL;
 
 	/* should not be an already instantiated pci client context. */
-	if (WARN_ON(!pci_client_h || *pci_client_h
-		    || !params || !params->self_mem || !params->peer_mem
-		    || !params->dev))
+	if (WARN_ON(!pci_client_h || *pci_client_h ||
+		    !params || !params->self_mem || !params->peer_mem ||
+		    !params->dev))
 		return -EINVAL;
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
@@ -278,14 +283,20 @@ pci_client_deinit(void **pci_client_h)
 		ctx->skip_iova = NULL;
 	}
 
-	if (ctx->skip_meta) {
-		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_meta);
-		ctx->skip_meta = NULL;
+	if (ctx->edma_ch_desc_iova_mapped) {
+		pci_client_unmap_addr(ctx, ctx->edma_ch_desc_iova, 60 * SZ_1K);
+		ctx->edma_ch_desc_iova_mapped = false;
 	}
 
 	if (ctx->edma_ch_desc_iova) {
-		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->edma_ch_desc_iova_h);
+		iova_mngr_block_release(ctx->mem_mngr_h,
+					&ctx->edma_ch_desc_iova_h);
 		ctx->edma_ch_desc_iova_h = NULL;
+	}
+
+	if (ctx->skip_meta) {
+		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_meta);
+		ctx->skip_meta = NULL;
 	}
 
 	if (ctx->mem_mngr_h) {
@@ -585,6 +596,7 @@ pci_client_get_drv_mode(void *pci_client_h)
 		return NVCPU_MAXIMUM;
 	return drv_ctx->drv_mode;
 }
+
 /* save the peer cup orin/x86_64 */
 int
 pci_client_save_peer_cpu(void *pci_client_h, enum peer_cpu_t peer_cpu)
@@ -601,7 +613,6 @@ pci_client_save_peer_cpu(void *pci_client_h, enum peer_cpu_t peer_cpu)
 	drv_ctx->peer_cpu = peer_cpu;
 	return ret;
 }
-
 
 /* get the peer cup orin/x86_64 */
 enum peer_cpu_t

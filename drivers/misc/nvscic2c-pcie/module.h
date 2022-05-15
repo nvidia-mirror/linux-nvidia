@@ -140,6 +140,8 @@ struct epf_context_t {
 	struct pci_epf *epf;
 	void *drv_ctx;
 	struct work_struct initialization_work;
+	atomic_t initialized;
+	wait_queue_head_t initialized_waitq;
 };
 
 /*

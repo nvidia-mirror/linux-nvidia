@@ -42,12 +42,12 @@ memobj_devmngd_unpin(struct vmap_ctx_t *vmap_ctx,
 	if (!pin)
 		return;
 
-	if (pin->sgt) {
+	if (!(IS_ERR_OR_NULL(pin->sgt))) {
 		dma_buf_unmap_attachment(pin->attach, pin->sgt,	pin->dir);
 		pin->sgt = NULL;
 	}
 
-	if (pin->attach) {
+	if (!(IS_ERR_OR_NULL(pin->attach))) {
 		pci_client_dmabuf_detach(vmap_ctx->pci_client_h,
 					 pin->dmabuf, pin->attach);
 		pin->attach = NULL;
@@ -73,6 +73,7 @@ memobj_devmngd_pin(struct vmap_ctx_t *vmap_ctx,
 		ret = PTR_ERR(pin->attach);
 		goto err;
 	}
+
 	pin->sgt = dma_buf_map_attachment(pin->attach, pin->dir);
 	if (IS_ERR_OR_NULL(pin->sgt)) {
 		ret = PTR_ERR(pin->sgt);
@@ -128,12 +129,12 @@ memobj_clientmngd_unpin(struct vmap_ctx_t *vmap_ctx,
 		pin->iova_block_h = NULL;
 	}
 
-	if (pin->sgt) {
+	if (!(IS_ERR_OR_NULL(pin->sgt))) {
 		dma_buf_unmap_attachment(pin->attach, pin->sgt, pin->dir);
 		pin->sgt = NULL;
 	}
 
-	if (pin->attach) {
+	if (!(IS_ERR_OR_NULL(pin->attach))) {
 		dma_buf_detach(pin->dmabuf, pin->attach);
 		pin->attach = NULL;
 	}
@@ -202,12 +203,12 @@ memobj_clientmngd_pin(struct vmap_ctx_t *vmap_ctx,
 		pin->nents[sg_index].iova = iova;
 		pin->nents[sg_index].len = sg->length;
 		ret = pci_client_map_addr(vmap_ctx->pci_client_h,
-					pin->nents[sg_index].iova, paddr,
-					pin->nents[sg_index].len,
-					(IOMMU_CACHE | prot));
+					  pin->nents[sg_index].iova, paddr,
+					  pin->nents[sg_index].len,
+					  (IOMMU_CACHE | prot));
 		if (ret < 0) {
 			pr_err("Failed: to iommu_map sg_nent: (%u), size: (%u)\n",
-					sg_index, sg->length);
+			       sg_index, sg->length);
 			goto err;
 		}
 		pin->nents[sg_index].mapped_iova = true;
