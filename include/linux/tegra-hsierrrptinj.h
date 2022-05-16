@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -7,8 +8,11 @@
  *
  * This program is distributed in the hope it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /**
@@ -60,7 +64,9 @@ IP_OTHER = 0x0009
  *  -EFAULT     (On IP driver failure to report error)
  *  -ETIME      (On timeout in IP driver)
  */
-int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame err_rpt_frame);
+typedef int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame err_rpt_frame);
+
+#if IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ)
 
 /**
  * @brief HSI error report injection callback registration
@@ -81,5 +87,14 @@ int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame err_rpt
  */
 int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func);
 
+#else
 
-#endif /* TEGRA_EPL_H */
+inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func)
+{
+	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ is not enabled\n");
+	return -ENODEV;
+}
+
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
+
+#endif /* TEGRA_HSIERRRPTINJ_H */
