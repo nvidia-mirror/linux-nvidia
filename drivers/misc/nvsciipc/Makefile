@@ -20,5 +20,10 @@ ifeq ($(CONFIG_NVSCIIPC_UPSTREAM),y)
 ccflags-y += -DCONFIG_NVSCIIPC_UPSTREAM
 endif
 
+# Make as module for OOT module build
+ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
+obj-m := nvsciipc.o
+else
 obj-$(CONFIG_NVSCIIPC) := nvsciipc.o
+endif
 
