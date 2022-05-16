@@ -856,6 +856,9 @@ void tegra_fb_pan_display_reset(struct tegra_fb_info *fb_info)
 #if defined(CONFIG_FRAMEBUFFER_CONSOLE)
 bool fbcon_is_fgconsole()
 {
+	if (fg_console < 0 || fg_console >= MAX_NR_CONSOLES)
+		return false;
+
 	return (vc_cons[fg_console].d->vc_mode == KD_TEXT);
 }
 #endif
