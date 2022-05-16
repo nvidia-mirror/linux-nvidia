@@ -121,9 +121,9 @@ struct max_gmsl_dp_ser_priv {
 	int ser_errb;
 	unsigned int ser_irq;
 	bool enable_mst;
-	u8 mst_payload_ids[MAX_GMSL_ARRAY_SIZE];
-	u8 gmsl_stream_ids[MAX_GMSL_ARRAY_SIZE];
-	u8 gmsl_link_select[MAX_GMSL_ARRAY_SIZE];
+	u32 mst_payload_ids[MAX_GMSL_ARRAY_SIZE];
+	u32 gmsl_stream_ids[MAX_GMSL_ARRAY_SIZE];
+	u32 gmsl_link_select[MAX_GMSL_ARRAY_SIZE];
 	bool link_a_is_enabled;
 	bool link_b_is_enabled;
 };
@@ -200,7 +200,7 @@ static void max_gmsl_dp_ser_mst_setup(struct max_gmsl_dp_ser_priv *priv)
 static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 {
 	int i;
-	u8 gmsl_link_select_value = 0;
+	u32 gmsl_link_select_value = 0;
 	static const int max_gmsl_ser_vid_tx_regs[] = {
 		MAX_GMSL_DP_SER_VID_TX_X,
 		MAX_GMSL_DP_SER_VID_TX_Y,
@@ -244,7 +244,7 @@ static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 		max_gmsl_dp_ser_mst_setup(priv);
 }
 
-static bool max_gmsl_dp_ser_check_dups(u8 *ids)
+static bool max_gmsl_dp_ser_check_dups(u32 *ids)
 {
 	int i = 0, j = 0;
 
@@ -447,7 +447,7 @@ static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
 		dev_info(dev, "%s: MST mode not enabled:\n", __func__);
 
 	if (priv->enable_mst) {
-		err = of_property_read_variable_u8_array(ser,
+		err = of_property_read_variable_u32_array(ser,
 							 "mst-payload-ids",
 							 priv->mst_payload_ids, 1,
 							 ARRAY_SIZE(priv->mst_payload_ids));
@@ -466,7 +466,7 @@ static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
 			return -EINVAL;
 		}
 
-		err = of_property_read_variable_u8_array(ser,
+		err = of_property_read_variable_u32_array(ser,
 							 "gmsl-stream-ids",
 							 priv->gmsl_stream_ids, 1,
 							 ARRAY_SIZE(priv->gmsl_stream_ids));
@@ -534,7 +534,7 @@ static int max_gmsl_dp_ser_parse_dt(struct i2c_client *client,
 		dev_info(dev, "%s: - dprx-link-rate %i\n", __func__, val);
 	}
 
-	err = of_property_read_variable_u8_array(ser, "gmsl-link-select",
+	err = of_property_read_variable_u32_array(ser, "gmsl-link-select",
 						 priv->gmsl_link_select, 1,
 						 ARRAY_SIZE(priv->gmsl_link_select));
 	if (err < 0) {
