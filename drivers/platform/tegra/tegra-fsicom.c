@@ -1,28 +1,6 @@
-/*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
-/**
- * @file tegra-fsicom.c
- * @brief <b> fsicom driver to communicate with fsicom daemon</b>
- *
- * This file will register as client driver so that FSICOM daemon can
- * utilize the smmu mapping and HSP drivers from kernel space
- */
-
-/* ==================[Includes]============================================= */
-
-#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/types.h>
@@ -33,30 +11,24 @@
 #include <linux/kdev_t.h>
 #include <linux/mailbox_client.h>
 #include <linux/sched/signal.h>
-#include "linux/tegra-fsicom.h"
+#include <uapi/linux/tegra-fsicom.h>
 
 
-/*Timeout in millisec*/
+/* Timeout in milliseconds */
 #define TIMEOUT		1000
 
-/* =================[Data types]======================================== */
-
-/*Data type for mailbox client and channel details*/
+/* Data type for mailbox client and channel details */
 struct fsi_hsp_sm {
 	struct mbox_client client;
 	struct mbox_chan *chan;
 };
 
-/*Data type for accessing TOP2 HSP */
+/* Data type for accessing TOP2 HSP */
 struct fsi_hsp {
 	struct fsi_hsp_sm rx;
 	struct fsi_hsp_sm tx;
 	struct device dev;
 };
-
-/* =================[GLOBAL variables]================================== */
-static ssize_t device_file_ioctl(
-		struct file *, unsigned int cmd, unsigned long arg);
 
 static int device_file_major_number;
 static const char device_name[] = "fsicom-client";
@@ -71,45 +43,7 @@ static struct task_struct *task;
 
 static struct fsi_hsp *fsi_hsp_v;
 
-/*File operations*/
-const static struct file_operations fsicom_driver_fops = {
-	.owner   = THIS_MODULE,
-	.unlocked_ioctl   = device_file_ioctl,
-};
-
-static int fsicom_register_device(void)
-{
-	int result = 0;
-	struct class *dev_class;
-
-	result = register_chrdev(0, device_name, &fsicom_driver_fops);
-	if (result < 0) {
-		pr_err("%s> register_chrdev code = %i\n", device_name, result);
-		return result;
-	}
-	device_file_major_number = result;
-	dev_class = class_create(THIS_MODULE, "fsicom_client");
-	if (dev_class == NULL) {
-		pr_err("%s> Could not create class for device\n", device_name);
-		goto class_fail;
-	}
-
-	if ((device_create(dev_class, NULL,
-		MKDEV(device_file_major_number, 0),
-			 NULL, "fsicom_client")) == NULL) {
-		pr_err("%s> Could not create device node\n", device_name);
-		goto device_failure;
-	}
-	return 0;
-
-device_failure:
-	class_destroy(dev_class);
-class_fail:
-	unregister_chrdev(device_file_major_number, device_name);
-	return -1;
-}
-
-static void fsicom_send_sgnal(int32_t data)
+static void fsicom_send_signal(int32_t data)
 {
 
 	struct siginfo info;
@@ -129,7 +63,7 @@ static void fsicom_send_sgnal(int32_t data)
 static void tegra_hsp_rx_notify(struct mbox_client *cl, void *msg)
 {
 
-	fsicom_send_sgnal(*((uint32_t *)msg));
+	fsicom_send_signal(*((uint32_t *)msg));
 }
 
 static void tegra_hsp_tx_empty_notify(struct mbox_client *cl,
@@ -145,9 +79,8 @@ static int tegra_hsp_mb_init(struct device *dev)
 	if (!fsi_hsp_v)
 		return -ENOMEM;
 
-	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))) {
+	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32)))
 		dev_err(dev, "FsiCom: setting DMA MASK failed!\n");
-	}
 
 	fsi_hsp_v->tx.client.dev = dev;
 	fsi_hsp_v->rx.client.dev = dev;
@@ -161,7 +94,6 @@ static int tegra_hsp_mb_init(struct device *dev)
 	if (IS_ERR(fsi_hsp_v->tx.chan)) {
 		err = PTR_ERR(fsi_hsp_v->tx.chan);
 		dev_err(dev, "failed to get tx mailbox: %d\n", err);
-		devm_kfree(dev, fsi_hsp_v);
 		return err;
 	}
 
@@ -170,18 +102,10 @@ static int tegra_hsp_mb_init(struct device *dev)
 	if (IS_ERR(fsi_hsp_v->rx.chan)) {
 		err = PTR_ERR(fsi_hsp_v->rx.chan);
 		dev_err(dev, "failed to get rx mailbox: %d\n", err);
-		devm_kfree(dev, fsi_hsp_v);
 		return err;
 	}
 
 	return 0;
-}
-
-
-static void fsicom_unregister_device(void)
-{
-	if (device_file_major_number != 0)
-		unregister_chrdev(device_file_major_number, device_name);
 }
 
 static ssize_t device_file_ioctl(
@@ -250,6 +174,50 @@ static ssize_t device_file_ioctl(
 	return ret;
 }
 
+/* File operations */
+static const struct file_operations fsicom_driver_fops = {
+	.owner   = THIS_MODULE,
+	.unlocked_ioctl   = device_file_ioctl,
+};
+
+static int fsicom_register_device(void)
+{
+	int result = 0;
+	struct class *dev_class;
+
+	result = register_chrdev(0, device_name, &fsicom_driver_fops);
+	if (result < 0) {
+		pr_err("%s> register_chrdev code = %i\n", device_name, result);
+		return result;
+	}
+	device_file_major_number = result;
+	dev_class = class_create(THIS_MODULE, "fsicom_client");
+	if (dev_class == NULL) {
+		pr_err("%s> Could not create class for device\n", device_name);
+		goto class_fail;
+	}
+
+	if ((device_create(dev_class, NULL,
+		MKDEV(device_file_major_number, 0),
+			 NULL, "fsicom_client")) == NULL) {
+		pr_err("%s> Could not create device node\n", device_name);
+		goto device_failure;
+	}
+	return 0;
+
+device_failure:
+	class_destroy(dev_class);
+class_fail:
+	unregister_chrdev(device_file_major_number, device_name);
+	return -1;
+}
+
+static void fsicom_unregister_device(void)
+{
+	if (device_file_major_number != 0)
+		unregister_chrdev(device_file_major_number, device_name);
+}
+
 static const struct of_device_id fsicom_client_dt_match[] = {
 	{ .compatible = "nvidia,tegra234-fsicom-client"},
 	{}
@@ -271,7 +239,6 @@ static int fsicom_client_probe(struct platform_device *pdev)
 static int fsicom_client_remove(struct platform_device *pdev)
 {
 	fsicom_unregister_device();
-	devm_kfree(&pdev->dev, fsi_hsp_v);
 	return 0;
 }
 

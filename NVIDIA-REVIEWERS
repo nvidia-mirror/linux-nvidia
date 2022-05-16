@@ -181,7 +181,7 @@ M:	Prashant Shaw <pshaw@nvidia.com>
 B:	Embedded Safety Services
 S:	Supported
 F:	drivers/platform/tegra/tegra-fsicom.c
-F:	include/linux/tegra-fsicom.h
+F:	include/uapi/linux/tegra-fsicom.h
 
 HDCP
 M:	Hyung Taek Ryoo <hryoo@nvidia.com>
