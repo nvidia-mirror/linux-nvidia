@@ -629,7 +629,7 @@ void nvhost_module_deinit(struct platform_device *pdev)
 		falcon_exit(falcon);
 	}
 
-	debugfs_remove(pdata->debugfs);
+	debugfs_remove_recursive(pdata->debugfs);
 }
 EXPORT_SYMBOL(nvhost_module_deinit);
 
