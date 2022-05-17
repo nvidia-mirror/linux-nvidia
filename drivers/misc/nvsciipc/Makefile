@@ -16,9 +16,6 @@
 ccflags-y += -Werror
 ccflags-y += -I$(srctree.nvidia)/include/
 
-ifeq ($(CONFIG_NVSCIIPC_UPSTREAM),y)
-ccflags-y += -DCONFIG_NVSCIIPC_UPSTREAM
-endif
 
 # Make as module for OOT module build
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
