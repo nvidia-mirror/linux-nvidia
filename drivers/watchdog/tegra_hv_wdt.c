@@ -1,7 +1,7 @@
 /*
  * drivers/watchdog/tegra_hv_wdt.c
  *
- * Copyright (c) 2014-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -335,6 +335,7 @@ static const struct of_device_id tegra_hv_wdt_match[] = {
 	{ .compatible = "nvidia,tegra-hv-wdt", },
 	{}
 };
+MODULE_DEVICE_TABLE(of, tegra_hv_wdt_match);
 
 static struct platform_driver tegra_hv_wdt_driver = {
 	.probe		= tegra_hv_wdt_probe,
