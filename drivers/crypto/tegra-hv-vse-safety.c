@@ -28,6 +28,7 @@
 #include <linux/platform_device.h>
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
+#include <linux/hw_random.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -222,6 +223,10 @@ struct tegra_virtual_se_dev {
 	struct mutex server_lock;
 	struct tegra_vse_soc_info *chipdata;
 	atomic_t mempoolbuf_in_use;
+#if defined(CONFIG_HW_RANDOM)
+	/* Integration with hwrng framework */
+	struct hwrng *hwrng;
+#endif /* CONFIG_HW_RANDOM */
 };
 
 struct tegra_virtual_se_addr {
@@ -2711,10 +2716,9 @@ static void tegra_hv_vse_safety_rng_drbg_exit(struct crypto_tfm *tfm)
 	rng_ctx->se_dev = NULL;
 }
 
-static int tegra_hv_vse_safety_rng_drbg_get_random(struct crypto_rng *tfm,
-	const u8 *src, unsigned int slen, u8 *rdata, unsigned int dlen)
+static int tegra_hv_vse_safety_get_random(struct tegra_virtual_se_rng_context *rng_ctx,
+	u8 *rdata, unsigned int dlen)
 {
-	struct tegra_virtual_se_rng_context *rng_ctx = crypto_rng_ctx(tfm);
 	struct tegra_virtual_se_dev *se_dev = rng_ctx->se_dev;
 	u8 *rdata_addr;
 	int err = 0, j, num_blocks, data_len = 0;
@@ -2808,6 +2812,12 @@ exit:
 	devm_kfree(se_dev->dev, priv);
 	devm_kfree(se_dev->dev, ivc_req_msg);
 	return dlen;
+}
+
+static int tegra_hv_vse_safety_rng_drbg_get_random(struct crypto_rng *tfm,
+	const u8 *src, unsigned int slen, u8 *rdata, unsigned int dlen)
+{
+	return tegra_hv_vse_safety_get_random(crypto_rng_ctx(tfm), rdata, dlen);
 }
 
 static int tegra_hv_vse_safety_rng_drbg_reset(struct crypto_rng *tfm,
@@ -4336,6 +4346,90 @@ static int tegra_vse_kthread(void *unused)
 	return 0;
 }
 
+#if defined(CONFIG_HW_RANDOM)
+static int tegra_hv_vse_safety_hwrng_read(struct hwrng *rng, void *buf, size_t size, bool wait)
+{
+	struct tegra_virtual_se_rng_context *ctx;
+
+	if (!wait)
+		return 0;
+
+	ctx = (struct tegra_virtual_se_rng_context *)rng->priv;
+	return tegra_hv_vse_safety_get_random(ctx, buf, size);
+}
+#endif /* CONFIG_HW_RANDOM */
+
+static int tegra_hv_vse_safety_register_hwrng(struct tegra_virtual_se_dev *se_dev)
+{
+#if defined(CONFIG_HW_RANDOM)
+	int ret;
+	struct hwrng *vse_hwrng;
+	struct tegra_virtual_se_rng_context *rng_ctx;
+
+	vse_hwrng = devm_kzalloc(se_dev->dev, sizeof(*vse_hwrng), GFP_KERNEL);
+	if (!vse_hwrng) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	rng_ctx = devm_kzalloc(se_dev->dev, sizeof(*rng_ctx), GFP_KERNEL);
+	if (!rng_ctx) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	rng_ctx->se_dev = se_dev;
+	rng_ctx->rng_buf =
+		dma_alloc_coherent(se_dev->dev, TEGRA_VIRTUAL_SE_RNG_DT_SIZE,
+			&rng_ctx->rng_buf_adr, GFP_KERNEL);
+	if (!rng_ctx->rng_buf) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	vse_hwrng->name = "tegra_hv_vse_safety";
+	vse_hwrng->read = tegra_hv_vse_safety_hwrng_read;
+	vse_hwrng->quality = 1024;
+	vse_hwrng->priv = (unsigned long)rng_ctx;
+
+	ret = devm_hwrng_register(se_dev->dev, vse_hwrng);
+out:
+	if (ret) {
+		if (rng_ctx) {
+			if (rng_ctx->rng_buf)
+				dma_free_coherent(se_dev->dev, TEGRA_VIRTUAL_SE_RNG_DT_SIZE,
+					rng_ctx->rng_buf, rng_ctx->rng_buf_adr);
+			devm_kfree(se_dev->dev, rng_ctx);
+		}
+		if (vse_hwrng)
+			devm_kfree(se_dev->dev, vse_hwrng);
+	} else {
+		se_dev->hwrng = vse_hwrng;
+	}
+	return ret;
+#else
+	return 0;
+#endif /* CONFIG_HW_RANDOM */
+}
+
+static void tegra_hv_vse_safety_unregister_hwrng(struct tegra_virtual_se_dev *se_dev)
+{
+#if defined(CONFIG_HW_RANDOM)
+	struct tegra_virtual_se_rng_context *rng_ctx;
+
+	if (se_dev->hwrng) {
+		devm_hwrng_unregister(se_dev->dev, se_dev->hwrng);
+		rng_ctx = (struct tegra_virtual_se_rng_context *)se_dev->hwrng->priv;
+
+		dma_free_coherent(se_dev->dev, TEGRA_VIRTUAL_SE_RNG_DT_SIZE,
+			rng_ctx->rng_buf, rng_ctx->rng_buf_adr);
+		devm_kfree(se_dev->dev, rng_ctx);
+		devm_kfree(se_dev->dev, se_dev->hwrng);
+		se_dev->hwrng = NULL;
+	}
+#endif /* CONFIG_HW_RANDOM */
+}
+
 static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 {
 	struct tegra_virtual_se_dev *se_dev = NULL;
@@ -4465,6 +4559,13 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 			goto exit;
 		}
 
+		err = tegra_hv_vse_safety_register_hwrng(se_dev);
+		if (err) {
+			dev_err(&pdev->dev,
+				"hwrng register failed. Err %d\n", err);
+			goto exit;
+		}
+
 	}
 
 	if (engine_id == VIRTUAL_SE_AES1) {
@@ -4526,6 +4627,8 @@ static void tegra_hv_vse_safety_shutdown(struct platform_device *pdev)
 static int tegra_hv_vse_safety_remove(struct platform_device *pdev)
 {
 	int i;
+
+	tegra_hv_vse_safety_unregister_hwrng(platform_get_drvdata(pdev));
 
 	for (i = 0; i < ARRAY_SIZE(sha_algs); i++)
 		crypto_unregister_ahash(&sha_algs[i]);
