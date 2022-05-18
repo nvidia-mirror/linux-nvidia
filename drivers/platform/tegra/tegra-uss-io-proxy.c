@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -39,9 +39,11 @@ struct tegra_uss_io_proxy {
 	struct reset_control *i2s8_reset;
 	struct clk *uss_clk;
 
+	unsigned int hss_version;
 	int uss_reset_gpio;
 	int vsup_dia_gpio;
-	int vsup_latch_gpio;
+	unsigned int vsup_fault_gpio;
+	unsigned int vsup_latch_gpio;
 	struct gpio_descs *g1_gpiods;
 	struct gpio_descs *g2_gpiods;
 	unsigned long g1_bitmap;
@@ -190,6 +192,16 @@ static ssize_t vsup_latch_show(struct device *dev,
 
 static DEVICE_ATTR_RW(vsup_latch);
 
+static ssize_t vsup_fault_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct tegra_uss_io_proxy *proxy = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", gpio_get_value(proxy->vsup_fault_gpio));
+}
+
+static DEVICE_ATTR_ADMIN_RO(vsup_fault);
+
 static ssize_t sensor_gpios_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
@@ -259,8 +271,14 @@ static ssize_t sensor_gpios_show(struct device *dev,
 	}
 	n -= snprintf(&buf[PAGE_SIZE - n], n, "\tVSUP_EN2: %d\n",
 		      !!(proxy->g2_bitmap & (1 << 6)));
-	n -= snprintf(&buf[PAGE_SIZE - n], n, "\tVSUP_SEL2: %d\n",
-		      !!(proxy->g2_bitmap & (1 << 7)));
+	if (proxy->hss_version == 1) {
+		n -= snprintf(&buf[PAGE_SIZE - n], n, "\tVSUP_SEL2: %d\n",
+			      !!(proxy->g2_bitmap & (1 << 7)));
+	}
+	if (proxy->hss_version == 2) {
+		n -= snprintf(&buf[PAGE_SIZE - n], n, "\tVSUP_LATCH: %d\n",
+			      !!(proxy->g2_bitmap & (1 << 7)));
+	}
 
 	return PAGE_SIZE - n;
 }
@@ -269,6 +287,7 @@ static DEVICE_ATTR_RW(sensor_gpios);
 
 static int tegra_uss_create_dev_attrs(struct platform_device *pdev)
 {
+	struct tegra_uss_io_proxy *proxy = platform_get_drvdata(pdev);
 	int err;
 
 	err = device_create_file(&pdev->dev, &dev_attr_uss_clk);
@@ -283,9 +302,14 @@ static int tegra_uss_create_dev_attrs(struct platform_device *pdev)
 	if (err)
 		goto err_vsup_dia;
 
-	err = device_create_file(&pdev->dev, &dev_attr_vsup_latch);
+	if (proxy->hss_version == 1)
+		err = device_create_file(&pdev->dev, &dev_attr_vsup_latch);
+
+	if (proxy->hss_version == 2)
+		err = device_create_file(&pdev->dev, &dev_attr_vsup_fault);
+
 	if (err)
-		goto err_vsup_latch;
+		goto err_vsup_latch_fault;
 
 	err = device_create_file(&pdev->dev, &dev_attr_sensor_gpios);
 	if (err)
@@ -295,8 +319,11 @@ static int tegra_uss_create_dev_attrs(struct platform_device *pdev)
 
 
 err_sensor_gpios:
-	device_remove_file(&pdev->dev, &dev_attr_vsup_latch);
-err_vsup_latch:
+	if (proxy->hss_version == 1)
+		device_remove_file(&pdev->dev, &dev_attr_vsup_latch);
+	if (proxy->hss_version == 2)
+		device_remove_file(&pdev->dev, &dev_attr_vsup_fault);
+err_vsup_latch_fault:
 	device_remove_file(&pdev->dev, &dev_attr_vsup_dia);
 err_vsup_dia:
 	device_remove_file(&pdev->dev, &dev_attr_uss_reset);
@@ -307,10 +334,15 @@ err_reset:
 
 static void tegra_uss_remove_dev_attrs(struct platform_device *pdev)
 {
+	struct tegra_uss_io_proxy *proxy = platform_get_drvdata(pdev);
+
 	device_remove_file(&pdev->dev, &dev_attr_uss_clk);
 	device_remove_file(&pdev->dev, &dev_attr_uss_reset);
 	device_remove_file(&pdev->dev, &dev_attr_vsup_dia);
-	device_remove_file(&pdev->dev, &dev_attr_vsup_latch);
+	if (proxy->hss_version == 1)
+		device_remove_file(&pdev->dev, &dev_attr_vsup_latch);
+	if (proxy->hss_version == 2)
+		device_remove_file(&pdev->dev, &dev_attr_vsup_fault);
 	device_remove_file(&pdev->dev, &dev_attr_sensor_gpios);
 }
 
@@ -345,7 +377,9 @@ static int tegra_uss_request_gpio(struct platform_device *pdev, const char *name
 
 static int tegra_uss_io_proxy_probe(struct platform_device *pdev)
 {
+	struct device_node *node = pdev->dev.of_node;
 	struct tegra_uss_io_proxy *proxy;
+	int rc;
 
 	proxy = devm_kzalloc(&pdev->dev, sizeof(*proxy), GFP_KERNEL);
 	if (unlikely(proxy == NULL))
@@ -369,6 +403,19 @@ static int tegra_uss_io_proxy_probe(struct platform_device *pdev)
 				     "failed to get I2S8 reset\n");
 	}
 
+	rc = of_property_read_u32(node, "uss-hss-version", &proxy->hss_version);
+	if (rc != 0) {
+		/* backward compatibility */
+		dev_info(&pdev->dev, "uss-hss-version property doesn't exist, "
+				     "assume version=1\n");
+		proxy->hss_version = 1;
+	}
+
+	if (proxy->hss_version > 2) {
+		return dev_err_probe(&pdev->dev, -EINVAL,
+				     "uss_hss_version is not valid.");
+	}
+
 	proxy->uss_reset_gpio = tegra_uss_request_gpio(pdev, "uss-nres");
 	if (proxy->uss_reset_gpio < 0) {
 		return dev_err_probe(&pdev->dev, proxy->uss_reset_gpio,
@@ -381,11 +428,21 @@ static int tegra_uss_io_proxy_probe(struct platform_device *pdev)
 				     "failed to get vsup-dia GPIO\n");
 	}
 
-	proxy->vsup_latch_gpio = tegra_uss_request_gpio(pdev,
-							"uss-vsup-latch");
-	if (proxy->vsup_latch_gpio < 0) {
-		return dev_err_probe(&pdev->dev, proxy->vsup_latch_gpio,
-				     "failed to get vsup-dia GPIO\n");
+	if (proxy->hss_version == 1) {
+		rc = tegra_uss_request_gpio(pdev, "uss-vsup-latch");
+		if (rc < 0)
+			return dev_err_probe(&pdev->dev, rc, "failed to get vsup-latch GPIO\n");
+
+		proxy->vsup_fault_gpio = rc;
+	}
+
+	if (proxy->hss_version == 2) {
+		rc = tegra_uss_request_gpio(pdev, "uss-vsup-fault");
+		if (rc < 0)
+			return dev_err_probe(&pdev->dev, rc, "failed to get vsup-fault GPIO\n");
+
+		proxy->vsup_fault_gpio = rc;
+		gpio_direction_input(proxy->vsup_fault_gpio);
 	}
 
 	proxy->g1_gpiods = devm_gpiod_get_array(&pdev->dev, "sensor-group-1",
