@@ -387,7 +387,7 @@ static void vi5_capture_enqueue(struct tegra_channel *chan,
 	struct tegra_channel_buffer *buf)
 {
 	int err = 0;
-	int vi_port;
+	unsigned int vi_port;
 	unsigned long flags;
 	struct tegra_mc_vi *vi = chan->vi;
 	struct vi_capture_req request[2] = {{
@@ -436,7 +436,7 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 	struct tegra_channel_buffer *buf)
 {
 	int err = 0;
-	int vi_port = 0;
+	unsigned int vi_port = 0;
 	int gang_prev_frame_id = 0;
 	unsigned long flags;
 	struct tegra_mc_vi *vi = chan->vi;
@@ -547,7 +547,7 @@ static int vi5_channel_error_recover(struct tegra_channel *chan,
 	bool queue_error)
 {
 	int err = 0;
-	int vi_port = 0;
+	unsigned int vi_port = 0;
 	struct tegra_channel_buffer *buf;
 	struct tegra_mc_vi *vi = chan->vi;
 	struct v4l2_subdev *csi_subdev;
@@ -560,7 +560,7 @@ static int vi5_channel_error_recover(struct tegra_channel *chan,
 			dev_err(&chan->video->dev, "vi capture release failed\n");
 			goto done;
 		}
-		vi_channel_close_ex(chan->id, chan->tegra_vi_channel[vi_port]);
+		vi_channel_close_ex(chan->id + vi_port, chan->tegra_vi_channel[vi_port]);
 		chan->tegra_vi_channel[vi_port] = NULL;
 	}
 
@@ -904,7 +904,7 @@ err_start_kthreads:
 err_setup:
 	if (!chan->bypass)
 		for (vi_port = 0; vi_port < chan->valid_ports; vi_port++) {
-			vi_channel_close_ex(chan->id, chan->tegra_vi_channel[vi_port]);
+			vi_channel_close_ex(chan->id + vi_port, chan->tegra_vi_channel[vi_port]);
 			chan->tegra_vi_channel[vi_port] = NULL;
 		}
 

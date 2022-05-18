@@ -393,7 +393,7 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 		return -EINVAL;
 	}
 
-	if (tegra_chan->tegra_vi_channel == NULL) {
+	if (tegra_chan->tegra_vi_channel[0] == NULL) {
 		/* We come here during initial v4l2 ctrl setup during TPG LKM
 		 * loading
 		 */

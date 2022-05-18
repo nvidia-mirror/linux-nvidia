@@ -152,7 +152,7 @@ struct tegra_vi_graph_entity {
  *                   capture thread resets the VI.
  */
 struct tegra_channel {
-	int id;
+	unsigned int id;
 	struct list_head list;
 	struct video_device *video;
 	struct media_pad pad;
