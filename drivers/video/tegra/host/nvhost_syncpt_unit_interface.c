@@ -137,6 +137,11 @@ int nvhost_syncpt_unit_interface_init(struct platform_device *engine_pdev)
 	host_pdev = to_platform_device(engine_pdev->dev.parent);
 	res = platform_get_resource_byname(host_pdev, IORESOURCE_MEM,
 					"sem-syncpt-shim");
+	if (!res) {
+		nvhost_err(&engine_pdev->dev, "missing atu_dma resource in DT\n");
+		return PTR_ERR(res);
+	}
+
 	range_start = (dma_addr_t)res->start;
 	range_size = (unsigned int)res->end - (unsigned int)res->start + 1;
 

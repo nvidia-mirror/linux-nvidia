@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2020 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2016-2022 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -74,7 +74,8 @@ static const char *nvhost_dma_fence_get_timeline_name(struct dma_fence *fence)
 static bool nvhost_dma_fence_signaled(struct dma_fence *fence)
 {
 	struct nvhost_dma_fence *f = to_nvhost_dma_fence(fence);
-
+	if (!f)
+		return true;
 	return nvhost_syncpt_is_expired(f->syncpt, f->id, f->threshold);
 }
 
