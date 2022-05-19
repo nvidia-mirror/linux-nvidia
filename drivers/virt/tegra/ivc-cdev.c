@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <soc/tegra/fuse.h>
 
 #include <uapi/linux/tegra-ivc-dev.h>
 #include "tegra_hv.h"
@@ -530,6 +531,13 @@ static int __init ivc_init(void)
 {
 	int result;
 
+	if (is_tegra_hypervisor_mode() == false) {
+		pr_info("ivc_init: hypervisor not present\n");
+		/*retunring success in case of native kernel otherwise
+		  systemd-modules-load service will failed.*/
+		return 0;
+	}
+
 	info = tegra_hv_get_ivc_info();
 	if (IS_ERR(info))
 		return -ENODEV;
@@ -542,3 +550,5 @@ static int __init ivc_init(void)
 }
 
 module_init(ivc_init);
+
+MODULE_LICENSE("GPL");

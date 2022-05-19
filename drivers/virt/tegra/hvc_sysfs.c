@@ -15,6 +15,8 @@
  *
  */
 
+#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/version.h>
 #if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
@@ -139,7 +141,9 @@ static int __init hvc_sysfs_register(void)
 
 	if (is_tegra_hypervisor_mode() == false) {
 		TEGRA_HV_INFO("hypervisor is not present\n");
-		return -EPERM;
+		/*retunring success in case of native kernel otherwise
+		  systemd-modules-load service will failed.*/
+		return 0;
 	}
 
 	kobj = kobject_create_and_add("hvc", NULL);
@@ -192,3 +196,5 @@ static int __init hvc_sysfs_register(void)
 }
 
 late_initcall(hvc_sysfs_register);
+
+MODULE_LICENSE("GPL");

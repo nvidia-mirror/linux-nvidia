@@ -392,7 +392,9 @@ static int __init userspace_ivc_mempool_init(void)
 
 	if (is_tegra_hypervisor_mode() == false) {
 		pr_info("user_ivc_mempool: hypervisor not present\n");
-		return -ENODEV;
+		/*retunring success in case of native kernel otherwise
+		  systemd-modules-load service will failed.*/
+		return 0;
 	}
 
 	/* get ivc configuration data for this  guest */
@@ -409,3 +411,5 @@ static int __init userspace_ivc_mempool_init(void)
 	return result;
 }
 module_init(userspace_ivc_mempool_init);
+
+MODULE_LICENSE("GPL");

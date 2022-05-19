@@ -5,6 +5,26 @@ config TEGRA_HV_PM_CTL
 	  Nvidia Tegra hypervisor PM control driver handles power state
 	  transition commands over IVC channel.
 
+config TEGRA_HV_SYSFS
+	tristate "Nvidia Tegra hypervisor sysfs driver"
+	depends on TEGRA_HV_MANAGER
+	help
+	  Nvidia Tegra hypervisor sysfs driver control hypervisor tracing.
+
+config TEGRA_HV_IVC_CDEV
+	tristate "Nvidia Tegra hypervisor ivc cdev driver"
+	depends on TEGRA_HV_MANAGER
+	help
+	  Nvidia Tegra hypervisor ivc cdev driver creates cdev node for
+	  for each ivc queue.
+
+config TEGRA_HV_MEMPOOL_CDEV
+	tristate "Nvidia Tegra hypervisor mempool cdev driver"
+	depends on TEGRA_HV_MANAGER
+	help
+	  Nvidia Tegra hypervisor ivc cdev driver creates cdev node for
+	  for each mempool.
+
 config TEGRA_HV_MANAGER
 	bool "Nvidia Tegra hypervisor management & IVC"
 	depends on TEGRA_VIRTUALIZATION
