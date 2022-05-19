@@ -769,10 +769,16 @@ static ssize_t clk_cap_store(struct kobject *kobj,
 		container_of(kobj, struct nvhost_device_data, clk_cap_kobj);
 	struct platform_device *pdev = pdata->pdev;
 	/* i is indeed 'index' here after type conversion */
-	int ret, i = attr - pdata->clk_cap_attrs;
-	struct clk *clk = pdata->clk[i];
+	int ret, i;
+	struct clk *clk;
 	unsigned long freq_cap;
 	long freq_cap_signed;
+
+	i = attr - pdata->clk_cap_attrs;
+	if (i < 0 || i >= NVHOST_MODULE_MAX_CLOCKS)
+		return -EINVAL;
+
+	clk = pdata->clk[i];
 
 	ret = kstrtoul(buf, 0, &freq_cap);
 	if (ret)
@@ -804,9 +810,15 @@ static ssize_t clk_cap_show(struct kobject *kobj,
 	struct nvhost_device_data *pdata =
 		container_of(kobj, struct nvhost_device_data, clk_cap_kobj);
 	/* i is indeed 'index' here after type conversion */
-	int i = attr - pdata->clk_cap_attrs;
-	struct clk *clk = pdata->clk[i];
+	int i;
+	struct clk *clk;
 	long max_rate;
+
+	i = attr - pdata->clk_cap_attrs;
+	if (i < 0 || i >= NVHOST_MODULE_MAX_CLOCKS)
+		return -EINVAL;
+
+	clk = pdata->clk[i];
 
 	max_rate = clk_round_rate(clk, UINT_MAX);
 	if (max_rate < 0)
