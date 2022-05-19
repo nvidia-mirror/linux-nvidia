@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -151,7 +151,7 @@ int dce_handle_boot_complete_received_event(struct tegra_dce *d, void *params)
  *
  * Return : 0 if successful else error code
  */
-static int
+int
 dce_start_boot_flow(struct tegra_dce *d)
 {
 	int ret = 0;
@@ -241,8 +241,12 @@ void dce_handle_irq_status(struct tegra_dce *d, u32 status)
 					 NULL);
 	}
 
-	if (status & DCE_IRQ_SC7_ENTERED)
+	if (status & DCE_IRQ_SC7_ENTERED) {
 		dce_info(d, "DCE can be safely powered-off now");
+		(void)dce_fsm_post_event(d,
+					 EVENT_ID_DCE_SC7_ENTERED_RECEIVED,
+					 NULL);
+	}
 
 	if (status & DCE_IRQ_LOG_READY) {
 		dce_info(d, "DCE trace log buffers available");

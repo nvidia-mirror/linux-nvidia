@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -85,7 +85,13 @@ int dce_work_cond_sw_resource_init(struct tegra_dce *d)
 
 	ret = dce_init_work(d, &d->dce_bootstrap_work, dce_bootstrap_work_fn);
 	if (ret) {
-		dce_err(d, "fsm_start work init failed");
+		dce_err(d, "Bootstrap work init failed");
+		goto exit;
+	}
+
+	ret = dce_init_work(d, &d->dce_resume_work, dce_resume_work_fn);
+	if (ret) {
+		dce_err(d, "resume work init failed");
 		goto exit;
 	}
 
