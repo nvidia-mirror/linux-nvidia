@@ -12,6 +12,8 @@
 #include <linux/mailbox_client.h>
 #include <linux/tegra-epl.h>
 #include <linux/pm.h>
+#include <linux/kthread.h>
+#include <linux/mutex.h>
 
 /* Timeout in milliseconds */
 #define TIMEOUT		1000
@@ -24,6 +26,12 @@
 
 /* Error index offset in mission status register */
 #define ERROR_INDEX_OFFSET	24U
+
+enum handshake_state {
+	HANDSHAKE_PENDING,
+	HANDSHAKE_FAILED,
+	HANDSHAKE_DONE
+};
 
 /* Data type for mailbox client and channel details */
 struct epl_hsp_sm {
@@ -56,6 +64,12 @@ static void __iomem *mission_err_status_va;
 static bool isAddrMappOk = true;
 
 static struct epl_misc_sw_err_cfg miscerr_cfg[NUM_SW_GENERIC_ERR];
+
+/* State of FSI handshake */
+static enum handshake_state hs_state = HANDSHAKE_PENDING;
+static DEFINE_MUTEX(hs_state_mutex);
+
+static struct task_struct *fsi_handshake_thread;
 
 static void tegra_hsp_tx_empty_notify(struct mbox_client *cl,
 					 void *data, int empty_value)
@@ -100,10 +114,14 @@ static ssize_t device_file_ioctl(
 	switch (cmd) {
 
 	case EPL_REPORT_ERROR_CMD:
-		ret = mbox_send_message(epl_hsp_v->tx.chan,
-						(void *) lData);
-		break;
+		mutex_lock(&hs_state_mutex);
+		if (hs_state == HANDSHAKE_DONE)
+			ret = mbox_send_message(epl_hsp_v->tx.chan, (void *) lData);
+		else
+			ret = -ENODEV;
+		mutex_unlock(&hs_state_mutex);
 
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -171,8 +189,12 @@ int epl_report_error(struct epl_error_report_frame error_report)
 {
 	int ret = -EINVAL;
 
-	if (epl_hsp_v == NULL)
+	mutex_lock(&hs_state_mutex);
+	if (epl_hsp_v == NULL || hs_state != HANDSHAKE_DONE) {
+		mutex_unlock(&hs_state_mutex);
 		return -ENODEV;
+	}
+	mutex_unlock(&hs_state_mutex);
 
 	ret = mbox_send_message(epl_hsp_v->tx.chan, (void *)&error_report);
 
@@ -180,15 +202,60 @@ int epl_report_error(struct epl_error_report_frame error_report)
 }
 EXPORT_SYMBOL_GPL(epl_report_error);
 
+static int epl_client_fsi_handshake(void *arg)
+{
+	mutex_lock(&hs_state_mutex);
+
+	if (epl_hsp_v) {
+		int ret;
+		const uint32_t handshake_data[] = {0x45504C48, 0x414E4453, 0x48414B45,
+			0x44415441};
+		const uint8_t max_retries = 3;
+		uint8_t count = 0;
+
+		do {
+			ret = mbox_send_message(epl_hsp_v->tx.chan, (void *) handshake_data);
+
+			if (ret < 0) {
+				hs_state = HANDSHAKE_FAILED;
+				count++;
+			} else {
+				hs_state = HANDSHAKE_DONE;
+				break;
+			}
+		} while (count < max_retries || kthread_should_stop());
+	}
+
+	if (hs_state == HANDSHAKE_FAILED)
+		pr_warn("epl_client: handshake with FSI failed\n");
+	else
+		pr_info("epl_client: handshake done with FSI\n");
+
+	mutex_unlock(&hs_state_mutex);
+
+	return 0;
+}
+
 static int __maybe_unused epl_client_suspend(struct device *dev)
 {
 	pr_debug("tegra-epl: suspend called\n");
+
+	mutex_lock(&hs_state_mutex);
+	hs_state = HANDSHAKE_PENDING;
+	mutex_unlock(&hs_state_mutex);
+
 	return 0;
 }
 
 static int __maybe_unused epl_client_resume(struct device *dev)
 {
 	pr_debug("tegra-epl: resume called\n");
+
+	fsi_handshake_thread = kthread_run(epl_client_fsi_handshake, NULL, "fsi-hs");
+
+	if (IS_ERR(fsi_handshake_thread))
+		return PTR_ERR(fsi_handshake_thread);
+
 	return 0;
 }
 static SIMPLE_DEV_PM_OPS(epl_client_pm, epl_client_suspend, epl_client_resume);
@@ -252,6 +319,10 @@ static int epl_client_probe(struct platform_device *pdev)
 	int iterator = 0;
 	char name[32] = "client-misc-sw-generic-err";
 
+	mutex_lock(&hs_state_mutex);
+	hs_state = HANDSHAKE_PENDING;
+	mutex_unlock(&hs_state_mutex);
+
 	epl_register_device();
 	ret = tegra_hsp_mb_init(dev);
 	pdev_local = pdev;
@@ -288,6 +359,13 @@ static int epl_client_probe(struct platform_device *pdev)
 		return PTR_ERR(mission_err_status_va);
 	}
 
+	if (ret == 0) {
+		fsi_handshake_thread = kthread_run(epl_client_fsi_handshake, NULL, "fsi-hs");
+
+		if (IS_ERR(fsi_handshake_thread))
+			return PTR_ERR(fsi_handshake_thread);
+	}
+
 	return ret;
 }
 
@@ -304,8 +382,8 @@ static struct platform_driver epl_client = {
 		.of_match_table = of_match_ptr(epl_client_dt_match),
 		.pm = pm_ptr(&epl_client_pm),
 	},
-	.probe          = epl_client_probe,
-	.remove         = epl_client_remove,
+	.probe			= epl_client_probe,
+	.remove			= epl_client_remove,
 };
 
 module_platform_driver(epl_client);
