@@ -200,7 +200,7 @@ static int edmalib_common_test(struct edmalib_common *edma)
 
 	edma->tsz = (u64)edma->stress_count * (nents_per_ch) * (u64)edma->dma_size * 8UL;
 
-	if (!edma->cookie && (edma->prev_edma_ch != edma->edma_ch)) {
+	if (!edma->cookie || (edma->prev_edma_ch != edma->edma_ch)) {
 		dev_info(edma->fdev, "%s: re-init edma lib prev_ch(%x) != current chans(%x)\n",
 			 __func__, edma->prev_edma_ch, edma->edma_ch);
 		edma->cookie = tegra_pcie_edma_initialize(&info);
