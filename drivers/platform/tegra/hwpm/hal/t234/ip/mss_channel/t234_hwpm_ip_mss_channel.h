@@ -14,7 +14,7 @@
 #ifndef T234_HWPM_IP_MSS_CHANNEL_H
 #define T234_HWPM_IP_MSS_CHANNEL_H
 
-#if defined(CONFIG_SOC_HWPM_IP_MSS_CHANNEL)
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 #define T234_HWPM_ACTIVE_IP_MSS_CHANNEL		T234_HWPM_IP_MSS_CHANNEL,
 
 /* This data should ideally be available in HW headers */

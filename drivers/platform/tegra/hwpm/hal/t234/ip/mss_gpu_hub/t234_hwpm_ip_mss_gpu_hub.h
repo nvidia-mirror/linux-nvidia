@@ -14,7 +14,7 @@
 #ifndef T234_HWPM_IP_MSS_GPU_HUB_H
 #define T234_HWPM_IP_MSS_GPU_HUB_H
 
-#if defined(CONFIG_SOC_HWPM_IP_MSS_GPU_HUB)
+#if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 #define T234_HWPM_ACTIVE_IP_MSS_GPU_HUB		T234_HWPM_IP_MSS_GPU_HUB,
 
 /* This data should ideally be available in HW headers */

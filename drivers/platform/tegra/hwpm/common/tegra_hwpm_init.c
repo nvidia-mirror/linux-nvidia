@@ -31,6 +31,9 @@
 #include <tegra_hwpm_common.h>
 
 #include <hal/t234/t234_hwpm_init.h>
+#ifdef CONFIG_TEGRA_NEXT1_HWPM
+#include <tegra_hwpm_next_init.h>
+#endif
 
 static int tegra_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
 {
@@ -52,9 +55,13 @@ static int tegra_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
 			err = t234_hwpm_init_chip_info(hwpm);
 			break;
 		default:
+#ifdef CONFIG_TEGRA_NEXT1_HWPM
+			err = tegra_hwpm_next1_init_chip_info(hwpm);
+#else
 			tegra_hwpm_err(hwpm, "Chip 0x%x rev 0x%x not supported",
 				hwpm->device_info.chip,
 				hwpm->device_info.chip_revision);
+#endif
 			break;
 		}
 		break;

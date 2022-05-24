@@ -233,82 +233,82 @@ bool t234_hwpm_is_ip_active(struct tegra_soc_hwpm *hwpm,
 
 	switch (ip_enum) {
 	case TEGRA_SOC_HWPM_IP_VI:
-#if defined(CONFIG_SOC_HWPM_IP_VI)
+#if defined(CONFIG_T234_HWPM_IP_VI)
 		config_ip = T234_HWPM_IP_VI;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_ISP:
-#if defined(CONFIG_SOC_HWPM_IP_ISP)
+#if defined(CONFIG_T234_HWPM_IP_ISP)
 		config_ip = T234_HWPM_IP_ISP;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_VIC:
-#if defined(CONFIG_SOC_HWPM_IP_VIC)
+#if defined(CONFIG_T234_HWPM_IP_VIC)
 		config_ip = T234_HWPM_IP_VIC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_OFA:
-#if defined(CONFIG_SOC_HWPM_IP_OFA)
+#if defined(CONFIG_T234_HWPM_IP_OFA)
 		config_ip = T234_HWPM_IP_OFA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_PVA:
-#if defined(CONFIG_SOC_HWPM_IP_PVA)
+#if defined(CONFIG_T234_HWPM_IP_PVA)
 		config_ip = T234_HWPM_IP_PVA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_NVDLA:
-#if defined(CONFIG_SOC_HWPM_IP_NVDLA)
+#if defined(CONFIG_T234_HWPM_IP_NVDLA)
 		config_ip = T234_HWPM_IP_NVDLA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_MGBE:
-#if defined(CONFIG_SOC_HWPM_IP_MGBE)
+#if defined(CONFIG_T234_HWPM_IP_MGBE)
 		config_ip = T234_HWPM_IP_MGBE;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_SCF:
-#if defined(CONFIG_SOC_HWPM_IP_SCF)
+#if defined(CONFIG_T234_HWPM_IP_SCF)
 		config_ip = T234_HWPM_IP_SCF;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_NVDEC:
-#if defined(CONFIG_SOC_HWPM_IP_NVDEC)
+#if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		config_ip = T234_HWPM_IP_NVDEC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_NVENC:
-#if defined(CONFIG_SOC_HWPM_IP_NVENC)
+#if defined(CONFIG_T234_HWPM_IP_NVENC)
 		config_ip = T234_HWPM_IP_NVENC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_PCIE:
-#if defined(CONFIG_SOC_HWPM_IP_PCIE)
+#if defined(CONFIG_T234_HWPM_IP_PCIE)
 		config_ip = T234_HWPM_IP_PCIE;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_DISPLAY:
-#if defined(CONFIG_SOC_HWPM_IP_DISPLAY)
+#if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 		config_ip = T234_HWPM_IP_DISPLAY;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_MSS_CHANNEL:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_CHANNEL)
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		config_ip = T234_HWPM_IP_MSS_CHANNEL;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_MSS_GPU_HUB:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_GPU_HUB)
+#if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 		config_ip = T234_HWPM_IP_MSS_GPU_HUB;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_MSS_ISO_NISO_HUBS:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_ISO_NISO_HUBS)
+#if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 		config_ip = T234_HWPM_IP_MSS_ISO_NISO_HUBS;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_IP_MSS_MCF:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_MCF)
+#if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 		config_ip = T234_HWPM_IP_MSS_MCF;
 #endif
 		break;
@@ -329,82 +329,82 @@ bool t234_hwpm_is_resource_active(struct tegra_soc_hwpm *hwpm,
 
 	switch (res_index) {
 	case TEGRA_SOC_HWPM_RESOURCE_VI:
-#if defined(CONFIG_SOC_HWPM_IP_VI)
+#if defined(CONFIG_T234_HWPM_IP_VI)
 		config_ip = T234_HWPM_IP_VI;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_ISP:
-#if defined(CONFIG_SOC_HWPM_IP_ISP)
+#if defined(CONFIG_T234_HWPM_IP_ISP)
 		config_ip = T234_HWPM_IP_ISP;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_VIC:
-#if defined(CONFIG_SOC_HWPM_IP_VIC)
+#if defined(CONFIG_T234_HWPM_IP_VIC)
 		config_ip = T234_HWPM_IP_VIC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_OFA:
-#if defined(CONFIG_SOC_HWPM_IP_OFA)
+#if defined(CONFIG_T234_HWPM_IP_OFA)
 		config_ip = T234_HWPM_IP_OFA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_PVA:
-#if defined(CONFIG_SOC_HWPM_IP_PVA)
+#if defined(CONFIG_T234_HWPM_IP_PVA)
 		config_ip = T234_HWPM_IP_PVA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_NVDLA:
-#if defined(CONFIG_SOC_HWPM_IP_NVDLA)
+#if defined(CONFIG_T234_HWPM_IP_NVDLA)
 		config_ip = T234_HWPM_IP_NVDLA;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_MGBE:
-#if defined(CONFIG_SOC_HWPM_IP_MGBE)
+#if defined(CONFIG_T234_HWPM_IP_MGBE)
 		config_ip = T234_HWPM_IP_MGBE;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_SCF:
-#if defined(CONFIG_SOC_HWPM_IP_SCF)
+#if defined(CONFIG_T234_HWPM_IP_SCF)
 		config_ip = T234_HWPM_IP_SCF;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_NVDEC:
-#if defined(CONFIG_SOC_HWPM_IP_NVDEC)
+#if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		config_ip = T234_HWPM_IP_NVDEC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_NVENC:
-#if defined(CONFIG_SOC_HWPM_IP_NVENC)
+#if defined(CONFIG_T234_HWPM_IP_NVENC)
 		config_ip = T234_HWPM_IP_NVENC;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_PCIE:
-#if defined(CONFIG_SOC_HWPM_IP_PCIE)
+#if defined(CONFIG_T234_HWPM_IP_PCIE)
 		config_ip = T234_HWPM_IP_PCIE;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_DISPLAY:
-#if defined(CONFIG_SOC_HWPM_IP_DISPLAY)
+#if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 		config_ip = T234_HWPM_IP_DISPLAY;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_MSS_CHANNEL:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_CHANNEL)
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		config_ip = T234_HWPM_IP_MSS_CHANNEL;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_MSS_GPU_HUB:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_GPU_HUB)
+#if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 		config_ip = T234_HWPM_IP_MSS_GPU_HUB;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_MSS_ISO_NISO_HUBS:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_ISO_NISO_HUBS)
+#if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 		config_ip = T234_HWPM_IP_MSS_ISO_NISO_HUBS;
 #endif
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_MSS_MCF:
-#if defined(CONFIG_SOC_HWPM_IP_MSS_MCF)
+#if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 		config_ip = T234_HWPM_IP_MSS_MCF;
 #endif
 		break;
@@ -452,55 +452,55 @@ int t234_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
 	t234_active_ip_info[T234_HWPM_IP_PMA] = &t234_hwpm_ip_pma;
 	t234_active_ip_info[T234_HWPM_IP_RTR] = &t234_hwpm_ip_rtr;
 
-#if defined(CONFIG_SOC_HWPM_IP_DISPLAY)
+#if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 	t234_active_ip_info[T234_HWPM_IP_DISPLAY] = &t234_hwpm_ip_display;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_ISP)
+#if defined(CONFIG_T234_HWPM_IP_ISP)
 	t234_active_ip_info[T234_HWPM_IP_ISP] = &t234_hwpm_ip_isp;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_MGBE)
+#if defined(CONFIG_T234_HWPM_IP_MGBE)
 	t234_active_ip_info[T234_HWPM_IP_MGBE] = &t234_hwpm_ip_mgbe;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_MSS_CHANNEL)
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 	t234_active_ip_info[T234_HWPM_IP_MSS_CHANNEL] =
 			&t234_hwpm_ip_mss_channel;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_MSS_GPU_HUB)
+#if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 	t234_active_ip_info[T234_HWPM_IP_MSS_GPU_HUB] =
 			&t234_hwpm_ip_mss_gpu_hub;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_MSS_ISO_NISO_HUBS)
+#if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 	t234_active_ip_info[T234_HWPM_IP_MSS_ISO_NISO_HUBS] =
 			&t234_hwpm_ip_mss_iso_niso_hubs;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_MSS_MCF)
+#if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 	t234_active_ip_info[T234_HWPM_IP_MSS_MCF] = &t234_hwpm_ip_mss_mcf;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_NVDEC)
+#if defined(CONFIG_T234_HWPM_IP_NVDEC)
 	t234_active_ip_info[T234_HWPM_IP_NVDEC] = &t234_hwpm_ip_nvdec;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_NVDLA)
+#if defined(CONFIG_T234_HWPM_IP_NVDLA)
 	t234_active_ip_info[T234_HWPM_IP_NVDLA] = &t234_hwpm_ip_nvdla;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_NVENC)
+#if defined(CONFIG_T234_HWPM_IP_NVENC)
 	t234_active_ip_info[T234_HWPM_IP_NVENC] = &t234_hwpm_ip_nvenc;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_OFA)
+#if defined(CONFIG_T234_HWPM_IP_OFA)
 	t234_active_ip_info[T234_HWPM_IP_OFA] = &t234_hwpm_ip_ofa;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_PCIE)
+#if defined(CONFIG_T234_HWPM_IP_PCIE)
 	t234_active_ip_info[T234_HWPM_IP_PCIE] = &t234_hwpm_ip_pcie;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_PVA)
+#if defined(CONFIG_T234_HWPM_IP_PVA)
 	t234_active_ip_info[T234_HWPM_IP_PVA] = &t234_hwpm_ip_pva;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_SCF)
+#if defined(CONFIG_T234_HWPM_IP_SCF)
 	t234_active_ip_info[T234_HWPM_IP_SCF] = &t234_hwpm_ip_scf;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_VI)
+#if defined(CONFIG_T234_HWPM_IP_VI)
 	t234_active_ip_info[T234_HWPM_IP_VI] = &t234_hwpm_ip_vi;
 #endif
-#if defined(CONFIG_SOC_HWPM_IP_VIC)
+#if defined(CONFIG_T234_HWPM_IP_VIC)
 	t234_active_ip_info[T234_HWPM_IP_VIC] = &t234_hwpm_ip_vic;
 #endif
 

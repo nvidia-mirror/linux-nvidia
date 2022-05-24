@@ -14,7 +14,7 @@
 #ifndef T234_HWPM_IP_DISPLAY_H
 #define T234_HWPM_IP_DISPLAY_H
 
-#if defined(CONFIG_SOC_HWPM_IP_DISPLAY)
+#if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 #define T234_HWPM_ACTIVE_IP_DISPLAY		T234_HWPM_IP_DISPLAY,
 
 /* This data should ideally be available in HW headers */

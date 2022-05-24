@@ -14,7 +14,7 @@
 #ifndef T234_HWPM_IP_PVA_H
 #define T234_HWPM_IP_PVA_H
 
-#if defined(CONFIG_SOC_HWPM_IP_PVA)
+#if defined(CONFIG_T234_HWPM_IP_PVA)
 #define T234_HWPM_ACTIVE_IP_PVA		T234_HWPM_IP_PVA,
 
 /* This data should ideally be available in HW headers */
