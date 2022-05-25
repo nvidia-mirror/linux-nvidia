@@ -31,7 +31,7 @@
 
 static const char *module_name = "tegra_bootloader_debug";
 static const char *dir_name = "tegra_bootloader";
-void __iomem *usc;
+static void __iomem *usc;
 
 #ifdef CONFIG_DEBUG_FS
 static const char *gr_file_mb1 = "gr_mb1";
@@ -90,9 +90,9 @@ static void *tegra_bl_mapped_prof_start;
 static void *tegra_bl_mapped_full_carveout;
 
 #ifdef CONFIG_DEBUG_FS
-const uint32_t gr_mb1 = enum_gr_mb1;
-const uint32_t gr_mb2 = enum_gr_mb2;
-const uint32_t gr_cpu_bl = enum_gr_cpu_bl;
+static const uint32_t gr_mb1 = enum_gr_mb1;
+static const uint32_t gr_mb2 = enum_gr_mb2;
+static const uint32_t gr_cpu_bl = enum_gr_cpu_bl;
 
 static int dbg_golden_register_show(struct seq_file *s, void *unused);
 static int dbg_golden_register_open_mb1(struct inode *inode, struct file *file);
