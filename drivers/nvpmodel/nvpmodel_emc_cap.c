@@ -59,12 +59,12 @@ static unsigned long emc_iso_cap;
 
 #if IS_ENABLED(CONFIG_TEGRA_BWMGR)
 /* bandwidth manager handle */
-struct tegra_bwmgr_client *bwmgr_handle;
+static struct tegra_bwmgr_client *bwmgr_handle;
 #endif
 
 #if IS_ENABLED(CONFIG_INTERCONNECT)
 /* interconnect path handle */
-struct icc_path *icc_path_handle;
+static struct icc_path *icc_path_handle;
 #endif
 
 struct nvpmodel_clk {
