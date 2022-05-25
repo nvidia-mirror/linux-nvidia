@@ -378,9 +378,9 @@ static int __init tegra_bootloader_debuginit(void)
 		pr_info("Remapped tegra_bl_debug_data_start(0x%llx)"
 			" to address(0x%llx), size(0x%llx)\n",
 			(u64)tegra_bl_debug_data_start,
-			(u64)ptr_bl_debug_data_start,
+			(__force u64)ptr_bl_debug_data_start,
 			(u64)tegra_bl_debug_data_size);
-		tegra_bl_mapped_debug_data_start = ptr_bl_debug_data_start;
+		tegra_bl_mapped_debug_data_start = (__force void *)ptr_bl_debug_data_start;
 	}
 
 	/*
@@ -408,7 +408,7 @@ static int __init tegra_bootloader_debuginit(void)
 					(unsigned int)tegra_bl_bcp_start);
 				goto out_err;
 			}
-			tegra_bl_mapped_boot_cfg_start = ptr_bl_boot_cfg_start;
+			tegra_bl_mapped_boot_cfg_start = (__force void *)ptr_bl_boot_cfg_start;
 		}
 	}
 #endif /* CONFIG_DEBUG_FS */
@@ -454,10 +454,10 @@ static int __init tegra_bootloader_debuginit(void)
 		pr_info("Remapped tegra_bl_full_carveout(0x%llx) "
 			"to address 0x%llx, size(0x%llx)\n",
 			(u64)tegra_bl_full_carveout,
-			(u64)ptr_bl_full_carveout,
+			(__force u64)ptr_bl_full_carveout,
 			(u64)SIZE_OF_FULL_CARVEOUT);
 
-		tegra_bl_mapped_full_carveout = ptr_bl_full_carveout;
+		tegra_bl_mapped_full_carveout = (__force void *)ptr_bl_full_carveout;
 	}
 
 	tegra_bl_mapped_prof_start = tegra_bl_mapped_full_carveout +
@@ -559,13 +559,13 @@ static void __exit tegra_bl_debuginit_module_exit(void)
 		debugfs_remove_recursive(bl_debug_node);
 
 	if (tegra_bl_mapped_debug_data_start)
-		iounmap(tegra_bl_mapped_debug_data_start);
+		iounmap((void __iomem *)tegra_bl_mapped_debug_data_start);
 
 	if (tegra_bl_mapped_boot_cfg_start)
-		iounmap(tegra_bl_mapped_boot_cfg_start);
+		iounmap((void __iomem *)tegra_bl_mapped_boot_cfg_start);
 #endif
 	if (tegra_bl_mapped_full_carveout)
-		iounmap(tegra_bl_mapped_full_carveout);
+		iounmap((void __iomem *)tegra_bl_mapped_full_carveout);
 
 	if (boot_profiler_kobj) {
 		sysfs_remove_file(boot_profiler_kobj,
