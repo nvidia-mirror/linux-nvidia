@@ -14,6 +14,7 @@
 
 #define EDMA_ABORT_TEST_EN	(edma->edma_ch & 0x40000000)
 #define EDMA_STOP_TEST_EN	(edma->edma_ch & 0x20000000)
+#define EDMA_CRC_TEST_EN	(edma->edma_ch & 0x10000000)
 #define IS_EDMA_CH_ENABLED(i)	(edma->edma_ch & ((BIT(i) << 4)))
 #define IS_EDMA_CH_ASYNC(i)	(edma->edma_ch & BIT(i))
 #define REMOTE_EDMA_TEST_EN	(edma->edma_ch & 0x80000000)
@@ -26,7 +27,9 @@
 
 struct edmalib_common {
 	struct device *fdev;
-	void *bar0_virt;
+	void (*raise_irq)(void *p);
+	void *priv;
+	struct pcie_epf_bar0 *epf_bar0;
 	void *src_virt;
 	void __iomem *dma_base;
 	u32 dma_size;
@@ -114,6 +117,7 @@ static int edmalib_common_test(struct edmalib_common *edma)
 	char *xfer_str[2] = {"WR", "RD"};
 	u32 l_r;
 	char *l_r_str[2] = {"local", "remote"};
+	struct pcie_epf_bar0 *epf_bar0 = edma->epf_bar0;
 
 	if (!edma->stress_count) {
 		tegra_pcie_edma_deinit(edma->cookie);
@@ -127,6 +131,16 @@ static int edmalib_common_test(struct edmalib_common *edma)
 		edma->edma_ch &= ~0xFF;
 		/* only channel 0, 2 is ASYNC, where chan 0 async gets aborted */
 		edma->edma_ch |= 0xF5;
+	}
+
+	if (EDMA_CRC_TEST_EN) {
+		/* 4 channels in sync mode */
+		edma->edma_ch = (EDMA_CRC_TEST_EN | 0xF0);
+		/* Single SZ_4K packet on each channel, so total SZ_16K of data */
+		edma->stress_count  = 1;
+		edma->dma_size = SZ_4K;
+		edma->nents = nents = 4;
+		epf_bar0->wr_data[0].size = edma->dma_size * edma->nents;
 	}
 
 	if (edma->cookie && edma->prev_edma_ch != edma->edma_ch) {
@@ -290,6 +304,19 @@ static int edmalib_common_test(struct edmalib_common *edma)
 				__func__, xfer_str[xfer_type], l_r_str[l_r], edma->stress_count, i,
 				edma->tsz, diff, EDMA_PERF);
 		}
+	}
+
+	if (EDMA_CRC_TEST_EN && !REMOTE_EDMA_TEST_EN) {
+		u32 crc;
+
+		edma->raise_irq(edma->priv);
+		crc = crc32_le(~0, edma->src_virt, epf_bar0->wr_data[0].size);
+		msleep(100);
+		if (crc != epf_bar0->wr_data[0].crc)
+			dev_err(edma->fdev, "CRC check failed, LCRC: 0x%x RCRC: 0x%x\n",
+				crc, epf_bar0->wr_data[0].crc);
+		else
+			dev_err(edma->fdev, "CRC check pass\n");
 	}
 	dev_info(edma->fdev, "%s: EDMA LIB submit done\n", __func__);
 

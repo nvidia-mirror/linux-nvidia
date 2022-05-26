@@ -27,6 +27,8 @@ static struct pcie_epf_dma *gepfnv;
 
 struct pcie_epf_dma {
 	struct pci_epf_header header;
+	struct pci_epf *epf;
+	struct pci_epc *epc;
 	struct device *fdev;
 	struct device *cdev;
 	void *bar0_virt;
@@ -78,10 +80,10 @@ struct edma_desc {
 static irqreturn_t pcie_dma_epf_wr0_msi(int irq, void *arg)
 {
 	struct pcie_epf_dma *epfnv = (struct pcie_epf_dma *)arg;
-	int bit = 0;
+	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)epfnv->bar0_virt;
 
-	epfnv->wr_busy &= ~BIT(bit);
-	wake_up(&epfnv->wr_wq[bit]);
+	epf_bar0->wr_data[0].crc = crc32_le(~0, epfnv->bar0_virt + SZ_128M + BAR0_DMA_BUF_OFFSET,
+					    epf_bar0->wr_data[0].size);
 
 	return IRQ_HANDLED;
 }
@@ -885,6 +887,13 @@ fail:
 	return 0;
 }
 
+static void edma_lib_test_raise_irq(void *p)
+{
+	struct pcie_epf_dma *epfnv = (struct pcie_epf_dma *)p;
+
+	pci_epc_raise_irq(epfnv->epc, epfnv->epf->func_no, PCI_EPC_IRQ_MSI, 1);
+}
+
 /* debugfs to perform eDMA lib transfers and do CRC check */
 static int edmalib_test(struct seq_file *s, void *data)
 {
@@ -901,7 +910,7 @@ static int edmalib_test(struct seq_file *s, void *data)
 	epfnv->edma.src_dma_addr = epf_bar0->ep_phy_addr + BAR0_DMA_BUF_OFFSET;
 	epfnv->edma.dst_dma_addr = epf_bar0->rp_phy_addr + BAR0_DMA_BUF_OFFSET;
 	epfnv->edma.fdev = epfnv->fdev;
-	epfnv->edma.bar0_virt = epfnv->bar0_virt;
+	epfnv->edma.epf_bar0 = (struct pcie_epf_bar0 *)epfnv->bar0_virt;
 	epfnv->edma.src_virt = epfnv->bar0_virt + BAR0_DMA_BUF_OFFSET;
 	epfnv->edma.dma_base = epfnv->dma_base;
 	epfnv->edma.dma_size = epfnv->dma_size;
@@ -909,6 +918,8 @@ static int edmalib_test(struct seq_file *s, void *data)
 	epfnv->edma.edma_ch = epfnv->edma_ch;
 	epfnv->edma.nents = epfnv->nents;
 	epfnv->edma.of_node = epfnv->cdev->of_node;
+	epfnv->edma.priv = (void *)epfnv;
+	epfnv->edma.raise_irq = edma_lib_test_raise_irq;
 
 	return edmalib_common_test(&epfnv->edma);
 }
@@ -1611,6 +1622,8 @@ static int pcie_dma_epf_bind(struct pci_epf *epf)
 
 	epfnv->fdev = fdev;
 	epfnv->cdev = cdev;
+	epfnv->epf = epf;
+	epfnv->epc = epc;
 
 	epfnv->bar0_virt = lpci_epf_alloc_space(epf, BAR0_SIZE, BAR_0, SZ_64K);
 	if (!epfnv->bar0_virt) {

@@ -85,9 +85,23 @@ static irqreturn_t ep_isr(int irq, void *arg)
 			       ep->bar0_virt + BAR0_MSI_OFFSET);
 		}
 	}
+#else
+	struct ep_pvt *ep = (struct ep_pvt *)arg;
+	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)ep->bar0_virt;
+
+	epf_bar0->wr_data[0].crc = crc32_le(~0,	ep->dma_virt + BAR0_DMA_BUF_OFFSET,
+					    epf_bar0->wr_data[0].size);
 #endif
 
 	return IRQ_HANDLED;
+}
+
+static void tegra_pcie_dma_raise_irq(void *p)
+{
+	struct ep_pvt *ep = (struct ep_pvt *)p;
+	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)ep->bar0_virt;
+
+	writel(epf_bar0->msi_data[0], ep->bar0_virt + BAR0_MSI_OFFSET);
 }
 
 extern struct device *naga_pci[];
@@ -132,9 +146,11 @@ static int edmalib_test(struct seq_file *s, void *data)
 	ep->edma.src_dma_addr = rp_dma_addr;
 	ep->edma.src_virt = ep->dma_virt + SZ_128M + SZ_1M;
 	ep->edma.fdev = &ep->pdev->dev;
-	ep->edma.bar0_virt = ep->bar0_virt;
+	ep->edma.epf_bar0 = (struct pcie_epf_bar0 *)ep->bar0_virt;
 	ep->edma.bar0_phy = ep->bar0_phy;
 	ep->edma.dma_base = ep->dma_base;
+	ep->edma.priv = (void *)ep;
+	ep->edma.raise_irq = tegra_pcie_dma_raise_irq;
 
 	if (REMOTE_EDMA_TEST_EN) {
 		ep->edma.dst_dma_addr = ep_dma_addr;
@@ -229,12 +245,14 @@ static int ep_test_dma_probe(struct pci_dev *pdev,
 		goto fail_region_remap;
 	}
 
-	if (pci_enable_msi(pdev) < 0) {
+	ret = pci_alloc_irq_vectors(pdev, 2, 2, PCI_IRQ_MSI);
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to enable MSI interrupt\n");
 		ret = -ENODEV;
 		goto fail_region_remap;
 	}
-	ret = request_irq(pdev->irq, (irq_handler_t)ep_isr, IRQF_SHARED,
+
+	ret = request_irq(pci_irq_vector(pdev, 1), ep_isr, IRQF_SHARED,
 			  "pcie_ep_isr", ep);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to register isr\n");
@@ -305,7 +323,7 @@ static int ep_test_dma_probe(struct pci_dev *pdev,
 	}
 	pci_read_config_dword(pdev, pdev->msi_cap + PCI_MSI_ADDRESS_LO, &val);
 	ep->msi_addr = (ep->msi_addr << 32) | val;
-	ep->msi_irq = pdev->irq;
+	ep->msi_irq = pci_irq_vector(pdev, 0);
 	ep->dma_phy_base = pci_resource_start(pdev, 4);
 	ep->dma_phy_size = pci_resource_len(pdev, 4);
 
@@ -330,9 +348,9 @@ static int ep_test_dma_probe(struct pci_dev *pdev,
 fail_name:
 	dma_free_coherent(&pdev->dev, BAR0_SIZE, ep->dma_virt, ep->dma_phy);
 fail_dma_alloc:
-	free_irq(pdev->irq, ep);
+	free_irq(pci_irq_vector(pdev, 1), ep);
 fail_isr:
-	pci_disable_msi(pdev);
+	pci_free_irq_vectors(pdev);
 fail_region_remap:
 	pci_release_regions(pdev);
 fail_region_request:
@@ -348,8 +366,8 @@ static void ep_test_dma_remove(struct pci_dev *pdev)
 	debugfs_remove_recursive(ep->debugfs);
 	tegra_pcie_edma_deinit(ep->cookie);
 	dma_free_coherent(&pdev->dev, BAR0_SIZE, ep->dma_virt, ep->dma_phy);
-	free_irq(pdev->irq, ep);
-	pci_disable_msi(pdev);
+	free_irq(pci_irq_vector(pdev, 1), ep);
+	pci_free_irq_vectors(pdev);
 	pci_release_regions(pdev);
 	pci_clear_master(pdev);
 }
