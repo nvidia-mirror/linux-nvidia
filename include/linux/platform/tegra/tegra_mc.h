@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2017-2022, NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -23,6 +23,7 @@ enum carveout_desc {
 	MC_SECURITY_CARVEOUT2,
 	MC_SECURITY_CARVEOUT3,
 	MC_SECURITY_CARVEOUT4,
+	MC_SECURITY_CARVEOUT_LITE42,
 	MC_NR_CARVEOUTS
 };
 

@@ -245,8 +245,11 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 	void __iomem *cpuctl_addr, *retcode_addr, *mailbox0_addr;
 	struct mc_carveout_info inf;
 	unsigned int gscid = 0x0;
-	dma_addr_t bl_args_iova;
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
+	struct mc_carveout_info ipc_co_info;
+	void __iomem *ipc_co_va = NULL;
+	dma_addr_t ipc_co_iova = 0;
+	dma_addr_t ipc_co_iova_with_streamid;
 
 	err = nvhost_tsec_riscv_init_sw(dev);
 	if (err)
@@ -281,6 +284,38 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 		dev_info(&dev->dev, "RISC-V boot using kernel allocated Mem\n");
 	}
 
+	/* Get IPC Careveout */
+	err = mc_get_carveout_info(&ipc_co_info, NULL, MC_SECURITY_CARVEOUT_LITE42);
+	if (err) {
+		dev_err(&dev->dev, "IPC Carveout memory allocation failed");
+		err = -ENOMEM;
+		goto clean_up;
+	}
+	dev_dbg(&dev->dev, "IPCCO base=0x%llx size=0x%llx\n", ipc_co_info.base, ipc_co_info.size);
+	ipc_co_va = __ioremap(ipc_co_info.base, ipc_co_info.size, pgprot_noncached(PAGE_KERNEL));
+	if (!ipc_co_va) {
+		dev_err(&dev->dev, "IPC Carveout memory VA mapping failed");
+		err = -ENOMEM;
+		goto clean_up;
+	}
+	dev_dbg(&dev->dev, "IPCCO va=0x%llx pa=0x%llx\n",
+		(phys_addr_t)(ipc_co_va), page_to_phys(vmalloc_to_page(ipc_co_va)));
+#if (KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE)
+	ipc_co_iova = dma_map_page_attrs(&dev->dev, vmalloc_to_page(ipc_co_va),
+		offset_in_page(ipc_co_va), ipc_co_info.size, DMA_BIDIRECTIONAL, 0);
+#else
+	ipc_co_iova = dma_map_page(&dev->dev, vmalloc_to_page(ipc_co_va),
+		offset_in_page(ipc_co_va), ipc_co_info.size, DMA_BIDIRECTIONAL);
+#endif
+	err = dma_mapping_error(&dev->dev, ipc_co_iova);
+	if (err) {
+		dev_err(&dev->dev, "IPC Carveout memory IOVA mapping failed");
+		ipc_co_iova = 0;
+		err = -ENOMEM;
+		goto clean_up;
+	}
+	dev_dbg(&dev->dev, "IPCCO iova=0x%llx\n", ipc_co_iova);
+
 	/* Program manifest start address */
 	pa = (dma_pa + m->os.manifest_offset) >> 8;
 	host1x_writel(dev, tsec_riscv_bcr_dmaaddr_pkcparam_lo_r(),
@@ -309,13 +344,13 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 			tsec_riscv_bcr_dmacfg_target_local_fb_f() |
 			tsec_riscv_bcr_dmacfg_lock_locked_f());
 
-	/* Pass the address of BL argument struct via mailbox registers */
-	bl_args_iova = m->dma_addr_bl_args + NV_RISCV_AMAP_FBGPA_START;
-	bl_args_iova |= NV_RISCV_AMAP_SMMU_IDX;
+	/* Pass the address of IPC Carveout via mailbox registers */
+	ipc_co_iova_with_streamid = (ipc_co_iova | NV_RISCV_AMAP_SMMU_IDX);
 	host1x_writel(dev, tsec_falcon_mailbox0_r(),
-			lower_32_bits((unsigned long long)bl_args_iova));
+		lower_32_bits((unsigned long long)ipc_co_iova_with_streamid));
 	host1x_writel(dev, tsec_falcon_mailbox1_r(),
-			upper_32_bits((unsigned long long)bl_args_iova));
+		upper_32_bits((unsigned long long)ipc_co_iova_with_streamid));
+
 
 	/* Kick start RISC-V and let BR take over */
 	host1x_writel(dev, tsec_riscv_cpuctl_r(),
@@ -394,6 +429,17 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 
 	return err;
 clean_up:
+	if (ipc_co_iova) {
+#if (KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE)
+		dma_unmap_page_attrs(&dev->dev, ipc_co_iova,
+			ipc_co_info.size, DMA_BIDIRECTIONAL, 0);
+#else
+		dma_unmap_page(&dev->dev, ipc_co_iova,
+			ipc_co_info.size, DMA_BIDIRECTIONAL);
+#endif
+	}
+	if (ipc_co_va)
+		iounmap(ipc_co_va);
 	s_riscv_booted = false;
 	nvhost_tsec_riscv_deinit_sw(dev);
 	return err;

@@ -30,7 +30,7 @@
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
 
-#include <linux/platform/tegra/mc-regs-t21x.h>
+#include <linux/platform/tegra/mc-regs-t23x.h>
 #include <linux/platform/tegra/mc.h>
 #include <linux/platform/tegra/mcerr.h>
 #include <linux/platform/tegra/tegra_emc.h>
@@ -118,6 +118,17 @@ int mc_get_carveout_info(struct mc_carveout_info *inf, int *nr,
 #ifdef MC_SECURITY_CARVEOUT4_BOM
 		MC_SECURITY_CARVEOUT(MC_SECURITY_CARVEOUT4, inf);
 		break;
+#else
+		return -ENODEV;
+#endif
+	case MC_SECURITY_CARVEOUT_LITE42:
+#ifdef MC_SECURITY_CARVEOUT_LITE42_BOM
+		if (tegra_get_chip_id() == TEGRA234) {
+			MC_SECURITY_CARVEOUT(MC_SECURITY_CARVEOUT_LITE42, inf);
+			break;
+		} else {
+			return -ENODEV;
+		}
 #else
 		return -ENODEV;
 #endif
