@@ -238,6 +238,14 @@ static inline u32 flcn_dmatrfcmd_idle_true_v(void)
 {
 	return 0x00000001;
 }
+static inline u32 flcn_dmatrfcmd_full_v(u32 r)
+{
+	return (r >> 0) & 0x1;
+}
+static inline u32 flcn_dmatrfcmd_full_false_v(void)
+{
+	return 0x00000000;
+}
 static inline u32 flcn_dmatrfcmd_imem_f(u32 v)
 {
 	return (v & 0x1) << 4;
