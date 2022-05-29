@@ -1,8 +1,4 @@
 /*
- * include/linux/nvhost.h
- *
- * Tegra graphics host driver
- *
  * Copyright (c) 2009-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -299,6 +295,8 @@ struct nvhost_device_data {
 	struct mutex no_poweroff_req_mutex;
 	struct dev_pm_qos_request no_poweroff_req;
 	int no_poweroff_req_count;
+
+	struct nvhost_scale_emc_mapping *dev_emc_map;
 
 	struct notifier_block		toggle_slcg_notifier;
 

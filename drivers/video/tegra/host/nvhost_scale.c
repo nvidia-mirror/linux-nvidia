@@ -1,6 +1,4 @@
 /*
- * Tegra Graphics Host Unit clock scaling
- *
  * Copyright (c) 2010-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,19 +14,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/fs.h>
 #include <linux/devfreq.h>
 #include <linux/debugfs.h>
 #include <linux/types.h>
-#include <linux/clk.h>
 #include <linux/export.h>
+#include <linux/sort.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/clk/tegra.h>
-#include <linux/version.h>
+#include <linux/of.h>
 #include <linux/pm_qos.h>
 #include <trace/events/nvhost.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#if IS_ENABLED(CONFIG_INTERCONNECT) && IS_ENABLED(CONFIG_TEGRA_T23X_GRHOST)
+#include <linux/interconnect.h>
+#include <linux/platform/tegra/mc_utils.h>
+#endif
+#if IS_ENABLED(CONFIG_TEGRA_BWMGR)
+#include <linux/platform/tegra/emc_bwmgr.h>
+#endif
 
 #include <soc/tegra/tegra-dvfs.h>
 #include <linux/clk-provider.h>
@@ -316,6 +322,110 @@ static int register_opp(struct platform_device *pdev)
 #endif
 }
 
+static int cmp_dev_freq(const void *_a, const void *_b)
+{
+	const struct nvhost_scale_emc_mapping *a = _a, *b = _b;
+
+	if (a->dev_freq_khz < b->dev_freq_khz)
+		return -1;
+	else if (a->dev_freq_khz == b->dev_freq_khz)
+		return 0;
+	else
+		return 1;
+}
+
+struct nvhost_scale_emc_mapping*
+nvhost_scale_emc_map_dt_init(struct device_node *node)
+{
+	size_t n_elements;
+	size_t entry_size = sizeof(struct nvhost_scale_emc_mapping);
+	size_t tb_size;
+	int n_entries;
+	void *tb;
+
+	n_entries = of_property_count_elems_of_size(node, "dev_emc_map",
+						    entry_size);
+	if (n_entries < 0)
+		return NULL;
+
+	tb_size = entry_size * n_entries;
+
+	/* Append termination entry as the last entry in the table */
+	tb = kzalloc(tb_size + entry_size, GFP_KERNEL);
+	if (!tb)
+		return NULL;
+
+	/* Fill the values in the allocated dev_emc mapping table */
+	n_elements = tb_size / sizeof(uint32_t);
+	if (of_property_read_u32_array(node, "dev_emc_map", tb, n_elements)) {
+		kfree(tb);
+		return NULL;
+	}
+
+	/* Sort the table in ascending order */
+	sort(tb, n_entries, entry_size, cmp_dev_freq, NULL);
+
+	return tb;
+}
+
+static ssize_t nvhost_scale_emc_map_read(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	struct nvhost_scale_emc_mapping *mapping = file->private_data;
+	int counter, size;
+	ssize_t ret;
+	char *kbuf;
+
+	/* Allocate kernel buffer size */
+	kbuf = kmalloc(count, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	/* Put the header line */
+	size = snprintf(kbuf, count, "(devfreq, emcfreq)\n");
+	if (size < 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* Fill the dev_emc mapping table information in kernel buffer */
+	counter = size;
+	while (mapping->dev_freq_khz) {
+		size = sprintf(kbuf + counter, "%u %u\n",
+					mapping->dev_freq_khz, mapping->emc_freq_khz);
+
+		if (size < 0 || (counter > INT_MAX - size)) {
+			ret = -EINVAL;
+			goto out;
+		}
+		counter += size;
+		mapping++;
+	}
+
+	/* Copy from information from kernel space to user space */
+	ret = simple_read_from_buffer(buf, count, ppos, kbuf, counter);
+
+out:
+	kfree(kbuf);
+	return ret;
+}
+
+static const struct file_operations nvhost_scale_emc_map_fops = {
+	.open = simple_open,
+	.read = nvhost_scale_emc_map_read,
+	.llseek = default_llseek,
+};
+
+static struct dentry *nvhost_debugfs_create_dev_emc_map(struct dentry *parent,
+		struct nvhost_scale_emc_mapping *mapping)
+{
+	if (!parent || !mapping)
+		return NULL;
+
+	return debugfs_create_file("dev_emc_map", S_IRUGO, parent,
+		mapping, &nvhost_scale_emc_map_fops);
+}
+
 /*
  * nvhost_scale_init(pdev)
  */
@@ -349,6 +459,11 @@ void nvhost_scale_init(struct platform_device *pdev)
 		nvhost_warn(&pdev->dev, "failed to power on host1x.");
 		goto err_module_busy;
 	}
+
+	/* Create device scale emc mapping table in debugfs */
+	if (pdata->dev_emc_map)
+		nvhost_debugfs_create_dev_emc_map(pdata->debugfs,
+				pdata->dev_emc_map);
 
 	/* Initialize actmon */
 	if (pdata->actmon_enabled) {
@@ -450,11 +565,12 @@ err_get_actmon_regs:
 err_allocate_actmon:
 	kfree(profile->actmon);
 err_allocate_actmons:
+	device_remove_file(&pdev->dev, &dev_attr_load);
+err_create_sysfs_entry:
+	debugfs_remove(pdata->debugfs);
 	nvhost_module_idle(nvhost_get_host(pdev)->dev);
 err_module_busy:
 err_get_freqs:
-	device_remove_file(&pdev->dev, &dev_attr_load);
-err_create_sysfs_entry:
 	kfree(pdata->power_profile);
 	pdata->power_profile = NULL;
 }
@@ -473,24 +589,25 @@ void nvhost_scale_deinit(struct platform_device *pdev)
 	if (!profile)
 		return;
 
-	/* Remove devfreq from acm client list */
-	nvhost_module_remove_client(pdev, pdata->power_manager);
-
+	/* Remove intermediate data of devfreq */
 	if (pdata->power_manager) {
-		devfreq_remove_device(pdata->power_manager);
 		sysfs_remove_link(&pdev->dev.kobj, "devfreq_dev");
+		nvhost_module_remove_client(pdev, pdata->power_manager);
+		devfreq_remove_device(pdata->power_manager);
+		unregister_opp(pdev);
 	}
 
+	/* Remove intermediate data of actmon */
 	if (pdata->actmon_enabled) {
-		if (pdata->devfreq_governor)
-			unregister_opp(pdev);
-
+		debugfs_remove(pdata->debugfs);
 		device_remove_file(&pdev->dev, &dev_attr_load);
 	}
 
+	/* Remove allocated space */
 	kfree(profile->devfreq_profile.freq_table);
 	kfree(profile->actmon);
 	kfree(profile);
+
 	pdata->power_profile = NULL;
 }
 
@@ -817,3 +934,51 @@ void nvhost_actmon_debug_init(struct host1x_actmon *actmon,
 
 }
 
+static unsigned long
+nvhost_scale_to_emc_freq(unsigned long dev_freq, struct nvhost_scale_emc_mapping *mapping)
+{
+	uint32_t emc_freq = mapping->emc_freq_khz;
+
+	while (mapping->dev_freq_khz) {
+		if (dev_freq < mapping->dev_freq_khz)
+			break;
+		emc_freq = mapping->emc_freq_khz;
+		mapping++;
+	}
+
+	return emc_freq;
+}
+
+void nvhost_scale_callback(struct nvhost_device_profile *profile, unsigned long freq)
+{
+	unsigned long emc_freq_khz, dev_freq_khz;
+	struct nvhost_device_data *pdata = platform_get_drvdata(profile->pdev);
+	struct nvhost_scale_emc_mapping *mapping = pdata->dev_emc_map;
+
+#if IS_ENABLED(CONFIG_INTERCONNECT) && IS_ENABLED(CONFIG_TEGRA_T23X_GRHOST)
+	/* Scale EMC frequency through ICC framework */
+	if (pdata->icc_path_handle && mapping && nvhost_is_234()) {
+		unsigned long emc_floor_kbps;
+
+		dev_freq_khz = freq / 1000;
+		emc_freq_khz = nvhost_scale_to_emc_freq(dev_freq_khz, mapping);
+		emc_floor_kbps = emc_freq_to_bw(emc_freq_khz);
+		if (emc_floor_kbps > U32_MAX)
+			dev_warn(&profile->pdev->dev,
+				 "Type casting out of range!\n");
+		else
+			icc_set_bw(pdata->icc_path_handle, 0, emc_floor_kbps);
+	}
+#endif
+
+#if IS_ENABLED(CONFIG_TEGRA_BWMGR)
+	/* Scale EMC frequency through bandwidth manager */
+	if (pdata->bwmgr_handle && mapping && nvhost_is_194()) {
+		dev_freq_khz = freq / 1000;
+		emc_freq_khz = nvhost_scale_to_emc_freq(dev_freq_khz, mapping);
+		tegra_bwmgr_set_emc(pdata->bwmgr_handle, emc_freq_khz*1000,
+				    TEGRA_BWMGR_SET_EMC_FLOOR);
+	}
+#endif
+
+}

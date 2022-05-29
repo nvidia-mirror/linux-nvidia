@@ -1,6 +1,4 @@
 /*
- * Tegra NVDEC Module Support
- *
  * Copyright (c) 2013-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -548,17 +546,23 @@ static int nvdec_release(struct inode *inode, struct file *file)
 
 	return 0;
 }
+
 static int nvdec_probe(struct platform_device *dev)
 {
-	int err = 0;
+	const struct of_device_id *match;
 	struct nvhost_device_data *pdata = NULL;
+	struct device_node *dn;
+	int err = 0;
 
-	if (dev->dev.of_node) {
-		const struct of_device_id *match;
-
+	dn = dev->dev.of_node;
+	if (dn) {
 		match = of_match_device(tegra_nvdec_of_match, &dev->dev);
-		if (match)
+		if (match) {
 			pdata = (struct nvhost_device_data *)match->data;
+			pdata->dev_emc_map = nvhost_scale_emc_map_dt_init(dn);
+			if (!pdata->dev_emc_map)
+				dev_info(&dev->dev, "dev_emc_map not present\n");
+		}
 	} else
 		pdata = (struct nvhost_device_data *)dev->dev.platform_data;
 
@@ -594,9 +598,10 @@ static int nvdec_probe(struct platform_device *dev)
 
 	dev->dev.platform_data = NULL;
 
-	/* get the module clocks to sane state */
+	/* Initialize clock and icc path */
 	nvhost_module_init(dev);
 
+	/* Initialize device and create debugfs */
 	err = nvhost_client_device_init(dev);
 
 	return 0;

@@ -1,6 +1,4 @@
 /*
- * Tegra Graphics Init for T23X Architecture Chips
- *
  * Copyright (c) 2016-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -67,6 +65,7 @@
 #include "chip_support.h"
 
 #include "scale_emc.h"
+#include "nvhost_scale.h"
 
 #include "streamid_regs.c"
 #include "cg_regs.c"
@@ -304,9 +303,9 @@ struct nvhost_device_data t23x_nvdec_info = {
 	.enable_riscv_boot	= true,
 	.riscv_desc_bin		= "nvhost_nvdec050_desc_dev.bin",
 	.riscv_image_bin	= "nvhost_nvdec050_sim.fw",
-	.scaling_init		= nvhost_scale_emc_init,
-	.scaling_deinit		= nvhost_scale_emc_deinit,
-	.scaling_post_cb	= &nvhost_scale_emc_callback,
+	.scaling_init		= nvhost_scale_init,
+	.scaling_deinit		= nvhost_scale_deinit,
+	.scaling_post_cb	= &nvhost_scale_callback,
 	.actmon_regs		= HOST1X_THOST_ACTMON_NVDEC,
 	.actmon_enabled         = true,
 	.actmon_irq		= 4,
