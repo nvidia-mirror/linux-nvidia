@@ -12,6 +12,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/sched/signal.h>
 #include <uapi/linux/tegra-fsicom.h>
+#include <linux/pm.h>
 
 
 /* Timeout in milliseconds */
@@ -43,27 +44,25 @@ static struct task_struct *task;
 
 static struct fsi_hsp *fsi_hsp_v;
 
-static void fsicom_send_signal(int32_t data)
+static void fsicom_send_signal(int sig, int32_t data)
 {
-
 	struct siginfo info;
 
-	/*Sending signal to app */
 	memset(&info, 0, sizeof(struct siginfo));
-	info.si_signo = SIG_FSI_DAEMON;
+	info.si_signo = sig;
 	info.si_code = SI_QUEUE;
 	info.si_int  = (u32) (unsigned long) data;
-	if (task != NULL) {
-		if (send_sig_info(SIG_FSI_DAEMON,
-				(struct kernel_siginfo *)&info, task) < 0)
-			pr_err("Unable to send signal\n");
-	}
+
+	/* Sending signal to app */
+	if (task != NULL)
+		if (send_sig_info(sig, (struct kernel_siginfo *)&info, task) < 0)
+			pr_err("Unable to send signal %d\n", sig);
 }
 
 static void tegra_hsp_rx_notify(struct mbox_client *cl, void *msg)
 {
 
-	fsicom_send_signal(*((uint32_t *)msg));
+	fsicom_send_signal(SIG_FSI_WRITE_EVENT, *((uint32_t *)msg));
 }
 
 static void tegra_hsp_tx_empty_notify(struct mbox_client *cl,
@@ -71,6 +70,7 @@ static void tegra_hsp_tx_empty_notify(struct mbox_client *cl,
 {
 	pr_debug("TX empty callback came\n");
 }
+
 static int tegra_hsp_mb_init(struct device *dev)
 {
 	int err;
@@ -242,11 +242,28 @@ static int fsicom_client_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int __maybe_unused fsicom_client_suspend(struct device *dev)
+{
+	dev_dbg(dev, "suspend called\n");
+	return 0;
+}
+
+static int __maybe_unused fsicom_client_resume(struct device *dev)
+{
+	dev_dbg(dev, "resume called\n");
+
+	fsicom_send_signal(SIG_DRIVER_RESUME, 0);
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(fsicom_client_pm, fsicom_client_suspend, fsicom_client_resume);
+
 static struct platform_driver fsicom_client = {
 	.driver         = {
 	.name   = "fsicom_client",
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table = of_match_ptr(fsicom_client_dt_match),
+		.pm = pm_ptr(&fsicom_client_pm),
 	},
 	.probe          = fsicom_client_probe,
 	.remove         = fsicom_client_remove,

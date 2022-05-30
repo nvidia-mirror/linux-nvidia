@@ -15,7 +15,8 @@ struct rw_data {
 };
 
 /* signal value */
-#define SIG_FSI_DAEMON 44
+#define SIG_DRIVER_RESUME	43
+#define SIG_FSI_WRITE_EVENT	44
 
 /* ioctl call macros */
 #define NVMAP_SMMU_MAP    _IOWR('q', 1, struct rw_data *)
