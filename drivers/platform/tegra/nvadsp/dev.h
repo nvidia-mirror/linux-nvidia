@@ -164,6 +164,7 @@ struct nvadsp_chipdata {
 	int			end_irq;
 
 	bool			amc_err_war;
+	bool			chipid_ext;
 };
 
 struct nvadsp_drv_data {

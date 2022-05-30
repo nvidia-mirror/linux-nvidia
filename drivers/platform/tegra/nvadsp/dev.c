@@ -622,6 +622,9 @@ static struct nvadsp_chipdata tegra239_adsp_chipdata = {
 	.end_irq   = INT_T18x_AGIC_END,
 
 	.amc_err_war = false,
+
+	/* Populate Chip ID Major Revision as well */
+	.chipid_ext  = true,
 };
 
 static const struct of_device_id nvadsp_of_match[] = {

@@ -134,6 +134,10 @@ struct nvadsp_mappings {
 	int len;
 };
 
+#if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
+static inline u8 tegra_get_major_rev(void) { return 0; }
+#endif
+
 static struct nvadsp_mappings adsp_map[NM_LOAD_MAPPINGS];
 static int map_idx;
 static struct nvadsp_mbox adsp_com_mbox;
@@ -792,7 +796,7 @@ static void nvadsp_set_shared_mem(struct platform_device *pdev,
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
 	struct nvadsp_os_args *os_args;
-	u8 chip_id;
+	u32 chip_id;
 
 	shared_mem->os_args.dynamic_app_support = dynamic_app_support;
 	/* set logger strcuture with required properties */
@@ -801,7 +805,10 @@ static void nvadsp_set_shared_mem(struct platform_device *pdev,
 	priv.logger.dev = dev;
 	priv.adsp_os_fw_loaded = true;
 
-	chip_id = tegra_get_chip_id();
+	chip_id = (u32)tegra_get_chip_id();
+	if (drv_data->chip_data->chipid_ext)
+		chip_id = (chip_id << 4) | tegra_get_major_rev();
+
 	os_args = &shared_mem->os_args;
 	/* Chip id info is communicated twice to ADSP
 	 * TODO::clean up the redundant comm.
