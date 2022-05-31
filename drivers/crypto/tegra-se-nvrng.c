@@ -3,7 +3,7 @@
  *
  * Support for Tegra NVRNG Engine Error Handling.
  *
- * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -81,6 +81,7 @@ static void tegra_se_nvrng_writel(struct tegra_se_nvrng_dev *nvrng_dev,
 	writel(value, nvrng_dev->rng1_base + offset);
 }
 
+#ifdef CONFIG_PM_SLEEP
 static unsigned int tegra_se_sap_readl(struct tegra_se_nvrng_dev *nvrng_dev,
 				 unsigned int offset)
 {
@@ -92,6 +93,7 @@ static void tegra_se_sap_writel(struct tegra_se_nvrng_dev *nvrng_dev,
 {
 	writel(value, nvrng_dev->sap_base + offset);
 }
+#endif
 
 static irqreturn_t tegra_se_nvrng_isr(int irq, void *dev_id)
 {

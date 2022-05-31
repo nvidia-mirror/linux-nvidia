@@ -3,7 +3,7 @@
  *
  * Very loosely based on virtio_net.c
  *
- * Copyright (C) 2014-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -840,7 +840,7 @@ static int tegra_hv_net_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int tegra_hv_net_suspend(struct platform_device *pdev,
 				pm_message_t state)
 {
