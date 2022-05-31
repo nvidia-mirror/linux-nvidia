@@ -1,7 +1,7 @@
 /*
  * hdmi2.0.h: hdmi2.0 driver.
  *
- * Copyright (c) 2014-2020, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION, All rights reserved.
  * Author: Animesh Kishore <ankishore@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -263,6 +263,7 @@ struct hdmi_hdr_infoframe {
 	u32 max_frame_avg_light_level_lsb:8;
 	u32 min_frame_avg_light_level_msb:8;
 
+	u32 reg_hole4:16;
 } __packed;
 
 enum {
@@ -324,6 +325,7 @@ struct hdmi_spd_infoframe {
 
 	/* PB25 : Source Information */
 	u32 source_information:8;
+	u32 reg_hole4:24;
 } __packed;
 
 enum {
@@ -400,6 +402,7 @@ struct hdmi_vendor_infoframe {
 	/* PB6 */
 	u32 res3:4;
 	u32 ext_data_3d:4;
+	u32 reg_hole1:8;
 
 	/*PB7-PB24*/
 	u32 res4:32;
@@ -407,6 +410,7 @@ struct hdmi_vendor_infoframe {
 	u32 res6:32;
 	u32 res7:32;
 	u16 res8:16;
+	u32 reg_hole2:16;
 } __packed;
 
 /* all fields little endian */
@@ -430,6 +434,7 @@ struct hdmi_dv_infoframe {
 
 	/* PB6 */
 	u32 eff_tmax_pq_low:8;
+	u32 reg_hole:8;
 
 	/* PB7 */
 	u32 auxilary_run_mode:8;
