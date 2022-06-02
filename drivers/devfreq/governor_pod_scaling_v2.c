@@ -445,9 +445,11 @@ static void nvhost_scale_emc_debug_init(struct devfreq *df)
 {
 	struct podgov_info_rec *podgov = df->data;
 	char dirname[128];
+	int err;
 
-	snprintf(dirname, sizeof(dirname), "%s_scaling",
+	err = snprintf(dirname, sizeof(dirname), "%s_scaling",
 		to_platform_device(df->dev.parent)->name);
+	WARN_ON(err < 0);
 
 	if (!podgov)
 		return;
@@ -506,6 +508,7 @@ static ssize_t enable_3d_scaling_show(struct kobject *kobj,
 	ssize_t res;
 
 	res = snprintf(buf, PAGE_SIZE, "%d\n", podgov->enable);
+	WARN_ON(res < 0);
 
 	return res;
 }
@@ -542,6 +545,7 @@ static ssize_t user_show(struct kobject *kobj,
 	ssize_t res;
 
 	res = snprintf(buf, PAGE_SIZE, "%d\n", podgov->p_user);
+	WARN_ON(res < 0);
 
 	return res;
 }
@@ -571,6 +575,7 @@ static ssize_t freq_request_show(struct kobject *kobj,
 	ssize_t res;
 
 	res = snprintf(buf, PAGE_SIZE, "%d\n", podgov->p_freq_request);
+	WARN_ON(res < 0);
 
 	return res;
 }
