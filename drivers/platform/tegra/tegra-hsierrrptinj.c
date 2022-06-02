@@ -37,9 +37,13 @@
 
 
 /* Format of input buffer */
-/* IP ID, Instance ID, Error Code, Reporter ID, Error Attribute */
-/* "0x0000 0x0000 0x0000 0x0000 0x00000000\n" */
-static const size_t hsierrrptinj_err_rpt_len = 39;
+/* IP ID : Instance ID : Error Code : Reporter ID : Error Attribute */
+/* "0x0000:0x0000:0x0000:0x0000:0x00000000 " */
+#define ERR_RPT_LEN 39U
+
+#define NUM_INPUTS 5U
+
+#define WRITE_USER 0200 /* S_IWUSR */
 
 /* This directory entry will point to `/sys/kernel/debug/tegra_hsierrrptinj`. */
 static struct dentry *hsierrrptinj_debugfs_root;
@@ -47,20 +51,145 @@ static struct dentry *hsierrrptinj_debugfs_root;
 /* This file will point to `/sys/kernel/debug/tegra_hsierrrptinj/hsierrrpt`. */
 const char *hsierrrptinj_debugfs_name = "hsierrrpt";
 
-#define WRITE_USER 0200 /* S_IWUSR */
+/* This array stores callbacks registered by IP Drivers */
+static hsierrrpt_inj ip_driver_cb[NUM_IPS] = {NULL};
 
-static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lbuf, loff_t *ppos)
+
+/* Register Error callbacks from IP Drivers */
+int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func)
 {
-	pr_debug("tegra-hsierrrptinj: Inject\n");
-	if (lbuf != hsierrrptinj_err_rpt_len) {
-		pr_err("tegra-hsierrrptinj: Invalid input.\n");
+	pr_debug("tegra-hsierrrptinj: Register callback for IP Driver 0x%04x\n", ip_id);
+
+	if (cb_func == NULL) {
+		pr_err("tegra-hsierrrptinj: Callback function for 0x%04X invalid\n", ip_id);
 		return -EINVAL;
 	}
 
-	/** Extract data and trigger*/
-	pr_info("tegra-hsierrrptinj: print input\n");
-	pr_info("%.38s\n", buf);
+	if (ip_driver_cb[ip_id] != NULL) {
+		pr_err("tegra-hsierrrptinj: Callback for 0x%04X already registered\n", ip_id);
+		return -EINVAL;
+	}
+
+	ip_driver_cb[ip_id] = cb_func;
+
+	pr_debug("tegra-hsierrrptinj: Successfully registred callback for 0x%04X\n", ip_id);
+
 	return 0;
+}
+EXPORT_SYMBOL(hsierrrpt_reg_cb);
+
+/* Parse user entered data via debugfs interface and trigger IP Driver callback */
+static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lbuf, loff_t *ppos)
+{
+	struct epl_error_report_frame error_report;
+	int count = 0, ret = 0;
+	unsigned long val = 0;
+	hsierrrpt_ipid_t ip_id = IP_OTHER;
+	unsigned long instance_id = 0x0000;
+	char ubuf[ERR_RPT_LEN] = {0};
+	char *token, *cur = ubuf;
+	const char *delim = ":";
+
+	pr_debug("tegra-hsierrrptinj: Inject Error Report\n");
+	if (buf == NULL) {
+		pr_err("tegra-hsierrrptinj: Invalid null input.\n");
+		return -EINVAL;
+	}
+
+	if (lbuf != ERR_RPT_LEN) {
+		pr_err("tegra-hsierrrptinj: Invalid input length.\n");
+		return -EINVAL;
+	}
+
+	if (copy_from_user(&ubuf, buf, ERR_RPT_LEN)) {
+		pr_err("tegra-hsierrrptinj: Failed to copy from input buffer.\n");
+		return -EFAULT;
+	}
+
+	pr_debug("tegra-hsierrrptinj: Input Buffer: %s\n", cur);
+
+	/** Extract data and trigger*/
+	while (count < NUM_INPUTS) {
+
+		token = strsep(&cur, delim);
+		if (token == NULL) {
+			pr_err("tegra-hsierrrptinj: Failed to obtain token\n");
+			return -EFAULT;
+		}
+
+		ret = kstrtoul(token, 16, &val);
+		if (ret < 0) {
+			pr_err("tegra-hsierrrptinj: Parsing failed. Error: %d\n", ret);
+			return ret;
+		}
+
+		switch (count) {
+
+		case 0: /* IP ID **/
+			pr_debug("tegra-hsierrrptinj: IP ID: 0x%04lx\n", val);
+			ip_id = val;
+			count++;
+			break;
+		case 1: /* Instance ID */
+			pr_debug("tegra-hsierrrptinj: Instance ID: 0x%04lx\n", val);
+			instance_id = val;
+			count++;
+			break;
+		case 2: /* Error Code */
+			pr_debug("tegra-hsierrrptinj: Error Code: 0x%04lx\n", val);
+			error_report.error_code = val;
+			count++;
+			break;
+		case 3: /* Reporter ID */
+			pr_debug("tegra-hsierrrptinj: Reporter ID: 0x%04lx\n", val);
+			error_report.reporter_id = val;
+			count++;
+			break;
+		case 4: /* Error Attribute */
+			pr_debug("tegra-hsierrrptinj: Error Attribute: 0x%08lx\n", val);
+			error_report.error_attribute = val;
+			count++;
+			break;
+		default: /* Unknown */
+			pr_debug("tegra-hsierrrptinj: Invalid input\n");
+			break;
+		}
+
+	}
+
+	if (count != NUM_INPUTS) {
+		pr_err("tegra-hsierrrptinj: Invalid Input format.\n");
+		return -EINVAL;
+	}
+
+	/* Add timestamp */
+	asm volatile("mrs %0, cntvct_el0" : "=r" (error_report.timestamp));
+
+	/* This is a placeholder to test errors getting repoted in Aurix and FSI consoles */
+	/* This will be removed once integration with IP Drivers are completed */
+	ret = epl_report_error(error_report);
+	if (ret < 0)
+		pr_err("tegra-hsierrrptinj: Failed to report errorto EPL\n");
+	else
+		pr_err("tegra-hsierrrptinj: Reported Error to EPL\n");
+
+	pr_err("tegra-hsierrrptinj: Timestamp: %u\n", error_report.timestamp);
+
+#if 0
+	if (ip_driver_cb[ip_id] != NULL) {
+		ret = ip_driver_cb[ip_id](instance_id, error_report);
+	} else {
+		pr_err("tegra-hsierrrptinj: IP Driver 0x%04x\n", ip_id);
+		pr_err("tegra-hsierrrptinj: No registered error trigger callback found\n");
+		ret = -ENODEV;
+	}
+
+	if (ret != 0)
+		pr_err("tegra-hsierrrptinj: Failed to trigger error report callback\n");
+		pr_err("tegra-hsierrrptinj: IP Driver: 0x%04x Error Code: %d", ip_id, ret);
+#endif
+
+	return ret;
 }
 
 static const struct file_operations hsierrrptinj_fops = {
@@ -86,7 +215,7 @@ static const struct of_device_id hsierrrptinj_dt_match[] = {
 	{ .compatible = "nvidia,tegra23x-hsierrrptinj", },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, hsierrrptinj_dt_match;
+MODULE_DEVICE_TABLE(of, hsierrrptinj_dt_match);
 
 static int hsierrrptinj_probe(struct platform_device *pdev)
 {
@@ -102,11 +231,11 @@ static int hsierrrptinj_probe(struct platform_device *pdev)
 	}
 
 	/* Create a debug file 'hsierrrpt' under 'sys/kernel/debug/tegra_hsierrrptinj' */
-	pr_info("tegra-hsierrrptinj: Create debugfs file\n");
+	pr_debug("tegra-hsierrrptinj: Create debugfs file\n");
 	dent = debugfs_create_file(hsierrrptinj_debugfs_name, WRITE_USER,
 				   hsierrrptinj_debugfs_root, NULL, &hsierrrptinj_fops);
 	if (IS_ERR_OR_NULL(dent)) {
-		pr_err("tegra-hsierrrptinj: Failed to create debugfs node\n")
+		pr_err("tegra-hsierrrptinj: Failed to create debugfs node\n");
 		goto abort;
 	}
 
@@ -126,7 +255,6 @@ static int hsierrrptinj_remove(struct platform_device *pdev)
 	 */
 	pr_debug("tegra-hsierrrptinj: Recursively remove directories and files created\n");
 	debugfs_remove_recursive(hsierrrptinj_debugfs_root);
-
 	return 0;
 }
 
