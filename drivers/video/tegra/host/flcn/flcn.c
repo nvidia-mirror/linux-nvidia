@@ -127,6 +127,26 @@ static int nvhost_flcn_wait_idle(struct platform_device *pdev)
 	return ret;
 }
 
+static int nvhost_flcn_dma_wait_notfull(struct platform_device *pdev)
+{
+	int ret;
+	void __iomem *addr = get_aperture(pdev, 0) + flcn_dmatrfcmd_r();
+	u32 val;
+
+	nvhost_dbg_fn("");
+	ret = readl_poll_timeout(addr, val,
+				(flcn_dmatrfcmd_full_v(val) ==
+				 flcn_dmatrfcmd_full_false_v()),
+				FLCN_IDLE_CHECK_PERIOD,
+				FLCN_IDLE_TIMEOUT_DEFAULT);
+	if (ret)
+		dev_err(&pdev->dev, "wait_notfull: flcn_dmatrfcmd_r val = %x", val);
+	else
+		nvhost_dbg_fn("done");
+
+	return ret;
+}
+
 static int nvhost_flcn_dma_wait_idle(struct platform_device *pdev)
 {
 	int ret;
@@ -140,7 +160,7 @@ static int nvhost_flcn_dma_wait_idle(struct platform_device *pdev)
 				FLCN_IDLE_CHECK_PERIOD,
 				FLCN_IDLE_TIMEOUT_DEFAULT);
 	if (ret)
-		nvhost_err(&pdev->dev, "flcn_idle_state_r =%x\n", val);
+		nvhost_err(&pdev->dev, "wait_idle: flcn_dmatrfcmd_r =%x\n", val);
 	else
 		nvhost_dbg_fn("done");
 
@@ -151,6 +171,7 @@ static int flcn_dma_pa_to_internal_256b(struct platform_device *pdev,
 					phys_addr_t pa, u32 internal_offset,
 					bool imem)
 {
+	int err = 0;
 	u32 cmd = flcn_dmatrfcmd_size_256b_f();
 	u32 pa_offset =  flcn_dmatrffboffs_offs_f(pa);
 	u32 i_offset = flcn_dmatrfmoffs_offs_f(internal_offset);
@@ -160,11 +181,15 @@ static int flcn_dma_pa_to_internal_256b(struct platform_device *pdev,
 
 	cmd |= flcn_dmatrfcmd_dmactx_f(1);
 
+	err = nvhost_flcn_dma_wait_notfull(pdev);
+	if (err)
+		return err;
+
 	host1x_writel(pdev, flcn_dmatrfmoffs_r(), i_offset);
 	host1x_writel(pdev, flcn_dmatrffboffs_r(), pa_offset);
 	host1x_writel(pdev, flcn_dmatrfcmd_r(), cmd);
 
-	return nvhost_flcn_dma_wait_idle(pdev);
+	return 0;
 
 }
 
@@ -190,7 +215,7 @@ int nvhost_flcn_load_image(struct platform_device *pdev,
 			goto err;
 	}
 
-	/* Write nvdec ucode to imem */
+	/* Write ucode code to imem */
 	dev_dbg(&pdev->dev, "flcn_boot: load imem\n");
 	for (offset = imem_offset; offset < os->code_size; offset += 256) {
 		ret = flcn_dma_pa_to_internal_256b(pdev, os->code_offset + offset,
@@ -198,6 +223,8 @@ int nvhost_flcn_load_image(struct platform_device *pdev,
 		if (ret)
 			goto err;
 	}
+
+	ret = nvhost_flcn_dma_wait_idle(pdev);
 
 err:
 	if (ret)
