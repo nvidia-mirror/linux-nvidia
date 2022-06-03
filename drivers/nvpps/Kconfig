@@ -1,6 +1,7 @@
 config NVPPS
-	tristate "Tegra NVPPS Support"
+	bool "Tegra NVPPS Support"
 	depends on (ARCH_TEGRA_194_SOC || ARCH_TEGRA_19x_SOC)
+	default y
 	help
 	  This config enables the Tegra NVPPS driver. NVPPS is the PPS
 	  source driver for the Tegra SOC.

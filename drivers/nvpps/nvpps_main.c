@@ -31,6 +31,7 @@
 #include <linux/version.h>
 #include <uapi/linux/nvpps_ioctl.h>
 #include <linux/tegra-gte.h>
+#include <linux/nvpps.h>
 
 
 
@@ -50,6 +51,7 @@ static dev_t		s_nvpps_devt;
 static DEFINE_MUTEX(s_nvpps_lock);
 static DEFINE_IDR(s_nvpps_idr);
 
+static char *interface_name;
 
 
 /* platform device instance data */
@@ -173,6 +175,17 @@ static inline u64 __arch_counter_get_cntvct(void)
 }
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0) */
 
+/*
+ * Get PTP time
+ * Clients may call this API whenever PTP time is needed.
+ * If PTP time source is not registered, returns -EINVAL
+ */
+int nvpps_get_ptp_ts(void *ts)
+{
+	//TODO : should we support this API with memmapped method
+	return tegra_get_hwtime(interface_name, ts, PTP_HWTIME);
+}
+EXPORT_SYMBOL(nvpps_get_ptp_ts);
 
 static inline u64 get_systime(struct nvpps_device_data *pdev_data, u64 *tsc)
 {
@@ -502,8 +515,13 @@ static int set_mode(struct nvpps_device_data *pdev_data, u32 mode)
 
 
 /* Character device stuff */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+static unsigned int  nvpps_poll(struct file *file, poll_table *wait)
+{
+#else
 static __poll_t nvpps_poll(struct file *file, poll_table *wait)
 {
+#endif
 	struct nvpps_file_data		*pfile_data = (struct nvpps_file_data *)file->private_data;
 	struct nvpps_device_data	*pdev_data = pfile_data->pdev_data;
 
@@ -847,6 +865,8 @@ static void nvpps_fill_default_mac_phc_info(struct platform_device *pdev,
 			dev_info(&pdev->dev, "using ptp notifier method with default interface(%s)\n", pdev_data->iface_nm);
 		}
 	}
+
+	interface_name = devm_kstrdup(&pdev->dev, pdev_data->iface_nm, GFP_KERNEL);
 }
 
 
