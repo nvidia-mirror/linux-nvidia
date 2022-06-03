@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * Authors:
  *      VenkataJagadish.p	<vjagadish@nvidia.com>
@@ -1223,6 +1223,12 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if(!hba->card_present)
 		return 0;
 
+	if (ufs_tegra->enable_auto_hibern8) {
+		ufshcd_readl(hba, REG_UTP_TRANSFER_REQ_DOOR_BELL);
+		ufs_aux_writel(ufs_tegra->ufs_aux_base, 0x5,
+			UFSHC_AUX_UFSHC_CARD_DET_LP_PWR_CTRL_0);
+	}
+
 	if (pm_op != UFS_SYSTEM_PM)
 		return 0;
 
@@ -1362,6 +1368,10 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	pm_runtime_disable(dev);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
+
+	if (ufs_tegra->enable_auto_hibern8)
+		ufs_aux_writel(ufs_tegra->ufs_aux_base, 0x4,
+				UFSHC_AUX_UFSHC_CARD_DET_LP_PWR_CTRL_0);
 
 	return ret;
 
@@ -1634,6 +1644,9 @@ static int ufs_tegra_hce_enable_notify(struct ufs_hba *hba,
 					UFSHC_AUX_UFSHC_SW_EN_CLK_SLCG_0);
 		ufs_tegra_ufs_aux_prog(ufs_tegra);
 		ufs_tegra_cfg_vendor_registers(hba);
+		if (ufs_tegra->enable_auto_hibern8)
+			ufs_aux_writel(ufs_tegra->ufs_aux_base, 0x4,
+					UFSHC_AUX_UFSHC_CARD_DET_LP_PWR_CTRL_0);
 		clk_disable_unprepare(ufs_tegra->mphy_force_ls_mode);
 		if (ufs_tegra->chip_id == TEGRA234)
 			ufs_tegra_ufs_mmio_axi(hba);
@@ -1745,8 +1758,11 @@ static void ufs_tegra_config_soc_data(struct ufs_tegra_host *ufs_tegra)
 	if (of_property_read_bool(np, "nvidia,enable-hibern8-war"))
 		ufs_tegra->nvquirks |= NVQUIRK_BROKEN_HIBERN8_ENTRY;
 
-	ufs_tegra->enable_auto_suspend =
-		of_property_read_bool(np, "nvidia,enable-auto-suspend");
+	ufs_tegra->enable_auto_hibern8 =
+		of_property_read_bool(np, "nvidia,enable-auto-hibern8");
+
+	ufs_tegra->enable_sw_hibern8 =
+		of_property_read_bool(np, "nvidia,enable-sw-hibern8");
 
 	ufs_tegra->x2config =
 		of_property_read_bool(np, "nvidia,enable-x2-config");
@@ -1896,7 +1912,7 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	hba->caps |= UFSHCD_CAP_INTR_AGGR;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-	if ((ufs_tegra->enable_auto_suspend) && (ufs_tegra->chip_id == TEGRA234))
+	if ((ufs_tegra->enable_sw_hibern8) && (ufs_tegra->chip_id == TEGRA234))
 		hba->caps |= UFSHCD_CAP_RPM_AUTOSUSPEND;
 
 	if (ufs_tegra->chip_id == TEGRA234)

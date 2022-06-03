@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * Authors:
  *      VenkataJagadish.p	<vjagadish@nvidia.com>
@@ -188,6 +188,7 @@ enum {
 #define UFSHC_AUX_UFSHC_STATUS_0	0x10
 #define UFSHC_HIBERNATE_STATUS		(1 << 0)
 #define UFSHC_AUX_UFSHC_DEV_CTRL_0	0x14
+#define UFSHC_AUX_UFSHC_CARD_DET_LP_PWR_CTRL_0	0x1CU
 #define UFSHC_DEV_CLK_EN		(1 << 0)
 #define UFSHC_DEV_RESET			(1 << 1)
 #define UFSHC_AUX_UFSHC_SW_EN_CLK_SLCG_0	0x08
@@ -311,7 +312,8 @@ static u16  __attribute__ ((unused)) mphy_tx_apb[] = {
 struct ufs_tegra_host {
 	struct ufs_hba *hba;
 	bool is_lane_clks_enabled;
-	bool enable_auto_suspend;
+	bool enable_auto_hibern8;
+	bool enable_sw_hibern8;
 	bool x2config;
 	bool enable_mphy_rx_calib;
 	bool enable_hs_mode;
