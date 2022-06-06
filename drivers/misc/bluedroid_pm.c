@@ -27,6 +27,7 @@
 #include <linux/timer.h>
 #include <linux/of_gpio.h>
 #include <linux/version.h>
+#include "bluedroid_pm.h"
 
 #define PROC_DIR	"bluetooth/sleep"
 
@@ -72,7 +73,7 @@ struct bluedroid_pm_data {
 #endif
 };
 
-struct proc_dir_entry *proc_bt_dir, *bluetooth_sleep_dir;
+static struct proc_dir_entry *proc_bt_dir, *bluetooth_sleep_dir;
 static bool bluedroid_pm_blocked = 1;
 
 static int create_bt_proc_interface(void *drv_data);
@@ -649,7 +650,7 @@ static void remove_bt_proc_interface(void)
 {
 	remove_proc_entry("lpm", bluetooth_sleep_dir);
 	remove_proc_entry("sleep", proc_bt_dir);
-	remove_proc_entry("bluetooth", 0);
+	remove_proc_entry("bluetooth", NULL);
 }
 
 static int create_bt_proc_interface(void *drv_data)
@@ -682,7 +683,7 @@ static int create_bt_proc_interface(void *drv_data)
 free_sleep:
 	remove_proc_entry("sleep", proc_bt_dir);
 free_bluetooth:
-	remove_proc_entry("bluetooth", 0);
+	remove_proc_entry("bluetooth", NULL);
 	return retval;
 }
 
