@@ -1,7 +1,7 @@
 /*
  * NVIDIA tegra i2c slave driver
  *
- * Copyright (C) 2017 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2017-2022 NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Shardar Shariff Md <smohammed@nvidia.com>
  *
@@ -458,15 +458,13 @@ static int tegra_i2cslv_resume(struct device *dev)
 	ret = clk_enable(i2cslv_dev->div_clk);
 	if (ret < 0) {
 		dev_err(i2cslv_dev->dev, "Enable div-clk failed: %d\n", ret);
-		return ret;
+		goto err;
 	}
 	ret = tegra_i2cslv_init(i2cslv_dev);
-	if (ret)
-		return ret;
-
+err:
 	raw_spin_unlock_irqrestore(&i2cslv_dev->xfer_lock, flags);
+	return ret;
 
-	return 0;
 }
 #endif
 

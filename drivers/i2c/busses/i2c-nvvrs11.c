@@ -183,12 +183,12 @@ static const struct attribute_group nvvrs11_attr_group = {
 	.attrs = nvvrs11_attr,
 };
 
-int nvvrs11_create_sys_files(struct device *dev)
+static int nvvrs11_create_sys_files(struct device *dev)
 {
 	return sysfs_create_group(&dev->kobj, &nvvrs11_attr_group);
 }
 
-void nvvrs11_delete_sys_files(struct device *dev)
+static void nvvrs11_delete_sys_files(struct device *dev)
 {
 	return sysfs_remove_group(&dev->kobj, &nvvrs11_attr_group);
 }
