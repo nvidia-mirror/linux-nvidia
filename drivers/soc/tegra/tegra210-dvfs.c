@@ -908,7 +908,7 @@ static int core_millivolts[MAX_DVFS_FREQS];
 #include "tegra210b01-core-dvfs.c"
 #include "tegra210b01-slt-core-dvfs.c"
 
-int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
+static int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
 {
 	int ret;
 
@@ -924,7 +924,7 @@ int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
 	return 0;
 }
 
-int tegra_dvfs_disable_cpu_set(const char *arg, const struct kernel_param *kp)
+static int tegra_dvfs_disable_cpu_set(const char *arg, const struct kernel_param *kp)
 {
 	int ret;
 
@@ -940,7 +940,7 @@ int tegra_dvfs_disable_cpu_set(const char *arg, const struct kernel_param *kp)
 	return 0;
 }
 
-int tegra_dvfs_disable_gpu_set(const char *arg, const struct kernel_param *kp)
+static int tegra_dvfs_disable_gpu_set(const char *arg, const struct kernel_param *kp)
 {
 	int ret;
 
@@ -956,7 +956,7 @@ int tegra_dvfs_disable_gpu_set(const char *arg, const struct kernel_param *kp)
 	return 0;
 }
 
-int tegra_dvfs_disable_get(char *buffer, const struct kernel_param *kp)
+static int tegra_dvfs_disable_get(char *buffer, const struct kernel_param *kp)
 {
 	return param_get_bool(buffer, kp);
 }
