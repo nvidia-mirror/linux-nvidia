@@ -58,7 +58,7 @@ static struct {
 	int client_pid;
 	bool suspend_response;
 } user_client[MAX_USER_CLIENT];
-static int user_client_count;
+static uint32_t user_client_count;
 #endif
 
 struct tegra_hv_pm_ctl {
@@ -955,7 +955,13 @@ static int notify_client(char *msg, int msg_size)
 		}
 
 		nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-		strncpy(nlmsg_data(nlh), msg, msg_size);
+		if (nlh != NULL)
+			strncpy(nlmsg_data(nlh), msg, msg_size);
+		else {
+			dev_err(data->dev, "Failed to allocate netlink msg header\n");
+			ret = -ENOMEM;
+			goto fail;
+		}
 
 		if (user_client[i].client_pid > 0) {
 			dev_dbg(data->dev, "Sending to client id: %d\n", user_client[i].client_pid);
