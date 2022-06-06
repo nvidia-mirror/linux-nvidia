@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2016-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -83,7 +83,7 @@ static unsigned long clk_skipper_recalc_rate(struct clk_hw *hw,
 	return (prate * mul) / SKIPPER_DIVISOR;
 }
 
-const struct clk_ops tegra_clk_skipper_ops = {
+static const struct clk_ops tegra_clk_skipper_ops = {
 	.recalc_rate = clk_skipper_recalc_rate,
 	.set_rate = clk_skipper_set_rate,
 	.determine_rate = clk_skipper_determine_rate,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,6 +19,7 @@
 #include <linux/clkdev.h>
 #include <linux/mutex.h>
 #include <soc/tegra/tegra-aon-ivc-pllaon.h>
+#include <linux/tegra-aon-clk.h>
 
 static int clk_aon_enable(struct clk_hw *hw)
 {
@@ -38,13 +39,13 @@ static int clk_aon_is_enabled(struct clk_hw *hw)
 	return tegra_aon_get_pllaon_state();
 }
 
-const struct clk_ops tegra_clk_aon_gate_ops = {
+static const struct clk_ops tegra_clk_aon_gate_ops = {
 	.is_prepared = clk_aon_is_enabled,
 	.prepare = clk_aon_enable,
 	.unprepare = clk_aon_disable,
 };
 
-struct tegra_clk_aon {
+static struct tegra_clk_aon {
 	struct clk_hw hw;
 	int clk_num;
 } aon_clk;
