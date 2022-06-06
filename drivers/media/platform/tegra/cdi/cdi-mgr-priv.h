@@ -32,16 +32,6 @@ struct cam_gpio_config {
 	int gpio_intr_irq;
 };
 
-struct max20087_priv {
-	struct i2c_adapter *adap;
-	int bus;
-	u32 addr;
-	u32 reg_len;
-	u32 dat_len;
-	bool enable;
-	struct semaphore sem;
-};
-
 struct tca9539_priv {
 	struct i2c_adapter *adap;
 	int bus;
@@ -81,8 +71,7 @@ struct cdi_mgr_priv {
 	wait_queue_head_t err_queue;
 	bool err_irq_reported;
 	u8 des_pwr_method;
-	u8 cam_pwr_method;
-	struct max20087_priv max20087;
+	u8 des_pwr_i2c_addr;
 	struct tca9539_priv tca9539;
 	struct cam_gpio_config gpio_arr[MAX_CDI_GPIOS];
 	uint32_t gpio_count;

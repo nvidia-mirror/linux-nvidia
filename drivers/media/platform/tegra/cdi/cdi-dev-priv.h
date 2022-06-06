@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,13 @@
 
 #include <linux/cdev.h>
 
+struct max20087_priv {
+	int bus;
+	u32 addr;
+	u32 reg_len;
+	u32 dat_len;
+};
+
 struct cdi_dev_info {
 	struct i2c_client *i2c_client;
 	struct device *dev;
@@ -29,8 +36,9 @@ struct cdi_dev_info {
 	u32 reg_off;
 	char devname[32];
 	u8 power_is_on;
-	u8 des_pwr_method;
 	u8 cam_pwr_method;
+	u8 cam_pwr_i2c_addr;
+	struct max20087_priv max20087;
 };
 
 int cdi_dev_raw_rd(struct cdi_dev_info *info, unsigned int offset,

@@ -401,22 +401,22 @@ static int cdi_dev_get_package(
 	return 0;
 }
 
-static int cdi_dev_get_pwr_mode(
+static int cdi_dev_get_pwr_info(
 	struct cdi_dev_info *info,
 	void __user *arg)
 {
-	struct cdi_dev_pwr_mode pmode;
+	struct cdi_dev_pwr_ctrl_info pinfo;
 
-	if (copy_from_user(&pmode, arg, sizeof(pmode))) {
+	if (copy_from_user(&pinfo, arg, sizeof(pinfo))) {
 		dev_err(info->dev,
 			"%s: failed to copy from user\n", __func__);
 		return -EFAULT;
 	}
 
-	pmode.des_pwr_mode = info->des_pwr_method;
-	pmode.cam_pwr_mode = info->cam_pwr_method;
+	pinfo.cam_pwr_method = info->cam_pwr_method;
+	pinfo.cam_pwr_i2c_addr = info->cam_pwr_i2c_addr;
 
-	if (copy_to_user(arg, &pmode, sizeof(pmode))) {
+	if (copy_to_user(arg, &pinfo, sizeof(pinfo))) {
 		dev_err(info->dev,
 			"%s: failed to copy to user\n", __func__);
 		return -EFAULT;
@@ -438,8 +438,8 @@ static long cdi_dev_ioctl(struct file *file,
 
 		err = cdi_dev_raw_rw(info);
 		break;
-	case CDI_DEV_IOCTL_GET_PWR_MODE:
-		err = cdi_dev_get_pwr_mode(info, (void __user *)arg);
+	case CDI_DEV_IOCTL_GET_PWR_INFO:
+		err = cdi_dev_get_pwr_info(info, (void __user *)arg);
 		break;
 	default:
 		dev_dbg(info->dev, "%s: invalid cmd %x\n", __func__, cmd);
@@ -464,8 +464,8 @@ static long cdi_dev_ioctl32(struct file *file,
 
 		err = cdi_dev_raw_rw(info);
 		break;
-	case CDI_DEV_IOCTL_GET_PWR_MODE:
-		err = cdi_dev_get_pwr_mode(info, (void __user *)arg);
+	case CDI_DEV_IOCTL_GET_PWR_INFO:
+		err = cdi_dev_get_pwr_info(info, (void __user *)arg);
 		break;
 	default:
 		return cdi_dev_ioctl(file, cmd, arg);
@@ -518,7 +518,7 @@ static int cdi_dev_probe(struct i2c_client *client,
 	struct cdi_dev_info *info;
 	struct cdi_mgr_priv *cdi_mgr = NULL;
 	struct device *pdev;
-	struct device_node *child = NULL;
+	struct device_node *child = NULL, *child_max20087 = NULL;
 	int err;
 
 	dev_dbg(&client->dev, "%s: initializing link @%x-%04x\n",
@@ -545,15 +545,6 @@ static int cdi_dev_probe(struct i2c_client *client,
 				"pwr_ctrl");
 		if (child != NULL) {
 			if (of_property_read_bool(child,
-						"deserializer-pwr-gpio"))
-				info->des_pwr_method = DES_PWR_GPIO;
-			else if (of_property_read_bool(child,
-						"deserializer-pwr-nvccp"))
-				info->des_pwr_method = DES_PWR_NVCCP;
-			else
-				info->des_pwr_method = DES_PWR_NO_PWR;
-
-			if (of_property_read_bool(child,
 						"cam-pwr-max20087"))
 				info->cam_pwr_method = CAM_PWR_MAX20087;
 			else if (of_property_read_bool(child,
@@ -561,6 +552,41 @@ static int cdi_dev_probe(struct i2c_client *client,
 				info->cam_pwr_method = CAM_PWR_NVCCP;
 			else
 				info->cam_pwr_method = CAM_PWR_NO_PWR;
+
+			/* get the max20087 information */
+			child_max20087 = of_get_child_by_name(child, "max20087");
+			if (child_max20087 != NULL) {
+				err = of_property_read_u32(child_max20087, "i2c-bus",
+						&info->max20087.bus);
+				if (err) {
+					dev_err(&client->dev, "%s: failed to read \"i2c-bus\"\n",
+						__func__);
+					return err;
+				}
+				err = of_property_read_u32(child_max20087, "addr",
+					&info->max20087.addr);
+				if (err || !info->max20087.addr) {
+					info->cam_pwr_i2c_addr = 0;
+					dev_err(&client->dev, "%s: failed to read \"addr\"\n",
+						__func__);
+					return err;
+				}
+				info->cam_pwr_i2c_addr = info->max20087.addr;
+				err = of_property_read_u32(child_max20087, "reg_len",
+					&info->max20087.reg_len);
+				if (err || !info->max20087.reg_len) {
+					dev_err(&client->dev, "%s: failed to read \"reg_len\"\n",
+						__func__);
+					return err;
+				}
+				err = of_property_read_u32(child_max20087, "dat_len",
+					&info->max20087.dat_len);
+				if (err || !info->max20087.dat_len) {
+					dev_err(&client->dev, "%s: failed to read \"dat_len\"\n",
+						__func__);
+					return err;
+				}
+			}
 		}
 	}
 
