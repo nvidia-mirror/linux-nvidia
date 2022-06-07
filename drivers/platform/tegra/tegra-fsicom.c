@@ -18,7 +18,9 @@
 /* Timeout in milliseconds */
 #define TIMEOUT		1000
 
-/* Data type for mailbox client and channel details */
+#define IOVA_UNI_CODE   0xFE0D
+
+/*Data type for mailbox client and channel details*/
 struct fsi_hsp_sm {
 	struct mbox_client client;
 	struct mbox_chan *chan;
@@ -117,15 +119,16 @@ static ssize_t device_file_ioctl(
 	struct rw_data *user_input;
 	int ret = 0;
 	uint32_t pdata[4] = {0};
+	struct iova_data ldata;
 
-	user_input = (struct rw_data *)arg;
-	if (copy_from_user(&input, (void __user *)arg,
-				 sizeof(struct rw_data)))
-		return -EACCES;
 
 	switch (cmd) {
 
 	case NVMAP_SMMU_MAP:
+		user_input = (struct rw_data *)arg;
+		if (copy_from_user(&input, (void __user *)arg,
+					sizeof(struct rw_data)))
+			return -EACCES;
 		dmabuf = dma_buf_get(input.handle);
 
 		if (IS_ERR_OR_NULL(dmabuf))
@@ -158,6 +161,9 @@ static ssize_t device_file_ioctl(
 	break;
 
 	case TEGRA_HSP_WRITE:
+		if (copy_from_user(&input, (void __user *)arg,
+					sizeof(struct rw_data)))
+			return -EACCES;
 		pdata[0] = input.handle;
 		ret = mbox_send_message(fsi_hsp_v->tx.chan,
 			(void *)pdata);
@@ -165,6 +171,18 @@ static ssize_t device_file_ioctl(
 
 	case TEGRA_SIGNAL_REG:
 		task = get_current();
+	break;
+
+	case TEGRA_IOVA_DATA:
+		if (copy_from_user(&ldata, (void __user *)arg,
+					sizeof(struct iova_data)))
+			return -EACCES;
+		pdata[0] = ldata.offset;
+		pdata[1] = ldata.iova;
+		pdata[2] = ldata.chid;
+		pdata[3] = IOVA_UNI_CODE;
+		ret = mbox_send_message(fsi_hsp_v->tx.chan,
+			(void *)pdata);
 	break;
 
 	default:
