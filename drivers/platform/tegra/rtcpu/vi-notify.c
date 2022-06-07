@@ -429,8 +429,12 @@ static int tegra_ivc_vi_notify_runtime_get(struct device *dev)
 {
 	struct tegra_ivc_channel *chan = to_tegra_ivc_channel(dev);
 	struct tegra_ivc_vi_notify *ivn = tegra_ivc_channel_get_drvdata(chan);
-	int err = nvhost_module_busy(ivn->vi);
+	int err;
 
+	if (platform_get_drvdata(ivn->vi) == NULL)
+		return -ENODEV;
+
+	err = nvhost_module_busy(ivn->vi);
 	if (err < 0)
 		return err;
 
@@ -482,10 +486,6 @@ static struct platform_device *tegra_vi_get(struct device *dev)
 	if (vi_pdev == NULL)
 		return ERR_PTR(-EPROBE_DEFER);
 
-	if (&vi_pdev->dev.driver == NULL) {
-		platform_device_put(vi_pdev);
-		return ERR_PTR(-EPROBE_DEFER);
-	}
 	return vi_pdev;
 }
 
