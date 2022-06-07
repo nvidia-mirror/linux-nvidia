@@ -23,17 +23,14 @@
 #include <linux/interconnect.h>
 #include <dt-bindings/interconnect/tegra_icc_id.h>
 #endif
-#include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/iommu.h>
-#include <linux/irqchip/tegra-agic.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #if IS_ENABLED(CONFIG_TEGRA_BWMGR)
@@ -68,25 +65,8 @@
 #include "soc/tegra/camrtc-commands.h"
 #include <linux/tegra-rtcpu-coverage.h>
 
-#ifndef RTCPU_DRIVER_SM5_VERSION
-#define RTCPU_DRIVER_SM5_VERSION U32_C(5)
-#endif
-
-#if defined(LINUX_VERSION) && (LINUX_VERSION < 409)
-#define DISABLE_APE_RUNTIME_PM 1
-#else
-#define DISABLE_APE_RUNTIME_PM 0
-#endif
-
-enum tegra_cam_rtcpu_id {
-	TEGRA_CAM_RTCPU_SCE,
-	TEGRA_CAM_RTCPU_APE,
-	TEGRA_CAM_RTCPU_RCE,
-};
-
 #define CAMRTC_NUM_REGS		2
 #define CAMRTC_NUM_RESETS	2
-#define CAMRTC_NUM_IRQS		1
 
 struct tegra_cam_rtcpu_pdata {
 	const char *name;
@@ -95,8 +75,6 @@ struct tegra_cam_rtcpu_pdata {
 	int (*wait_for_idle)(struct device *);
 	const char * const *reset_names;
 	const char * const *reg_names;
-	const char * const *irq_names;
-	enum tegra_cam_rtcpu_id id;
 };
 
 /* Register specifics */
@@ -117,11 +95,6 @@ struct tegra_cam_rtcpu_pdata {
 static int tegra_sce_cam_wait_for_idle(struct device *dev);
 static void tegra_sce_cam_assert_resets(struct device *dev);
 static int tegra_sce_cam_deassert_resets(struct device *dev);
-
-static int tegra_ape_cam_wait_for_idle(struct device *dev);
-static irqreturn_t tegra_camrtc_adsp_wfi_handler(int irq, void *data);
-static void tegra_ape_cam_assert_resets(struct device *dev);
-static int tegra_ape_cam_deassert_resets(struct device *dev);
 
 static int tegra_rce_cam_wait_for_idle(struct device *dev);
 static void tegra_rce_cam_assert_resets(struct device *dev);
@@ -144,35 +117,8 @@ static const struct tegra_cam_rtcpu_pdata sce_pdata = {
 	.wait_for_idle = tegra_sce_cam_wait_for_idle,
 	.assert_resets = tegra_sce_cam_assert_resets,
 	.deassert_resets = tegra_sce_cam_deassert_resets,
-	.id = TEGRA_CAM_RTCPU_SCE,
 	.reset_names = sce_reset_names,
 	.reg_names = sce_reg_names,
-};
-
-static const char * const ape_reg_names[] = {
-	"ape-amisc",
-	NULL,
-};
-
-static const char * const ape_reset_names[] = {
-	"reset-names",			/* all named resets */
-	NULL,
-};
-
-static const char * const ape_irq_names[] = {
-	"adsp-wfi",
-	NULL
-};
-
-static const struct tegra_cam_rtcpu_pdata ape_pdata = {
-	.name = "ape",
-	.assert_resets = tegra_ape_cam_assert_resets,
-	.deassert_resets = tegra_ape_cam_deassert_resets,
-	.wait_for_idle = tegra_ape_cam_wait_for_idle,
-	.id = TEGRA_CAM_RTCPU_APE,
-	.reset_names = ape_reset_names,
-	.reg_names = ape_reg_names,
-	.irq_names = ape_irq_names,
 };
 
 static const char * const rce_reset_names[] = {
@@ -191,7 +137,6 @@ static const struct tegra_cam_rtcpu_pdata rce_pdata = {
 	.wait_for_idle = tegra_rce_cam_wait_for_idle,
 	.assert_resets = tegra_rce_cam_assert_resets,
 	.deassert_resets = tegra_rce_cam_deassert_resets,
-	.id = TEGRA_CAM_RTCPU_RCE,
 	.reset_names = rce_reset_names,
 	.reg_names = rce_reg_names,
 };
@@ -202,7 +147,6 @@ struct tegra_cam_rtcpu {
 	const char *name;
 	struct tegra_ivc_bus *ivc;
 	struct device_dma_parameters dma_parms;
-	struct device *hsp_device;
 	struct camrtc_hsp *hsp;
 	struct tegra_rtcpu_trace *tracer;
 	struct tegra_rtcpu_coverage *coverage;
@@ -219,18 +163,9 @@ struct tegra_cam_rtcpu {
 			void __iomem *pm_base;
 			void __iomem *cfg_base;
 		};
-		struct {
-			void __iomem *amisc_base;
-		};
 	};
 	struct camrtc_clk_group *clocks;
 	struct camrtc_reset_group *resets[CAMRTC_NUM_RESETS];
-	union {
-		int irqs[CAMRTC_NUM_IRQS];
-		struct {
-			int adsp_wfi_irq;
-		};
-	};
 	const struct tegra_cam_rtcpu_pdata *pdata;
 	struct camrtc_device_group *camera_devices;
 #if IS_ENABLED(CONFIG_INTERCONNECT)
@@ -339,32 +274,6 @@ static int tegra_camrtc_get_resources(struct device *dev)
 			return -EPROBE_DEFER;
 		}
 	}
-
-	return 0;
-}
-
-static int tegra_camrtc_get_irqs(struct device *dev)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-	const struct tegra_cam_rtcpu_pdata *pdata = rtcpu->pdata;
-	int i, err;
-
-	/*
-	 * AGIC can be touched only after APE is fully powered on.
-	 *
-	 * This can be called only after runtime resume.
-	 */
-
-	if (pdata->irq_names == NULL)
-		return 0;
-
-#define _get_irq(_dev, _name) of_irq_get_byname(_dev->of_node, _name)
-#define _int2err(x) ((x) < 0 ? (x) : 0)
-
-	GET_RESOURCES(irq, _get_irq, 0, _int2err);
-
-#undef _get_irq
-#undef _int2err
 
 	return 0;
 }
@@ -603,108 +512,6 @@ static int tegra_sce_cam_wait_for_idle(struct device *dev)
 	return 0;
 }
 
-static void tegra_ape_cam_assert_resets(struct device *dev)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-
-	camrtc_reset_group_assert(rtcpu->resets[0]);
-}
-
-static int tegra_ape_cam_deassert_resets(struct device *dev)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-
-	return camrtc_reset_group_deassert(rtcpu->resets[0]);
-}
-
-static irqreturn_t tegra_camrtc_adsp_wfi_handler(int irq, void *data)
-{
-	struct completion *entered_wfi = data;
-
-	disable_irq_nosync(irq);
-
-	complete(entered_wfi);
-
-	return IRQ_HANDLED;
-}
-
-static int tegra_ape_cam_wait_for_l2_idle(struct device *dev, long *timeout)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-	long delay_stride = HZ / 50;
-
-	if (rtcpu->amisc_base == NULL) {
-		dev_WARN(dev, "iobase \"ape-amisc\" missing\n");
-		return 0;
-	}
-
-	/* Poll for L2 idle.*/
-	for (;;) {
-		u32 val = readl(rtcpu->amisc_base + AMISC_ADSP_STATUS);
-		u32 mask = AMISC_ADSP_L2_IDLE;
-
-		if ((val & mask) == mask)
-			break;
-
-		if (*timeout <= 0) {
-			dev_WARN(dev, "timeout waiting for L2 idle\n");
-			return -EBUSY;
-		}
-
-		msleep(delay_stride);
-		*timeout -= delay_stride;
-	}
-
-	return 0;
-}
-
-static int tegra_ape_cam_wait_for_wfi(struct device *dev, long *timeout)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-	DECLARE_COMPLETION_ONSTACK(entered_wfi);
-	unsigned int irq = rtcpu->adsp_wfi_irq;
-	int err;
-
-	if (irq <= 0) {
-		dev_WARN(dev, "irq \"adsp-wfi\" missing\n");
-		return 0;
-	}
-
-	err = request_threaded_irq(irq,
-			tegra_camrtc_adsp_wfi_handler, NULL,
-			IRQF_TRIGGER_HIGH,
-			"adsp-wfi", &entered_wfi);
-	if (err) {
-		dev_WARN(dev, "cannot request for %s interrupt: %d\n",
-			"adsp-wfi", err);
-		return err;
-	}
-
-	*timeout = wait_for_completion_timeout(&entered_wfi, *timeout);
-
-	free_irq(irq, &entered_wfi);
-
-	if (*timeout == 0) {
-		dev_WARN(dev, "timeout waiting for WFI\n");
-		return -EBUSY;
-	}
-
-	return 0;
-}
-
-static int tegra_ape_cam_wait_for_idle(struct device *dev)
-{
-	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-	long timeout = rtcpu->cmd_timeout;
-	int err;
-
-	err = tegra_ape_cam_wait_for_wfi(dev, &timeout);
-	if (err)
-		return err;
-
-	return tegra_ape_cam_wait_for_l2_idle(dev, &timeout);
-}
-
 static int tegra_rce_cam_wait_for_idle(struct device *dev)
 {
 	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
@@ -861,12 +668,6 @@ static int tegra_camrtc_poweron(struct device *dev, bool full_speed)
 	if (rtcpu->powered) {
 		if (full_speed)
 			camrtc_clk_group_adjust_fast(rtcpu->clocks);
-		return 0;
-	}
-
-	/* APE power domain may misbehave and try to resume while probing */
-	if (rtcpu->hsp == NULL) {
-		dev_info(dev, "poweron while probing");
 		return 0;
 	}
 
@@ -1036,56 +837,13 @@ static int tegra_cam_rtcpu_runtime_idle(struct device *dev)
 	return 0;
 }
 
-static struct device *tegra_camrtc_get_hsp_device(struct device_node *hsp_node)
-{
-	struct device_node *of_node;
-	struct platform_device *pdev;
-
-	of_node = of_parse_phandle(hsp_node, "device", 0);
-	if (of_node == NULL)
-		return NULL;
-
-	pdev = of_find_device_by_node(of_node);
-	of_node_put(of_node);
-
-	if (pdev == NULL)
-		return ERR_PTR(-EPROBE_DEFER);
-
-	if (&pdev->dev.driver == NULL) {
-		platform_device_put(pdev);
-		return ERR_PTR(-EPROBE_DEFER);
-	}
-
-	return &pdev->dev;
-}
-
 static int tegra_camrtc_hsp_init(struct device *dev)
 {
 	struct tegra_cam_rtcpu *rtcpu = dev_get_drvdata(dev);
-	struct device_node *hsp_node;
 	int err;
 
 	if (!IS_ERR_OR_NULL(rtcpu->hsp))
 		return 0;
-
-	hsp_node = of_get_child_by_name(dev->of_node, "hsp");
-	rtcpu->hsp_device = tegra_camrtc_get_hsp_device(hsp_node);
-	if (IS_ERR(rtcpu->hsp_device)) {
-		of_node_put(hsp_node);
-		return PTR_ERR(rtcpu->hsp_device);
-	}
-
-	if (rtcpu->hsp_device != NULL) {
-		int ret = pm_runtime_get_sync(rtcpu->hsp_device);
-		if (ret < 0) {
-			dev_warn(rtcpu->hsp_device,
-				"power on failure: %d\n", ret);
-			of_node_put(hsp_node);
-			put_device(rtcpu->hsp_device);
-			rtcpu->hsp_device = NULL;
-			return ret;
-		}
-	}
 
 	rtcpu->hsp = camrtc_hsp_create(dev, tegra_camrtc_ivc_notify,
 			rtcpu->cmd_timeout);
@@ -1116,11 +874,6 @@ static int tegra_cam_rtcpu_remove(struct platform_device *pdev)
 			camrtc_hsp_bye(rtcpu->hsp);
 		camrtc_hsp_free(rtcpu->hsp);
 		rtcpu->hsp = NULL;
-	}
-
-	if (!IS_ERR_OR_NULL(rtcpu->hsp_device)) {
-		pm_runtime_put(rtcpu->hsp_device);
-		put_device(rtcpu->hsp_device);
 	}
 
 	tegra_rtcpu_trace_destroy(rtcpu->tracer);
@@ -1169,7 +922,7 @@ static int tegra_cam_rtcpu_probe(struct platform_device *pdev)
 	}
 
 	name = pdata->name;
-	of_property_read_string(dev->of_node, NV(cpu-name), &name);
+	of_property_read_string(dev->of_node, "nvidia,cpu-name", &name);
 
 	dev_dbg(dev, "probing RTCPU on %s\n", name);
 
@@ -1226,13 +979,6 @@ static int tegra_cam_rtcpu_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto fail;
 
-	/* Clocks are on, resets are deasserted, we can touch the hardware */
-
-	/* Tegra-agic driver routes IRQs when probing, do it when powered */
-	ret = tegra_camrtc_get_irqs(dev);
-	if (ret)
-		goto put_and_fail;
-
 	rtcpu->ivc = tegra_ivc_bus_create(dev);
 	if (IS_ERR(rtcpu->ivc)) {
 		ret = PTR_ERR(rtcpu->ivc);
@@ -1246,12 +992,8 @@ static int tegra_cam_rtcpu_probe(struct platform_device *pdev)
 		goto put_and_fail;
 	}
 
-	if (of_property_read_bool(dev->of_node, NV(disable-runtime-pm)) ||
-		/* APE power domain powergates APE block when suspending */
-		/* This won't do */
-		(DISABLE_APE_RUNTIME_PM && pdata->id == TEGRA_CAM_RTCPU_APE)) {
+	if (of_property_read_bool(dev->of_node, "nvidia,disable-runtime-pm"))
 		pm_runtime_get(dev);
-	}
 
 	ret = camrtc_hsp_get_fw_hash(rtcpu->hsp,
 			rtcpu->fw_hash, sizeof(rtcpu->fw_hash));
@@ -1400,9 +1142,6 @@ static void tegra_cam_rtcpu_shutdown(struct platform_device *pdev)
 static const struct of_device_id tegra_cam_rtcpu_of_match[] = {
 	{
 		.compatible = NV(tegra186-sce-ivc), .data = &sce_pdata
-	},
-	{
-		.compatible = NV(tegra186-ape-ivc), .data = &ape_pdata
 	},
 	{
 		.compatible = NV(tegra194-rce), .data = &rce_pdata
