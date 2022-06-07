@@ -600,13 +600,15 @@ int esc_mods_register_irq_4(struct mods_client         *client,
 int esc_mods_query_irq_3(struct mods_client      *client,
 			 struct MODS_QUERY_IRQ_3 *p);
 
-#ifdef MODS_HAS_TEGRA
-
+#ifdef MODS_HAS_PROD
 /* bpmp uphy */
 int esc_mods_bpmp_set_pcie_state(struct mods_client *client,
 				  struct MODS_SET_PCIE_STATE *p);
 int esc_mods_bpmp_init_pcie_ep_pll(struct mods_client *client,
 				  struct MODS_INIT_PCIE_EP_PLL *p);
+#endif
+
+#ifdef MODS_HAS_TEGRA
 
 /* clock */
 int esc_mods_get_clock_handle(struct mods_client           *client,
@@ -674,7 +676,7 @@ int esc_mods_net_force_link(struct mods_client          *client,
 			    struct MODS_NET_DEVICE_NAME *p);
 #endif
 
-#if defined(MODS_HAS_TEGRA) && defined(CONFIG_DMA_SHARED_BUFFER)
+#if defined(MODS_HAS_DMABUF) && defined(CONFIG_DMA_SHARED_BUFFER)
 int esc_mods_dmabuf_get_phys_addr(struct mods_client *client,
 				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *p);
 #else
@@ -691,6 +693,7 @@ int esc_mods_adsp_run_app(struct mods_client            *client,
 			  struct MODS_ADSP_RUN_APP_INFO *p);
 #endif
 
+#ifdef MODS_HAS_PROD
 /* prod */
 int mods_tegra_prod_init(const struct miscdevice *misc_dev);
 int esc_mods_tegra_prod_iterate_dt(struct mods_client *client,
@@ -705,6 +708,7 @@ int esc_mods_tegra_prod_set_prod_by_name(struct mods_client *client,
 	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
 int esc_mods_tegra_prod_set_prod_exact(struct mods_client *client,
 	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
+#endif
 
 #ifdef CONFIG_TRUSTY
 /* trustzone app call */
@@ -724,7 +728,7 @@ static inline int mods_create_debugfs(struct miscdevice *modsdev)
 static inline void mods_remove_debugfs(void) {}
 #endif /* CONFIG_DEBUG_FS */
 
-#if defined(MODS_HAS_TEGRA) && defined(CONFIG_DMA_SHARED_BUFFER)
+#if defined(MODS_HAS_DMABUF) && defined(CONFIG_DMA_SHARED_BUFFER)
 int mods_init_dmabuf(void);
 void mods_exit_dmabuf(void);
 #else

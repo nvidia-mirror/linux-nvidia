@@ -465,8 +465,10 @@ static int __init mods_init_module(void)
 	if (rc < 0)
 		return rc;
 
+#if defined(MODS_HAS_PROD)
 	/* tegra prod */
 	mods_tegra_prod_init(&mods_dev);
+#endif
 
 #if defined(CONFIG_DMA_ENGINE)
 	mods_init_dma();
@@ -2377,7 +2379,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   MODS_GET_RESET_HANDLE);
 		break;
 #endif
-#if defined(MODS_HAS_TEGRA)
+#if defined(MODS_HAS_PROD)
 	case MODS_ESC_BPMP_SET_PCIE_STATE:
 		MODS_IOCTL(MODS_ESC_BPMP_SET_PCIE_STATE,
 			   esc_mods_bpmp_set_pcie_state,
@@ -2389,6 +2391,8 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_bpmp_init_pcie_ep_pll,
 			   MODS_INIT_PCIE_EP_PLL);
 		break;
+#endif
+#if defined(MODS_HAS_TEGRA)
 	case MODS_ESC_DMA_ALLOC_COHERENT:
 		MODS_IOCTL(MODS_ESC_DMA_ALLOC_COHERENT,
 			   esc_mods_dma_alloc_coherent,
@@ -2474,7 +2478,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 				    MODS_FLUSH_CPU_CACHE_RANGE);
 		break;
 #endif
-#ifdef MODS_HAS_TEGRA
+#if defined(MODS_HAS_DMABUF)
 	case MODS_ESC_DMABUF_GET_PHYSICAL_ADDRESS:
 		MODS_IOCTL(MODS_ESC_DMABUF_GET_PHYSICAL_ADDRESS,
 			   esc_mods_dmabuf_get_phys_addr,
@@ -2534,7 +2538,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 		break;
 #endif
 
-#if defined(MODS_HAS_TEGRA)
+#if defined(MODS_HAS_PROD)
 	case MODS_ESC_TEGRA_PROD_IS_SUPPORTED:
 		MODS_IOCTL(MODS_ESC_TEGRA_PROD_IS_SUPPORTED,
 			   esc_mods_tegra_prod_is_supported,
@@ -2570,6 +2574,9 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_tegra_prod_iterate_dt,
 			   MODS_TEGRA_PROD_ITERATOR);
 		break;
+#endif
+
+#if defined(MODS_HAS_TEGRA)
 
 #ifdef CONFIG_TRUSTY
 	case MODS_ESC_SEND_TZ_MSG:

@@ -2244,10 +2244,6 @@ static void clear_contiguous_cache(struct mods_client *client,
 				   u64                 phys_start,
 				   u32                 size)
 {
-#ifdef MODS_HAS_TEGRA
-	__flush_dcache_area((void *)(size_t)(virt_start), size);
-#else
-	/* __flush_dcache_area is not exported in upstream kernels */
 	u64 end = virt_start + size;
 	u64 cur;
 	u32 d_line_shift = 4; /* Fallback for kernel 5.9 or older */
@@ -2267,7 +2263,6 @@ static void clear_contiguous_cache(struct mods_client *client,
 	do {
 		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
 	} while (cur += d_size, cur < end);
-#endif
 
 	cl_debug(DEBUG_MEM_DETAILED,
 		 "clear cache virt 0x%llx phys 0x%llx size 0x%x\n",
