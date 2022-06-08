@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,6 +18,7 @@
 #define PVA_BIT_HELPERS_H_
 
 #include <linux/types.h>
+#include <linux/limits.h>
 
 #define RMOS_BYTES_PER_WORD (sizeof(unsigned int))
 #define RMOS_BITS_PER_WORD (RMOS_BYTES_PER_WORD * 8U)
@@ -71,8 +72,12 @@ static inline uint32_t rmos_find_first_zero_bit(uint32_t *addr, uint32_t size)
 
 	tmp = (*p) | (~0U << size);
 	tmp = rmos_get_first_zero_bit(tmp);
-	if (tmp == 32U)
-		return result + size;
+	if (tmp == 32U) {
+		if ((U32_MAX - result) < size)
+			return size;
+		else
+			return result + size;
+	}
 
 	return result + tmp;
 }
