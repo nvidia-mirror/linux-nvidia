@@ -425,6 +425,81 @@ static int cdi_dev_get_pwr_info(
 	return 0;
 }
 
+static int tca9539_wr(
+	struct cdi_dev_info *info, unsigned int offset, u8 val)
+{
+	int ret = -ENODEV;
+
+	dev_dbg(info->dev, "%s\n", __func__);
+	mutex_lock(&info->mutex);
+
+	ret = tca9539_raw_wr(info->dev, &info->tca9539, offset, val);
+
+	mutex_unlock(&info->mutex);
+	return ret;
+}
+
+static int tca9539_rd(
+	struct cdi_dev_info *info, unsigned int offset, u8 *val)
+{
+	int ret = -ENODEV;
+
+	dev_dbg(info->dev, "%s\n", __func__);
+	mutex_lock(&info->mutex);
+
+	ret = tca9539_raw_rd(info->dev, &info->tca9539, offset, val);
+
+	mutex_unlock(&info->mutex);
+
+	return ret;
+}
+
+static int cdi_dev_set_fsync_mux(
+	struct cdi_dev_info *info,
+	void __user *arg)
+{
+	u8 val, shift;
+	struct cdi_dev_fsync_mux fsync_mux;
+
+	if (copy_from_user(&fsync_mux, arg, sizeof(fsync_mux))) {
+		dev_err(info->dev,
+			"%s: failed to copy from user\n", __func__);
+		return -EFAULT;
+	}
+
+	if (info->cim_ver == 2U) {
+		/* P01:P00 for the camera group B. cam_grp 1.
+		 * P03:P02 for the camera group C. cam_grp 2.
+		 * P05:P04 for the camera group D. cam_grp 3.
+		 */
+		if ((fsync_mux.cam_grp > 0U) && (fsync_mux.cam_grp < 4U)) {
+			if (tca9539_rd(info, 0x02, &val) != 0)
+				return -EFAULT;
+			switch (fsync_mux.cam_grp) {
+			case 1U:
+				shift = 0U;
+				break;
+			case 2U:
+				shift = 2U;
+				break;
+			case 3U:
+				shift = 4U;
+				break;
+			default:
+				shift = 0U;
+				break;
+			}
+
+			val &= ~(0x3 << shift);
+			val |= (fsync_mux.mux_sel << shift);
+			if (tca9539_wr(info, 0x02, val) != 0)
+				return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
 static long cdi_dev_ioctl(struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
@@ -441,6 +516,9 @@ static long cdi_dev_ioctl(struct file *file,
 		break;
 	case CDI_DEV_IOCTL_GET_PWR_INFO:
 		err = cdi_dev_get_pwr_info(info, (void __user *)arg);
+		break;
+	case CDI_DEV_IOCTL_FRSYNC_MUX:
+		err = cdi_dev_set_fsync_mux(info, (void __user *)arg);
 		break;
 	default:
 		dev_dbg(info->dev, "%s: invalid cmd %x\n", __func__, cmd);
@@ -467,6 +545,9 @@ static long cdi_dev_ioctl32(struct file *file,
 		break;
 	case CDI_DEV_IOCTL_GET_PWR_INFO:
 		err = cdi_dev_get_pwr_info(info, (void __user *)arg);
+		break;
+	case CDI_DEV_IOCTL_FRSYNC_MUX:
+		err = cdi_dev_set_fsync_mux(info, (void __user *)arg);
 		break;
 	default:
 		return cdi_dev_ioctl(file, cmd, arg);
@@ -513,6 +594,38 @@ static const struct file_operations cdi_dev_fileops = {
 	.release = cdi_dev_release,
 };
 
+static void cdi_dev_get_cim_ver(struct device_node *np, struct cdi_dev_info *info)
+{
+	int err = 0;
+	struct device_node *child = NULL;
+	struct device_node *cim = NULL;
+	const char *cim_ver;
+
+	child = of_get_parent(np);
+	if (child != NULL) {
+		cim = of_get_compatible_child(child,
+					"nvidia,cim_ver");
+		if (cim != NULL) {
+			err = of_property_read_string(cim,
+					"cim_ver",
+					&cim_ver);
+			if (!err) {
+				if (!strncmp(cim_ver,
+					"cim_ver_a01",
+					sizeof("cim_ver_a01"))) {
+					dev_info(info->dev,
+						"CIM A01\n");
+					info->cim_ver = 1U;
+				} else {
+					dev_info(info->dev,
+						"CIM A02\n");
+					info->cim_ver = 2U;
+				}
+			}
+		}
+	}
+}
+
 static int cdi_dev_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -520,6 +633,7 @@ static int cdi_dev_probe(struct i2c_client *client,
 	struct cdi_mgr_priv *cdi_mgr = NULL;
 	struct device *pdev;
 	struct device_node *child = NULL, *child_max20087 = NULL;
+	struct device_node *child_tca9539 = NULL;
 	int err;
 	int numLinks = 0;
 	int i;
@@ -543,7 +657,10 @@ static int cdi_dev_probe(struct i2c_client *client,
 		dev_notice(&client->dev, "%s NO platform data\n", __func__);
 		return -ENODEV;
 	}
+
 	if (info->pdata->np != NULL) {
+		cdi_dev_get_cim_ver(info->pdata->np, info);
+
 		child = of_get_child_by_name(info->pdata->np,
 				"pwr_ctrl");
 		if (child != NULL) {
@@ -610,6 +727,68 @@ static int cdi_dev_probe(struct i2c_client *client,
 							}
 						}
 					}
+				}
+			}
+		}
+
+		if (info->cim_ver == 2U) {
+			/* get the I/O expander information */
+			child_tca9539 = of_get_child_by_name(child, "tca9539");
+			if (child_tca9539 != NULL) {
+				err = of_property_read_u32(child_tca9539, "i2c-bus",
+						&info->tca9539.bus);
+				if (err) {
+					dev_err(info->dev,
+						"%s: Failed to get I2C bus number, ERROR %d\n",
+						__func__, err);
+					return -ENODEV;
+				}
+				err = of_property_read_u32(child_tca9539, "addr",
+					&info->tca9539.addr);
+				if (err || !info->tca9539.addr) {
+					dev_err(info->dev,
+						"%s: ERROR %d addr = %d\n",
+						__func__, err,
+						info->tca9539.addr);
+					return -ENODEV;
+				}
+				err = of_property_read_u32(child_tca9539, "reg_len",
+					&info->tca9539.reg_len);
+				if (err || !info->tca9539.reg_len) {
+					dev_err(info->dev,
+						"%s: ERROR %d reg_len = %d\n",
+						__func__, err,
+						info->tca9539.reg_len);
+					return -ENODEV;
+				}
+				err = of_property_read_u32(child_tca9539, "dat_len",
+					&info->tca9539.dat_len);
+				if (err || !info->tca9539.dat_len) {
+					dev_err(info->dev,
+						"%s: ERROR %d dat_len = %d\n",
+						__func__, err,
+						info->tca9539.dat_len);
+					return -ENODEV;
+				}
+				err = of_property_read_u32(child_tca9539->parent,
+						"power_port",
+						&info->tca9539.power_port);
+				if (err) {
+					dev_err(info->dev,
+						"%s: ERROR %d power_port = %d\n",
+						__func__, err,
+						info->tca9539.power_port);
+					return -ENODEV;
+				}
+
+				info->tca9539.reg_len /= 8;
+				info->tca9539.dat_len /= 8;
+				info->tca9539.enable = 1;
+				info->tca9539.adap = i2c_get_adapter(info->tca9539.bus);
+				if (!info->tca9539.adap) {
+					dev_err(info->dev, "%s no such i2c bus %d\n",
+						__func__, info->tca9539.bus);
+					return -ENODEV;
 				}
 			}
 		}

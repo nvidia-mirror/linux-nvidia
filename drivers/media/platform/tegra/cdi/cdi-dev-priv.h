@@ -15,6 +15,7 @@
 #define __CDI_DEV_PRIV_H__
 
 #include <linux/cdev.h>
+#include "cdi-tca-priv.h"
 
 #define MAX_POWER_LINKS_PER_BLOCK (4U)
 
@@ -42,6 +43,8 @@ struct cdi_dev_info {
 	u8 cam_pwr_method;
 	u8 cam_pwr_i2c_addr;
 	struct max20087_priv max20087;
+	struct tca9539_priv tca9539;
+	u8 cim_ver; /* 1 - P3714 A01, 2 - P3714 A02/A03 */
 };
 
 int cdi_dev_raw_rd(struct cdi_dev_info *info, unsigned int offset,

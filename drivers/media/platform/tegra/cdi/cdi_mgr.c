@@ -164,107 +164,30 @@ static int pwr_off_set(void *data, u64 val)
 
 DEFINE_SIMPLE_ATTRIBUTE(pwr_off_fops, pwr_off_get, pwr_off_set, "0x%02llx\n");
 
-static int tca9539_raw_wr(
+static int tca9539_wr(
 	struct cdi_mgr_priv *info, unsigned int offset, u8 val)
 {
 	int ret = -ENODEV;
-	u8 *buf_start = NULL;
-	struct i2c_msg *i2cmsg;
-	unsigned int num_msgs = 0, total_size, i;
-	u8 data[3];
-	size_t size = 1;
 
 	dev_dbg(info->dev, "%s\n", __func__);
 	mutex_lock(&info->mutex);
 
-	if (info->tca9539.reg_len == 2) {
-		data[0] = (u8)((offset >> 8) & 0xff);
-		data[1] = (u8)(offset & 0xff);
-		data[2] = val;
-		size += 2;
-	} else if (info->tca9539.reg_len == 1) {
-		data[0] = (u8)(offset & 0xff);
-		data[1] = val;
-		size += 1;
-	} else if ((info->tca9539.reg_len == 0) ||
-			(info->tca9539.reg_len > 3)) {
-		mutex_unlock(&info->mutex);
-		return 0;
-	}
+	ret = tca9539_raw_wr(info->dev, &info->tca9539, offset, val);
 
-	num_msgs = size / MAX_MSG_SIZE;
-	num_msgs += (size % MAX_MSG_SIZE) ? 1 : 0;
-
-	i2cmsg = kzalloc((sizeof(struct i2c_msg)*num_msgs), GFP_KERNEL);
-	if (!i2cmsg) {
-		mutex_unlock(&info->mutex);
-		return -ENOMEM;
-	}
-
-	buf_start = data;
-	total_size = size;
-
-	dev_dbg(info->dev, "%s: num_msgs: %d\n", __func__, num_msgs);
-	for (i = 0; i < num_msgs; i++) {
-		i2cmsg[i].addr = info->tca9539.addr;
-		i2cmsg[i].buf = (__u8 *)buf_start;
-
-		if (i > 0)
-			i2cmsg[i].flags = I2C_M_NOSTART;
-		else
-			i2cmsg[i].flags = 0;
-
-		if (total_size > MAX_MSG_SIZE) {
-			i2cmsg[i].len = MAX_MSG_SIZE;
-			buf_start += MAX_MSG_SIZE;
-			total_size -= MAX_MSG_SIZE;
-		} else {
-			i2cmsg[i].len = total_size;
-		}
-		dev_dbg(info->dev, "%s: addr:%x buf:%p, flags:%u len:%u\n",
-			__func__, i2cmsg[i].addr, (void *)i2cmsg[i].buf,
-			i2cmsg[i].flags, i2cmsg[i].len);
-	}
-
-	ret = i2c_transfer(info->tca9539.adap, i2cmsg, num_msgs);
-	if (ret > 0)
-		ret = 0;
-
-	kfree(i2cmsg);
 	mutex_unlock(&info->mutex);
 	return ret;
 }
 
-static int tca9539_raw_rd(
+static int tca9539_rd(
 	struct cdi_mgr_priv *info, unsigned int offset, u8 *val)
 {
 	int ret = -ENODEV;
-	u8 data[2];
-	size_t size = 1;
-	struct i2c_msg i2cmsg[2];
 
 	dev_dbg(info->dev, "%s\n", __func__);
 	mutex_lock(&info->mutex);
 
-	if (info->tca9539.reg_len == 2) {
-		data[0] = (u8)((offset >> 8) & 0xff);
-		data[1] = (u8)(offset & 0xff);
-	} else if (info->tca9539.reg_len == 1)
-		data[0] = (u8)(offset & 0xff);
+	ret = tca9539_raw_rd(info->dev, &info->tca9539, offset, val);
 
-	i2cmsg[0].addr = info->tca9539.addr;
-	i2cmsg[0].len = info->tca9539.reg_len;
-	i2cmsg[0].buf = (__u8 *)data;
-	i2cmsg[0].flags = I2C_M_NOSTART;
-
-	i2cmsg[1].addr = info->tca9539.addr;
-	i2cmsg[1].flags = I2C_M_RD;
-	i2cmsg[1].len = size;
-	i2cmsg[1].buf = (__u8 *)val;
-
-	ret = i2c_transfer(info->tca9539.adap, i2cmsg, 2);
-	if (ret > 0)
-		ret = 0;
 	mutex_unlock(&info->mutex);
 
 	return ret;
@@ -924,16 +847,16 @@ static int cdi_mgr_open(struct inode *inode, struct file *file)
 				"%s: failed to wait for the semaphore\n",
 				__func__);
 		if (cdi_mgr->cim_ver == 1U) { /* P3714 A01 */
-			if (tca9539_raw_rd(cdi_mgr, 0x02, &val) != 0)
+			if (tca9539_rd(cdi_mgr, 0x02, &val) != 0)
 				return -EFAULT;
 			val |= (0x10 << cdi_mgr->tca9539.power_port);
-			if (tca9539_raw_wr(cdi_mgr, 0x02, val) != 0)
+			if (tca9539_wr(cdi_mgr, 0x02, val) != 0)
 				return -EFAULT;
 		} else if (cdi_mgr->cim_ver == 2U) { /* P3714 A02 */
-			if (tca9539_raw_rd(cdi_mgr, 0x03, &val) != 0)
+			if (tca9539_rd(cdi_mgr, 0x03, &val) != 0)
 				return -EFAULT;
 			val |= (0x1 << cdi_mgr->tca9539.power_port);
-			if (tca9539_raw_wr(cdi_mgr, 0x03, val) != 0)
+			if (tca9539_wr(cdi_mgr, 0x03, val) != 0)
 				return -EFAULT;
 		}
 		up(&tca9539_sem);
@@ -956,16 +879,16 @@ static int cdi_mgr_release(struct inode *inode, struct file *file)
 				"%s: failed to wait for the semaphore\n",
 				__func__);
 		if (cdi_mgr->cim_ver == 1U) { /* P3714 A01 */
-			if (tca9539_raw_rd(cdi_mgr, 0x02, &val) != 0)
+			if (tca9539_rd(cdi_mgr, 0x02, &val) != 0)
 				return -EFAULT;
 			val &= ~(0x10 << cdi_mgr->tca9539.power_port);
-			if (tca9539_raw_wr(cdi_mgr, 0x02, val) != 0)
+			if (tca9539_wr(cdi_mgr, 0x02, val) != 0)
 				return -EFAULT;
 		} else if (cdi_mgr->cim_ver == 2U) { /* P3714 A02 */
-			if (tca9539_raw_rd(cdi_mgr, 0x03, &val) != 0)
+			if (tca9539_rd(cdi_mgr, 0x03, &val) != 0)
 				return -EFAULT;
 			val &= ~(0x1 << cdi_mgr->tca9539.power_port);
-			if (tca9539_raw_wr(cdi_mgr, 0x03, val) != 0)
+			if (tca9539_wr(cdi_mgr, 0x03, val) != 0)
 				return -EFAULT;
 		}
 		up(&tca9539_sem);
@@ -1272,7 +1195,7 @@ static int cdi_mgr_suspend(struct device *dev)
 	if (cdi_mgr->tca9539.enable) {
 		reg_addr = CDI_MGR_TCA9539_BASE_REG_ADDR;
 		while (reg_addr < CDI_MGR_TCA9539_REGISTER_COUNT) {
-			rc = tca9539_raw_rd(cdi_mgr, reg_addr,
+			rc = tca9539_rd(cdi_mgr, reg_addr,
 				&cdi_mgr->pre_suspend_tca9539_regvals[reg_addr]);
 			if (rc != 0) {
 				dev_err(dev, "%s: tca9539_raw_rd failed reading reg[0x%x]\n",
@@ -1306,7 +1229,7 @@ static int cdi_mgr_resume(struct device *dev)
 	if (cdi_mgr->tca9539.enable) {
 		reg_addr = CDI_MGR_TCA9539_BASE_REG_ADDR;
 		while (reg_addr < CDI_MGR_TCA9539_REGISTER_COUNT) {
-			rc = tca9539_raw_wr(cdi_mgr, reg_addr,
+			rc = tca9539_wr(cdi_mgr, reg_addr,
 				cdi_mgr->pre_suspend_tca9539_regvals[reg_addr]);
 			if (rc != 0) {
 				dev_err(dev, "%s: tca9539_raw_wr failed setting reg[0x%x] = 0x%x\n",
@@ -1720,27 +1643,27 @@ static int cdi_mgr_probe(struct platform_device *pdev)
 			/* the registers in TCA9539 */
 			/* Use the IO expander to control PWDN signals */
 			if (cdi_mgr->cim_ver == 1U) { /* P3714 A01 */
-				if (tca9539_raw_wr(cdi_mgr, 0x6, 0x0E) != 0) {
+				if (tca9539_wr(cdi_mgr, 0x6, 0x0E) != 0) {
 					dev_err(&pdev->dev,
 							"%s: ERR %d: TCA9539: Failed to select PWDN signal source\n",
 							__func__, err);
 					goto err_probe;
 				}
 				/* Output low for AGGA/B/C/D_PWRDN */
-				if (tca9539_raw_wr(cdi_mgr, 0x2, 0x0E) != 0) {
+				if (tca9539_wr(cdi_mgr, 0x2, 0x0E) != 0) {
 					dev_err(&pdev->dev,
 							"%s: ERR %d: TCA9539: Failed to set the output level\n",
 							__func__, err);
 					goto err_probe;
 				}
 			} else if (cdi_mgr->cim_ver == 2U) { /* P3714 A02 */
-				if (tca9539_raw_wr(cdi_mgr, 0x6, 0xC0) != 0) {
+				if (tca9539_wr(cdi_mgr, 0x6, 0xC0) != 0) {
 					dev_err(&pdev->dev,
 							"%s: ERR %d: TCA9539: Failed to select FS selection signal source\n",
 							__func__, err);
 					goto err_probe;
 				}
-				if (tca9539_raw_wr(cdi_mgr, 0x7, 0x70) != 0) {
+				if (tca9539_wr(cdi_mgr, 0x7, 0x70) != 0) {
 					dev_err(&pdev->dev,
 							"%s: ERR %d: TCA9539: Failed to select PWDN signal source\n",
 							__func__, err);
@@ -1753,7 +1676,7 @@ static int cdi_mgr_probe(struct platform_device *pdev)
 						cdi_mgr->cim_frsync[0],
 						cdi_mgr->cim_frsync[1],
 						cdi_mgr->cim_frsync[2]);
-				if (tca9539_raw_wr(cdi_mgr, 0x2,
+				if (tca9539_wr(cdi_mgr, 0x2,
 					(cdi_mgr->cim_frsync[2] << 4) |
 					(cdi_mgr->cim_frsync[1] << 2) |
 					(cdi_mgr->cim_frsync[0])) < 0) {
@@ -1763,7 +1686,7 @@ static int cdi_mgr_probe(struct platform_device *pdev)
 					goto err_probe;
 				}
 				/* Output low for AGGA/B/C/D_PWRDN */
-				if (tca9539_raw_wr(cdi_mgr, 0x3, 0x00) != 0) {
+				if (tca9539_wr(cdi_mgr, 0x3, 0x00) != 0) {
 					dev_err(&pdev->dev,
 							"%s: ERR %d: TCA9539: Failed to set the output level\n",
 							__func__, err);

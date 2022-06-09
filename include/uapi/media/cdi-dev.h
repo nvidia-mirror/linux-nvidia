@@ -21,6 +21,7 @@
 
 #define CDI_DEV_IOCTL_RW	          _IOW('o', 1, struct cdi_dev_package)
 #define CDI_DEV_IOCTL_GET_PWR_INFO    _IOW('o', 2, struct cdi_dev_pwr_ctrl_info)
+#define CDI_DEV_IOCTL_FRSYNC_MUX      _IOW('o', 3, struct cdi_dev_fsync_mux)
 
 #define DES_PWR_NVCCP    0U
 #define DES_PWR_GPIO     1U
@@ -35,6 +36,11 @@ struct __attribute__ ((__packed__)) cdi_dev_pwr_ctrl_info {
 	__s8 cam_pwr_method;
 	__s8 cam_pwr_i2c_addr;
 	__u8 cam_pwr_links[MAX_POWER_LINKS_PER_BLOCK];
+};
+
+struct cdi_dev_fsync_mux {
+	__s8 mux_sel;
+	__s8 cam_grp;
 };
 
 struct __attribute__ ((__packed__)) cdi_dev_package {

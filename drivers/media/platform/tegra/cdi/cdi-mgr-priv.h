@@ -17,6 +17,7 @@
 #include <linux/cdev.h>
 #include <linux/version.h>
 #include <media/cdi-mgr.h>
+#include "cdi-tca-priv.h"
 
 #define CDI_MGR_STOP_GPIO_INTR_EVENT_WAIT	(~(0u))
 #define CDI_MGR_TCA9539_REGISTER_COUNT      (8)
@@ -33,17 +34,6 @@ struct cam_gpio_config {
 	enum cam_gpio_direction gpio_dir;
 	struct gpio_desc *desc;
 	int gpio_intr_irq;
-};
-
-struct tca9539_priv {
-	struct i2c_adapter *adap;
-	int bus;
-	u32 addr;
-	u32 reg_len;
-	u32 dat_len;
-	u8 init_val[12];
-	u32 power_port;
-	bool enable;
 };
 
 struct cdi_mgr_priv {
@@ -80,7 +70,7 @@ struct cdi_mgr_priv {
 	uint32_t gpio_count;
 	uint32_t err_irq_recvd_status_mask;
 	bool stop_err_irq_wait;
-	u8 cim_ver; /* 1 - P3714 A01, 2 - P3714 A02 */
+	u8 cim_ver; /* 1 - P3714 A01, 2 - P3714 A02/A03 */
 	u32 cim_frsync[3]; /* FRSYNC source selection for each muxer */
 	u8 pre_suspend_tca9539_regvals[CDI_MGR_TCA9539_REGISTER_COUNT];
 };
