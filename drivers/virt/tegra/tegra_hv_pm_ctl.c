@@ -272,13 +272,23 @@ static int tegra_hv_pm_ctl_get_guest_state(u32 vmid, u32 *state)
 static irqreturn_t tegra_hv_pm_ctl_irq(int irq, void *dev_id)
 {
 	struct tegra_hv_pm_ctl *data = dev_id;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	struct ivc *ivc = tegra_hv_ivc_convert_cookie(data->ivck);
+#endif
 
 	/* handle IVC state changes */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (tegra_ivc_channel_notified(ivc) != 0)
+#else
+	if (tegra_hv_ivc_channel_notified(data->ivck) != 0)
+#endif
 		goto out;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (tegra_ivc_can_read(ivc) || tegra_ivc_can_write(ivc))
+#else
+	if (tegra_hv_ivc_can_read(data->ivck) || tegra_hv_ivc_can_write(data->ivck))
+#endif
 		wake_up_interruptible_all(&data->wq);
 
 out:
@@ -289,23 +299,38 @@ static ssize_t tegra_hv_pm_ctl_read(struct file *filp, char __user *buf,
 				    size_t count, loff_t *ppos)
 {
 	struct tegra_hv_pm_ctl *data = filp->private_data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	struct ivc *ivc = tegra_hv_ivc_convert_cookie(data->ivck);
+#endif
 	size_t chunk;
 	int ret = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (!tegra_ivc_can_read(ivc)) {
+#else
+	if (!tegra_hv_ivc_can_read(data->ivck)) {
+#endif
 		if (filp->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 		ret = wait_event_interruptible(data->wq,
 					       tegra_ivc_can_read(ivc));
+#else
+		ret = wait_event_interruptible(data->wq,
+					       tegra_hv_ivc_can_read(data->ivck));
+#endif
 		if (ret < 0)
 			return ret;
 	}
 
 	chunk = min_t(size_t, count, data->ivck->frame_size);
 	mutex_lock(&data->mutex_lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	ret = tegra_ivc_read_user(ivc, buf, chunk);
+#else
+	ret = tegra_hv_ivc_read_user(data->ivck, buf, chunk);
+#endif
 	mutex_unlock(&data->mutex_lock);
 	if (ret < 0)
 		dev_err(data->dev, "%s: Failed to read data from IVC %d, %d\n",
@@ -318,23 +343,38 @@ static ssize_t tegra_hv_pm_ctl_write(struct file *filp, const char __user *buf,
 				     size_t count, loff_t *ppos)
 {
 	struct tegra_hv_pm_ctl *data = filp->private_data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	struct ivc *ivc = tegra_hv_ivc_convert_cookie(data->ivck);
+#endif
 	size_t chunk;
 	int ret = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (!tegra_ivc_can_write(ivc)) {
+#else
+	if (!tegra_hv_ivc_can_write(data->ivck)) {
+#endif
 		if (filp->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 		ret = wait_event_interruptible(data->wq,
 					       tegra_ivc_can_write(ivc));
+#else
+		ret = wait_event_interruptible(data->wq,
+					       tegra_hv_ivc_can_write(data->ivck));
+#endif
 		if (ret < 0)
 			return ret;
 	}
 
 	chunk = min_t(size_t, count, data->ivck->frame_size);
 	mutex_lock(&data->mutex_lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	ret = tegra_ivc_write_user(ivc, buf, chunk);
+#else
+	ret = tegra_hv_ivc_write_user(data->ivck, buf, chunk);
+#endif
 	mutex_unlock(&data->mutex_lock);
 	if (ret < 0)
 		dev_err(data->dev, "%s: Failed to write data from IVC %d, %d\n",
@@ -352,8 +392,8 @@ static __poll_t tegra_hv_pm_ctl_poll(struct file *filp,
 #endif
 {
 	struct tegra_hv_pm_ctl *data = filp->private_data;
-	struct ivc *ivc = tegra_hv_ivc_convert_cookie(data->ivck);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+	struct ivc *ivc = tegra_hv_ivc_convert_cookie(data->ivck);
 	unsigned long req_events = poll_requested_events(table);
 	unsigned int read_mask = POLLIN | POLLRDNORM;
 	unsigned int write_mask = POLLOUT | POLLWRNORM;
@@ -366,16 +406,27 @@ static __poll_t tegra_hv_pm_ctl_poll(struct file *filp,
 #endif
 
 	mutex_lock(&data->mutex_lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (!tegra_ivc_can_read(ivc) && (req_events & read_mask)) {
+#else
+	if (!tegra_hv_ivc_can_read(data->ivck) && (req_events & read_mask)) {
+#endif
 		mutex_unlock(&data->mutex_lock);
 		poll_wait(filp, &data->wq, table);
 		mutex_lock(&data->mutex_lock);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (tegra_ivc_can_read(ivc))
 		mask |= read_mask;
 	if (tegra_ivc_can_write(ivc))
 		mask |= write_mask;
+#else
+	if (tegra_hv_ivc_can_read(data->ivck))
+		mask |= read_mask;
+	if (tegra_hv_ivc_can_write(data->ivck))
+		mask |= write_mask;
+#endif
 	mutex_unlock(&data->mutex_lock);
 
 	return mask;

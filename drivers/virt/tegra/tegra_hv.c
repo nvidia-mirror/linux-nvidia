@@ -782,6 +782,15 @@ int tegra_hv_ivc_write(struct tegra_hv_ivc_cookie *ivck, const void *buf,
 }
 EXPORT_SYMBOL(tegra_hv_ivc_write);
 
+int tegra_hv_ivc_write_user(struct tegra_hv_ivc_cookie *ivck, const void __user *buf,
+		int size)
+{
+	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
+
+	return tegra_ivc_write_user(ivc, buf, size);
+}
+EXPORT_SYMBOL(tegra_hv_ivc_write_user);
+
 int tegra_hv_ivc_read(struct tegra_hv_ivc_cookie *ivck, void *buf, int size)
 {
 	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
@@ -789,6 +798,14 @@ int tegra_hv_ivc_read(struct tegra_hv_ivc_cookie *ivck, void *buf, int size)
 	return tegra_ivc_read(ivc, buf, size);
 }
 EXPORT_SYMBOL(tegra_hv_ivc_read);
+
+int tegra_hv_ivc_read_user(struct tegra_hv_ivc_cookie *ivck, void __user *buf, int size)
+{
+	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
+
+	return tegra_ivc_read_user(ivc, buf, size);
+}
+EXPORT_SYMBOL(tegra_hv_ivc_read_user);
 
 int tegra_hv_ivc_read_peek(struct tegra_hv_ivc_cookie *ivck, void *buf,
 			   int off, int count)
