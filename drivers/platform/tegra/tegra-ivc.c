@@ -169,9 +169,8 @@ static inline uint64_t safe_mult_u32_u32__u64(uint32_t a, uint32_t b)
 	if (!is_u32_u32__u64_multiplication_safe(a, b))
 		BUG();
 	else
-		return (a * b);
+		return ((uint64_t)a * (uint64_t)b);
 }
-
 
 static inline void ivc_invalidate_counter(struct ivc *ivc,
 		dma_addr_t handle)
@@ -506,11 +505,9 @@ int tegra_ivc_read_advance(struct ivc *ivc)
 	if (result)
 		return result;
 
-	BUILD_BUG_ON(offsetof(struct ivc_channel_header, r_count) >  (UINT_MAX * 1ULL));
-	BUILD_BUG_ON(offsetof(struct ivc_channel_header, w_count) >  (UINT_MAX * 1ULL));
-	if (!is_u32_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, r_count)))
+	if (!is_u64_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, r_count)))
 		return -EFAULT;
-	if (!is_u32_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, w_count)))
+	if (!is_u64_addition_safe(ivc->rx_handle, offsetof(struct ivc_channel_header, w_count)))
 		return -EFAULT;
 	if (!is_u32_subtraction_safe(ivc->nframes, 1))
 		return -EFAULT;
