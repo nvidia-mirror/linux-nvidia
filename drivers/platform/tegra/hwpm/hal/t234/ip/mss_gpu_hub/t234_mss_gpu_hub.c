@@ -11,10 +11,10 @@
  * more details.
  */
 
-#include "t234_hwpm_ip_mss_gpu_hub.h"
+#include "t234_mss_gpu_hub.h"
 
 #include <tegra_hwpm.h>
-#include <hal/t234/t234_hwpm_regops_allowlist.h>
+#include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
 
 static struct hwpm_ip_aperture t234_mss_gpu_hub_inst0_perfmon_element_static_array[

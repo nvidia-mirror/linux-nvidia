@@ -11,22 +11,22 @@
  * more details.
  */
 
-#include "t234_hwpm_ip_mss_mcf.h"
+#include "t234_mss_iso_niso_hubs.h"
 
 #include <tegra_hwpm.h>
-#include <hal/t234/t234_hwpm_regops_allowlist.h>
+#include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
 
-static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmon_element_static_array[
-	T234_HWPM_IP_MSS_MCF_NUM_PERFMON_PER_INST] = {
+static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_static_array[
+	T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_PERFMON_PER_INST] = {
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
 		.dt_index = 0U,
 		.dt_mmio = NULL,
-		.name = "perfmon_mssmcfclient0",
-		.start_abs_pa = addr_map_rpg_pm_mcf0_base_r(),
-		.end_abs_pa = addr_map_rpg_pm_mcf0_limit_r(),
+		.name = "perfmon_msshub0",
+		.start_abs_pa = addr_map_rpg_pm_msshub0_base_r(),
+		.end_abs_pa = addr_map_rpg_pm_msshub0_limit_r(),
 		.start_pa = 0,
 		.end_pa = 0,
 		.base_pa = addr_map_rpg_pm_base_r(),
@@ -39,24 +39,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmon_element_static_array[
 		.element_index_mask = BIT(0),
 		.dt_index = 1U,
 		.dt_mmio = NULL,
-		.name = "perfmon_mssmcfmem0",
-		.start_abs_pa = addr_map_rpg_pm_mcf1_base_r(),
-		.end_abs_pa = addr_map_rpg_pm_mcf1_limit_r(),
-		.start_pa = 0,
-		.end_pa = 0,
-		.base_pa = addr_map_rpg_pm_base_r(),
-		.alist = t234_perfmon_alist,
-		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
-		.fake_registers = NULL,
-	},
-	{
-		.element_type = HWPM_ELEMENT_PERFMON,
-		.element_index_mask = BIT(0),
-		.dt_index = 2U,
-		.dt_mmio = NULL,
-		.name = "perfmon_mssmcfmem1",
-		.start_abs_pa = addr_map_rpg_pm_mcf2_base_r(),
-		.end_abs_pa = addr_map_rpg_pm_mcf2_limit_r(),
+		.name = "perfmon_msshub1",
+		.start_abs_pa = addr_map_rpg_pm_msshub1_base_r(),
+		.end_abs_pa = addr_map_rpg_pm_msshub1_limit_r(),
 		.start_pa = 0,
 		.end_pa = 0,
 		.base_pa = addr_map_rpg_pm_base_r(),
@@ -66,8 +51,8 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmon_element_static_array[
 	},
 };
 
-static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
-	T234_HWPM_IP_MSS_MCF_NUM_PERFMUX_PER_INST] = {
+static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_static_array[
+	T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_PERFMUX_PER_INST] = {
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
@@ -79,8 +64,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc0to1_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc0to1_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -94,8 +80,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc0to1_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc0to1_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -109,8 +96,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -124,8 +112,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -139,8 +128,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -154,8 +144,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -169,8 +160,9 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 	{
@@ -184,14 +176,30 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmux_element_static_array[
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mc2to7_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mc2to7_mss_mcf_alist),
+		.alist = t234_mc0to7_res_mss_iso_niso_hub_alist,
+		.alist_size =
+			ARRAY_SIZE(t234_mc0to7_res_mss_iso_niso_hub_alist),
+		.fake_registers = NULL,
+	},
+	{
+		.element_type = IP_ELEMENT_PERFMUX,
+		.element_index_mask = BIT(8),
+		.dt_index = 9U,
+		.dt_mmio = NULL,
+		.name = {'\0'},
+		.start_abs_pa = addr_map_mc8_base_r(),
+		.end_abs_pa = addr_map_mc8_limit_r(),
+		.start_pa = 0ULL,
+		.end_pa = 0ULL,
+		.base_pa = 0ULL,
+		.alist = t234_mc8_res_mss_iso_niso_hub_alist,
+		.alist_size = ARRAY_SIZE(t234_mc8_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 };
 
-static struct hwpm_ip_aperture t234_mss_mcf_inst0_broadcast_element_static_array[
-	T234_HWPM_IP_MSS_MCF_NUM_BROADCAST_PER_INST] = {
+static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_broadcast_element_static_array[
+	T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_BROADCAST_PER_INST] = {
 	{
 		.element_type = IP_ELEMENT_BROADCAST,
 		.element_index_mask = BIT(0),
@@ -203,19 +211,19 @@ static struct hwpm_ip_aperture t234_mss_mcf_inst0_broadcast_element_static_array
 		.start_pa = 0ULL,
 		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_mcb_mss_mcf_alist,
-		.alist_size = ARRAY_SIZE(t234_mcb_mss_mcf_alist),
+		.alist = t234_mcb_res_mss_iso_niso_hub_alist,
+		.alist_size = ARRAY_SIZE(t234_mcb_res_mss_iso_niso_hub_alist),
 		.fake_registers = NULL,
 	},
 };
 
 /* IP instance array */
-static struct hwpm_ip_inst t234_mss_mcf_inst_static_array[
-	T234_HWPM_IP_MSS_MCF_NUM_INSTANCES] = {
+static struct hwpm_ip_inst t234_mss_iso_niso_hub_inst_static_array[
+	T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_INSTANCES] = {
 	{
 		.hw_inst_mask = BIT(0),
 		.num_core_elements_per_inst =
-			T234_HWPM_IP_MSS_MCF_NUM_CORE_ELEMENT_PER_INST,
+			T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_CORE_ELEMENT_PER_INST,
 		.element_info = {
 			/*
 			 * Instance info corresponding to
@@ -223,14 +231,14 @@ static struct hwpm_ip_inst t234_mss_mcf_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_MSS_MCF_NUM_PERFMUX_PER_INST,
+					T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_PERFMUX_PER_INST,
 				.element_static_array =
-					t234_mss_mcf_inst0_perfmux_element_static_array,
+					t234_mss_iso_niso_hub_inst0_perfmux_element_static_array,
 				/* NOTE: range should be in ascending order */
-				.range_start = addr_map_mc4_base_r(),
+				.range_start = addr_map_mc8_base_r(),
 				.range_end = addr_map_mc3_limit_r(),
-				.element_stride = addr_map_mc4_limit_r() -
-					addr_map_mc4_base_r() + 1ULL,
+				.element_stride = addr_map_mc8_limit_r() -
+					addr_map_mc8_base_r() + 1ULL,
 				.element_slots = 0U,
 				.element_arr = NULL,
 			},
@@ -240,9 +248,9 @@ static struct hwpm_ip_inst t234_mss_mcf_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_MSS_MCF_NUM_BROADCAST_PER_INST,
+					T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_BROADCAST_PER_INST,
 				.element_static_array =
-					t234_mss_mcf_inst0_broadcast_element_static_array,
+					t234_mss_iso_niso_hub_inst0_broadcast_element_static_array,
 				.range_start = addr_map_mcb_base_r(),
 				.range_end = addr_map_mcb_limit_r(),
 				.element_stride = addr_map_mcb_limit_r() -
@@ -256,13 +264,13 @@ static struct hwpm_ip_inst t234_mss_mcf_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_MSS_MCF_NUM_PERFMON_PER_INST,
+					T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_PERFMON_PER_INST,
 				.element_static_array =
-					t234_mss_mcf_inst0_perfmon_element_static_array,
-				.range_start = addr_map_rpg_pm_mcf0_base_r(),
-				.range_end = addr_map_rpg_pm_mcf2_limit_r(),
-				.element_stride = addr_map_rpg_pm_mcf0_limit_r() -
-					addr_map_rpg_pm_mcf0_base_r() + 1ULL,
+					t234_mss_iso_niso_hub_inst0_perfmon_element_static_array,
+				.range_start = addr_map_rpg_pm_msshub0_base_r(),
+				.range_end = addr_map_rpg_pm_msshub1_limit_r(),
+				.element_stride = addr_map_rpg_pm_msshub0_limit_r() -
+					addr_map_rpg_pm_msshub0_base_r() + 1ULL,
 				.element_slots = 0U,
 				.element_arr = NULL,
 			},
@@ -279,9 +287,9 @@ static struct hwpm_ip_inst t234_mss_mcf_inst_static_array[
 };
 
 /* IP structure */
-struct hwpm_ip t234_hwpm_ip_mss_mcf = {
-	.num_instances = T234_HWPM_IP_MSS_MCF_NUM_INSTANCES,
-	.ip_inst_static_array = t234_mss_mcf_inst_static_array,
+struct hwpm_ip t234_hwpm_ip_mss_iso_niso_hubs = {
+	.num_instances = T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_INSTANCES,
+	.ip_inst_static_array = t234_mss_iso_niso_hub_inst_static_array,
 
 	.inst_aperture_info = {
 		/*
@@ -290,10 +298,10 @@ struct hwpm_ip t234_hwpm_ip_mss_mcf = {
 		 */
 		{
 			/* NOTE: range should be in ascending order */
-			.range_start = addr_map_mc4_base_r(),
+			.range_start = addr_map_mc8_base_r(),
 			.range_end = addr_map_mc3_limit_r(),
 			.inst_stride = addr_map_mc3_limit_r() -
-				addr_map_mc4_base_r() + 1ULL,
+				addr_map_mc8_base_r() + 1ULL,
 			.inst_slots = 0U,
 			.inst_arr = NULL,
 		},
@@ -314,10 +322,10 @@ struct hwpm_ip t234_hwpm_ip_mss_mcf = {
 		 * TEGRA_HWPM_APERTURE_TYPE_PERFMON
 		 */
 		{
-			.range_start = addr_map_rpg_pm_mcf0_base_r(),
-			.range_end = addr_map_rpg_pm_mcf2_limit_r(),
-			.inst_stride = addr_map_rpg_pm_mcf2_limit_r() -
-				addr_map_rpg_pm_mcf0_base_r() + 1ULL,
+			.range_start = addr_map_rpg_pm_msshub0_base_r(),
+			.range_end = addr_map_rpg_pm_msshub1_limit_r(),
+			.inst_stride = addr_map_rpg_pm_msshub1_limit_r() -
+				addr_map_rpg_pm_msshub0_base_r() + 1ULL,
 			.inst_slots = 0U,
 			.inst_arr = NULL,
 		},
@@ -329,3 +337,4 @@ struct hwpm_ip t234_hwpm_ip_mss_mcf = {
 	.resource_status = TEGRA_HWPM_RESOURCE_STATUS_INVALID,
 	.reserved = false,
 };
+

@@ -19,7 +19,7 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
-#include <hal/t234/t234_hwpm_internal.h>
+#include <hal/t234/t234_internal.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
 
 /*

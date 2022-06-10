@@ -18,8 +18,8 @@
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_static_analysis.h>
-#include <hal/t234/t234_hwpm_internal.h>
-#include <hal/t234/t234_hwpm_regops_allowlist.h>
+#include <hal/t234/t234_internal.h>
+#include <hal/t234/t234_regops_allowlist.h>
 
 size_t t234_hwpm_get_alist_buf_size(struct tegra_soc_hwpm *hwpm)
 {

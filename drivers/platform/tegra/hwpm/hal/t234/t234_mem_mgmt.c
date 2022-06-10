@@ -18,7 +18,7 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
-#include <hal/t234/t234_hwpm_internal.h>
+#include <hal/t234/t234_internal.h>
 
 #include <hal/t234/hw/t234_pmasys_soc_hwpm.h>
 #include <hal/t234/hw/t234_pmmsys_soc_hwpm.h>

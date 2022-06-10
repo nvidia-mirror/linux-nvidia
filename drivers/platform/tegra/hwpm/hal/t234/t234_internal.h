@@ -14,24 +14,24 @@
 #ifndef T234_HWPM_INTERNAL_H
 #define T234_HWPM_INTERNAL_H
 
-#include <hal/t234/ip/vi/t234_hwpm_ip_vi.h>
-#include <hal/t234/ip/isp/t234_hwpm_ip_isp.h>
-#include <hal/t234/ip/vic/t234_hwpm_ip_vic.h>
-#include <hal/t234/ip/ofa/t234_hwpm_ip_ofa.h>
-#include <hal/t234/ip/pva/t234_hwpm_ip_pva.h>
-#include <hal/t234/ip/nvdla/t234_hwpm_ip_nvdla.h>
-#include <hal/t234/ip/mgbe/t234_hwpm_ip_mgbe.h>
-#include <hal/t234/ip/scf/t234_hwpm_ip_scf.h>
-#include <hal/t234/ip/nvdec/t234_hwpm_ip_nvdec.h>
-#include <hal/t234/ip/nvenc/t234_hwpm_ip_nvenc.h>
-#include <hal/t234/ip/pcie/t234_hwpm_ip_pcie.h>
-#include <hal/t234/ip/display/t234_hwpm_ip_display.h>
-#include <hal/t234/ip/mss_channel/t234_hwpm_ip_mss_channel.h>
-#include <hal/t234/ip/mss_gpu_hub/t234_hwpm_ip_mss_gpu_hub.h>
-#include <hal/t234/ip/mss_iso_niso_hubs/t234_hwpm_ip_mss_iso_niso_hubs.h>
-#include <hal/t234/ip/mss_mcf/t234_hwpm_ip_mss_mcf.h>
-#include <hal/t234/ip/pma/t234_hwpm_ip_pma.h>
-#include <hal/t234/ip/rtr/t234_hwpm_ip_rtr.h>
+#include <hal/t234/ip/vi/t234_vi.h>
+#include <hal/t234/ip/isp/t234_isp.h>
+#include <hal/t234/ip/vic/t234_vic.h>
+#include <hal/t234/ip/ofa/t234_ofa.h>
+#include <hal/t234/ip/pva/t234_pva.h>
+#include <hal/t234/ip/nvdla/t234_nvdla.h>
+#include <hal/t234/ip/mgbe/t234_mgbe.h>
+#include <hal/t234/ip/scf/t234_scf.h>
+#include <hal/t234/ip/nvdec/t234_nvdec.h>
+#include <hal/t234/ip/nvenc/t234_nvenc.h>
+#include <hal/t234/ip/pcie/t234_pcie.h>
+#include <hal/t234/ip/display/t234_display.h>
+#include <hal/t234/ip/mss_channel/t234_mss_channel.h>
+#include <hal/t234/ip/mss_gpu_hub/t234_mss_gpu_hub.h>
+#include <hal/t234/ip/mss_iso_niso_hubs/t234_mss_iso_niso_hubs.h>
+#include <hal/t234/ip/mss_mcf/t234_mss_mcf.h>
+#include <hal/t234/ip/pma/t234_pma.h>
+#include <hal/t234/ip/rtr/t234_rtr.h>
 
 #define T234_HWPM_ACTIVE_IP_MAX		T234_HWPM_IP_MAX
 

@@ -11,24 +11,24 @@
  * more details.
  */
 
-#include "t234_hwpm_ip_nvdec.h"
+#include "t234_ofa.h"
 
 #include <tegra_hwpm.h>
-#include <hal/t234/t234_hwpm_regops_allowlist.h>
+#include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
 
-static struct hwpm_ip_aperture t234_nvdec_inst0_perfmon_element_static_array[
-	T234_HWPM_IP_NVDEC_NUM_PERFMON_PER_INST] = {
+static struct hwpm_ip_aperture t234_ofa_inst0_perfmon_element_static_array[
+	T234_HWPM_IP_OFA_NUM_PERFMON_PER_INST] = {
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
 		.dt_index = 0U,
 		.dt_mmio = NULL,
-		.name = "perfmon_nvdeca0",
-		.start_abs_pa = addr_map_rpg_pm_nvdec0_base_r(),
-		.end_abs_pa = addr_map_rpg_pm_nvdec0_limit_r(),
-		.start_pa = 0,
-		.end_pa = 0,
+		.name = "perfmon_ofaa0",
+		.start_abs_pa = addr_map_rpg_pm_ofa_base_r(),
+		.end_abs_pa = addr_map_rpg_pm_ofa_limit_r(),
+		.start_pa = 0ULL,
+		.end_pa = 0ULL,
 		.base_pa = addr_map_rpg_pm_base_r(),
 		.alist = t234_perfmon_alist,
 		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
@@ -36,32 +36,32 @@ static struct hwpm_ip_aperture t234_nvdec_inst0_perfmon_element_static_array[
 	},
 };
 
-static struct hwpm_ip_aperture t234_nvdec_inst0_perfmux_element_static_array[
-	T234_HWPM_IP_NVDEC_NUM_PERFMUX_PER_INST] = {
+static struct hwpm_ip_aperture t234_ofa_inst0_perfmux_element_static_array[
+	T234_HWPM_IP_OFA_NUM_PERFMUX_PER_INST] = {
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
 		.dt_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
-		.start_abs_pa = addr_map_nvdec_base_r(),
-		.end_abs_pa = addr_map_nvdec_limit_r(),
-		.start_pa = 0,
-		.end_pa = 0,
+		.start_abs_pa = addr_map_ofa_base_r(),
+		.end_abs_pa = addr_map_ofa_limit_r(),
+		.start_pa = 0ULL,
+		.end_pa = 0ULL,
 		.base_pa = 0ULL,
-		.alist = t234_nvdec_alist,
-		.alist_size = ARRAY_SIZE(t234_nvdec_alist),
+		.alist = t234_ofa_alist,
+		.alist_size = ARRAY_SIZE(t234_ofa_alist),
 		.fake_registers = NULL,
 	},
 };
 
 /* IP instance array */
-static struct hwpm_ip_inst t234_nvdec_inst_static_array[
-	T234_HWPM_IP_NVDEC_NUM_INSTANCES] = {
+static struct hwpm_ip_inst t234_ofa_inst_static_array[
+	T234_HWPM_IP_OFA_NUM_INSTANCES] = {
 	{
 		.hw_inst_mask = BIT(0),
 		.num_core_elements_per_inst =
-			T234_HWPM_IP_NVDEC_NUM_CORE_ELEMENT_PER_INST,
+			T234_HWPM_IP_OFA_NUM_CORE_ELEMENT_PER_INST,
 		.element_info = {
 			/*
 			 * Instance info corresponding to
@@ -69,13 +69,13 @@ static struct hwpm_ip_inst t234_nvdec_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_NVDEC_NUM_PERFMUX_PER_INST,
+					T234_HWPM_IP_OFA_NUM_PERFMUX_PER_INST,
 				.element_static_array =
-					t234_nvdec_inst0_perfmux_element_static_array,
-				.range_start = addr_map_nvdec_base_r(),
-				.range_end = addr_map_nvdec_limit_r(),
-				.element_stride = addr_map_nvdec_limit_r() -
-					addr_map_nvdec_base_r() + 1ULL,
+					t234_ofa_inst0_perfmux_element_static_array,
+				.range_start = addr_map_ofa_base_r(),
+				.range_end = addr_map_ofa_limit_r(),
+				.element_stride = addr_map_ofa_limit_r() -
+					addr_map_ofa_base_r() + 1ULL,
 				.element_slots = 0U,
 				.element_arr = NULL,
 			},
@@ -85,7 +85,7 @@ static struct hwpm_ip_inst t234_nvdec_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_NVDEC_NUM_BROADCAST_PER_INST,
+					T234_HWPM_IP_OFA_NUM_BROADCAST_PER_INST,
 				.element_static_array = NULL,
 				.range_start = 0ULL,
 				.range_end = 0ULL,
@@ -99,13 +99,13 @@ static struct hwpm_ip_inst t234_nvdec_inst_static_array[
 			 */
 			{
 				.num_element_per_inst =
-					T234_HWPM_IP_NVDEC_NUM_PERFMON_PER_INST,
+					T234_HWPM_IP_OFA_NUM_PERFMON_PER_INST,
 				.element_static_array =
-					t234_nvdec_inst0_perfmon_element_static_array,
-				.range_start = addr_map_rpg_pm_nvdec0_base_r(),
-				.range_end = addr_map_rpg_pm_nvdec0_limit_r(),
-				.element_stride = addr_map_rpg_pm_nvdec0_limit_r() -
-					addr_map_rpg_pm_nvdec0_base_r() + 1ULL,
+					t234_ofa_inst0_perfmon_element_static_array,
+				.range_start = addr_map_rpg_pm_ofa_base_r(),
+				.range_end = addr_map_rpg_pm_ofa_limit_r(),
+				.element_stride = addr_map_rpg_pm_ofa_limit_r() -
+					addr_map_rpg_pm_ofa_base_r() + 1ULL,
 				.element_slots = 0U,
 				.element_arr = NULL,
 			},
@@ -122,9 +122,9 @@ static struct hwpm_ip_inst t234_nvdec_inst_static_array[
 };
 
 /* IP structure */
-struct hwpm_ip t234_hwpm_ip_nvdec = {
-	.num_instances = T234_HWPM_IP_NVDEC_NUM_INSTANCES,
-	.ip_inst_static_array = t234_nvdec_inst_static_array,
+struct hwpm_ip t234_hwpm_ip_ofa = {
+	.num_instances = T234_HWPM_IP_OFA_NUM_INSTANCES,
+	.ip_inst_static_array = t234_ofa_inst_static_array,
 
 	.inst_aperture_info = {
 		/*
@@ -132,10 +132,10 @@ struct hwpm_ip t234_hwpm_ip_nvdec = {
 		 * TEGRA_HWPM_APERTURE_TYPE_PERFMUX
 		 */
 		{
-			.range_start = addr_map_nvdec_base_r(),
-			.range_end = addr_map_nvdec_limit_r(),
-			.inst_stride = addr_map_nvdec_limit_r() -
-				addr_map_nvdec_base_r() + 1ULL,
+			.range_start = addr_map_ofa_base_r(),
+			.range_end = addr_map_ofa_limit_r(),
+			.inst_stride = addr_map_ofa_limit_r() -
+				addr_map_ofa_base_r() + 1ULL,
 			.inst_slots = 0U,
 			.inst_arr = NULL,
 		},
@@ -155,10 +155,10 @@ struct hwpm_ip t234_hwpm_ip_nvdec = {
 		 * TEGRA_HWPM_APERTURE_TYPE_PERFMON
 		 */
 		{
-			.range_start = addr_map_rpg_pm_nvdec0_base_r(),
-			.range_end = addr_map_rpg_pm_nvdec0_limit_r(),
-			.inst_stride = addr_map_rpg_pm_nvdec0_limit_r() -
-				addr_map_rpg_pm_nvdec0_base_r() + 1ULL,
+			.range_start = addr_map_rpg_pm_ofa_base_r(),
+			.range_end = addr_map_rpg_pm_ofa_limit_r(),
+			.inst_stride = addr_map_rpg_pm_ofa_limit_r() -
+				addr_map_rpg_pm_ofa_base_r() + 1ULL,
 			.inst_slots = 0U,
 			.inst_arr = NULL,
 		},

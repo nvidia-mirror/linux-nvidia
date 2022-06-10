@@ -30,7 +30,7 @@
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
 
-#include <hal/t234/t234_hwpm_init.h>
+#include <hal/t234/t234_init.h>
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
 #include <tegra_hwpm_next_init.h>
 #endif

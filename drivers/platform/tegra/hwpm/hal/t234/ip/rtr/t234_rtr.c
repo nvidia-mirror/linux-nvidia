@@ -11,10 +11,10 @@
  * more details.
  */
 
-#include "t234_hwpm_ip_rtr.h"
+#include "t234_rtr.h"
 
 #include <tegra_hwpm.h>
-#include <hal/t234/t234_hwpm_regops_allowlist.h>
+#include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
 
 /* RTR aperture should be placed in instance T234_HWPM_IP_RTR_STATIC_RTR_INST */

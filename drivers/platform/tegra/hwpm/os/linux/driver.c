@@ -24,7 +24,7 @@
 #include <soc/tegra/fuse.h>
 
 #include <tegra_hwpm_log.h>
-#include <tegra_hwpm_debugfs.h>
+#include <os/linux/debugfs.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
 

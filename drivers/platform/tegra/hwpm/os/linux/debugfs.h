@@ -11,8 +11,8 @@
  * more details.
  */
 
-#ifndef TEGRA_HWPM_DEBUGFS_H
-#define TEGRA_HWPM_DEBUGFS_H
+#ifndef TEGRA_HWPM_OS_LINUX_DEBUGFS_H
+#define TEGRA_HWPM_OS_LINUX_DEBUGFS_H
 
 struct tegra_soc_hwpm;
 
@@ -24,4 +24,4 @@ static inline void tegra_hwpm_debugfs_init(struct tegra_soc_hwpm *hwpm) {}
 static inline void tegra_hwpm_debugfs_deinit(struct tegra_soc_hwpm *hwpm) {}
 #endif  /* CONFIG_DEBUG_FS  */
 
-#endif /* TEGRA_HWPM_DEBUGFS_H */
+#endif /* TEGRA_HWPM_OS_LINUX_DEBUGFS_H */
