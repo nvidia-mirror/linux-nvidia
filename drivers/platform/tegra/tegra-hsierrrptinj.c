@@ -38,12 +38,34 @@
 
 /* Format of input buffer */
 /* IP ID : Instance ID : Error Code : Reporter ID : Error Attribute */
-/* "0x0000:0x0000:0x0000:0x0000:0x00000000 " */
+/* "0x0000:0x0000:0x0000:0x0000:0x00000000" */
 #define ERR_RPT_LEN 39U
 
 #define NUM_INPUTS 5U
 
 #define WRITE_USER 0200 /* S_IWUSR */
+
+/* Max instance of any registred IP */
+#define MAX_INSTANCE 11U
+
+/**
+ * Note: Any update to IP instances array should be reflected in the macro MAX_INSTANCE.
+ */
+
+/**
+ * @brief IP Instances
+ * EQOS  - 1
+ * GPU   - 1
+ * I2C   - 10
+ * MGBE  - 4
+ * PCIE  - 11
+ * PSC   - 1
+ * QSPI  - 2
+ * TSEC  - 1
+ * SDMMC - 2
+ * DLA   - 2
+ */
+unsigned int ip_instances[NUM_IPS] = {1, 1, 10, 4, 11, 1, 2, 1, 2, 2};
 
 /* This directory entry will point to `/sys/kernel/debug/tegra_hsierrrptinj`. */
 static struct dentry *hsierrrptinj_debugfs_root;
@@ -52,11 +74,11 @@ static struct dentry *hsierrrptinj_debugfs_root;
 const char *hsierrrptinj_debugfs_name = "hsierrrpt";
 
 /* This array stores callbacks registered by IP Drivers */
-static hsierrrpt_inj ip_driver_cb[NUM_IPS] = {NULL};
+static hsierrrpt_inj ip_driver_cb[NUM_IPS][MAX_INSTANCE] = {{NULL}};
 
 
 /* Register Error callbacks from IP Drivers */
-int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func)
+int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func)
 {
 	pr_debug("tegra-hsierrrptinj: Register callback for IP Driver 0x%04x\n", ip_id);
 
@@ -65,27 +87,47 @@ int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func)
 		return -EINVAL;
 	}
 
-	if (ip_driver_cb[ip_id] != NULL) {
+	if (ip_id >= NUM_IPS) {
+		pr_err("tegra-hsierrrptinj: Invalid IP ID 0x%04x\n", ip_id);
+		return -EINVAL;
+	}
+
+	if (instance_id >= ip_instances[ip_id]) {
+		pr_err("tegra-hsierrrptinj: Invalid instance 0x%04x\n", instance_id);
+		return -EINVAL;
+	}
+
+	if (ip_driver_cb[ip_id][instance_id] != NULL) {
 		pr_err("tegra-hsierrrptinj: Callback for 0x%04X already registered\n", ip_id);
 		return -EINVAL;
 	}
 
-	ip_driver_cb[ip_id] = cb_func;
+	ip_driver_cb[ip_id][instance_id] = cb_func;
 
-	pr_debug("tegra-hsierrrptinj: Successfully registred callback for 0x%04X\n", ip_id);
+	pr_debug("tegra-hsierrrptinj: Successfully registered callback for 0x%04X\n", ip_id);
 
 	return 0;
 }
 EXPORT_SYMBOL(hsierrrpt_reg_cb);
 
+/* Report errors to FSI */
+int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
+{
+	int ret = -EINVAL;
+
+	ret = epl_report_error(err_rpt_frame);
+
+	return ret;
+}
+
 /* Parse user entered data via debugfs interface and trigger IP Driver callback */
 static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lbuf, loff_t *ppos)
 {
 	struct epl_error_report_frame error_report;
-	int count = 0, ret = 0;
+	int count = 0, ret = -EINVAL;
 	unsigned long val = 0;
-	hsierrrpt_ipid_t ip_id = IP_OTHER;
-	unsigned long instance_id = 0x0000;
+	hsierrrpt_ipid_t ip_id = IP_EQOS;
+	unsigned int instance_id = 0x0000;
 	char ubuf[ERR_RPT_LEN] = {0};
 	char *token, *cur = ubuf;
 	const char *delim = ":";
@@ -162,32 +204,48 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 		return -EINVAL;
 	}
 
+	if (instance_id >= ip_instances[ip_id]) {
+		pr_err("tegra-hsierrrptinj: Invalid instance for IP Driver 0x%04x\n", ip_id);
+		return -EINVAL;
+	}
+
 	/* Add timestamp */
 	asm volatile("mrs %0, cntvct_el0" : "=r" (error_report.timestamp));
 
-	/* This is a placeholder to test errors getting repoted in Aurix and FSI consoles */
-	/* This will be removed once integration with IP Drivers are completed */
-	ret = epl_report_error(error_report);
-	if (ret < 0)
-		pr_err("tegra-hsierrrptinj: Failed to report errorto EPL\n");
-	else
-		pr_err("tegra-hsierrrptinj: Reported Error to EPL\n");
+	/* IPs not in the hsierrrpt_ipid_t list normally report HSI errors to the FSI
+	 * via their local EC, therefore their controlling drivers do not provide a callback.
+	 * Directly send error reports for such IPs to the FSI.
+	 */
+	if (ip_id >= NUM_IPS) {
+		ret = hsierrrpt_report_to_fsi(error_report);
+		pr_debug("tegra-hsierrrptinj: Report error to FSI\n");
+		goto done;
+	}
+
+	/* Trigger IP driver registered callback */
+	if (ip_driver_cb[ip_id][instance_id] != NULL) {
+		ret = ip_driver_cb[ip_id][instance_id](error_report);
+	} else {
+		pr_err("tegra-hsierrrptinj: IP Driver 0x%04x\n", ip_id);
+		pr_err("tegra-hsierrrptinj: Instance 0x%04x\n", instance_id);
+		pr_err("tegra-hsierrrptinj: No registered error trigger callback found\n");
+		ret = epl_report_error(error_report);
+		pr_err("tegra-hsierrrptinj: Reporting error to FSI\n");
+	}
 
 	pr_err("tegra-hsierrrptinj: Timestamp: %u\n", error_report.timestamp);
 
-#if 0
-	if (ip_driver_cb[ip_id] != NULL) {
-		ret = ip_driver_cb[ip_id](instance_id, error_report);
-	} else {
-		pr_err("tegra-hsierrrptinj: IP Driver 0x%04x\n", ip_id);
-		pr_err("tegra-hsierrrptinj: No registered error trigger callback found\n");
-		ret = -ENODEV;
-	}
-
-	if (ret != 0)
+done:
+	if (ret != 0) {
 		pr_err("tegra-hsierrrptinj: Failed to trigger error report callback\n");
-		pr_err("tegra-hsierrrptinj: IP Driver: 0x%04x Error Code: %d", ip_id, ret);
-#endif
+		pr_err("tegra-hsierrrptinj: IP Driver: 0x%04x\n", ip_id);
+		pr_err("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
+		pr_err("tegra-hsierrrptinj: Error Code: %d", ret);
+	} else {
+		pr_debug("tegra-hsierrrptinj: Successfully triggered registered error callback\n");
+		pr_debug("tegra-hsierrrptinj: IP Driver: 0x%04x\n", ip_id);
+		pr_debug("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
+	}
 
 	return ret;
 }
@@ -230,8 +288,8 @@ static int hsierrrptinj_probe(struct platform_device *pdev)
 		goto abort;
 	}
 
-	/* Create a debug file 'hsierrrpt' under 'sys/kernel/debug/tegra_hsierrrptinj' */
-	pr_debug("tegra-hsierrrptinj: Create debugfs file\n");
+	/* Create a debug node 'hsierrrpt' under 'sys/kernel/debug/tegra_hsierrrptinj' */
+	pr_debug("tegra-hsierrrptinj: Create debugfs node\n");
 	dent = debugfs_create_file(hsierrrptinj_debugfs_name, WRITE_USER,
 				   hsierrrptinj_debugfs_root, NULL, &hsierrrptinj_fops);
 	if (IS_ERR_OR_NULL(dent)) {
@@ -253,7 +311,7 @@ static int hsierrrptinj_remove(struct platform_device *pdev)
 	/* We must explicitly remove the debugfs entries we created. They are not
 	 * automatically removed upon module removal.
 	 */
-	pr_debug("tegra-hsierrrptinj: Recursively remove directories and files created\n");
+	pr_debug("tegra-hsierrrptinj: Recursively remove directory and node created\n");
 	debugfs_remove_recursive(hsierrrptinj_debugfs_root);
 	return 0;
 }

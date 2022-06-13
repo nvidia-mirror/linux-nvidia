@@ -31,6 +31,13 @@
 #include "tegra-epl.h"
 
 /* ==================[Type Definitions]===================================== */
+/* Number of regiestred IPs */
+#define NUM_IPS 10U
+
+/**
+ * Note: Any update to IP ID enum should be reflected in the macro NUM_IPS.
+ */
+
 /**
  * @brief IP Ids
  */
@@ -44,19 +51,13 @@ IP_PSC   = 0x0005,
 IP_QSPI  = 0x0006,
 IP_TSEC  = 0x0007,
 IP_SDMMC = 0x0008,
-IP_DLA   = 0x0009,
-IP_OTHER = 0x000A
+IP_DLA   = 0x0009
 } hsierrrpt_ipid_t;
 
-/**
- * Number of regiestred IPs
- */
-#define NUM_IPS 10U
 
 /**
  * @brief Callback signature for initiating HSI error reports to FSI
  *
- * @param[in]   instance_id             Instance of the supported IP.
  * @param[in]   err_rpt_frame           Error frame to be reported.
  *
  * API signature for the common callback function that will be
@@ -66,11 +67,10 @@ IP_OTHER = 0x000A
  * @returns
  *  0           (success)
  *  -EINVAL     (On invalid arguments)
- *  -ENODEV     (On device driver not loaded)
  *  -EFAULT     (On IP driver failure to report error)
  *  -ETIME      (On timeout in IP driver)
  */
-typedef int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame err_rpt_frame);
+typedef int (*hsierrrpt_inj)(struct epl_error_report_frame err_rpt_frame);
 
 #if IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ)
 
@@ -78,6 +78,7 @@ typedef int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame
  * @brief HSI error report injection callback registration
  *
  * @param[in]   ip_id                   Supported IP Id.
+ * @param[in]   instance_id             Instance of supported IP.
  * @param[in]   cb_func                 Pointer to callback function.
  *
  * API to register the HSI error report trigger callback function
@@ -89,11 +90,11 @@ typedef int (*hsierrrpt_inj)(uint32_t instance_id, struct epl_error_report_frame
  *  -EINVAL     (On invalid arguments)
  *  -ENODEV     (On device driver not loaded)
  */
-int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func);
+int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func);
 
 #else
 
-inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, hsierrrpt_inj cb_func)
+inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func)
 {
 	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
 	return -ENODEV;
