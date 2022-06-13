@@ -404,6 +404,10 @@ enum tegra_soc_hwpm_ioctl_num {
 				TEGRA_SOC_HWPM_IOCTL_UPDATE_GET_PUT,	\
 				struct tegra_soc_hwpm_update_get_put)
 
+#define TEGRA_SOC_HWPM_MAX_ARG_SIZE	\
+			sizeof(struct tegra_soc_hwpm_exec_reg_ops)
+
+
 
 /* Interface for IP driver communication */
 

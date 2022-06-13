@@ -32,85 +32,9 @@
 
 #define LA_CLK_RATE 625000000UL
 
-struct tegra_soc_hwpm_ioctl {
-	const char *const name;
-	const size_t struct_size;
-	int (*handler)(struct tegra_soc_hwpm *, void *);
-};
-
-static int device_info_ioctl(struct tegra_soc_hwpm *hwpm,
-			     void *ioctl_struct);
-static int floorsweep_info_ioctl(struct tegra_soc_hwpm *hwpm,
-			     void *ioctl_struct);
-static int resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
-				void *ioctl_struct);
-static int reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
-				  void *ioctl_struct);
-static int alloc_pma_stream_ioctl(struct tegra_soc_hwpm *hwpm,
-				  void *ioctl_struct);
-static int bind_ioctl(struct tegra_soc_hwpm *hwpm,
-		      void *ioctl_struct);
-static int query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
-				 void *ioctl_struct);
-static int exec_reg_ops_ioctl(struct tegra_soc_hwpm *hwpm,
-			      void *ioctl_struct);
-static int update_get_put_ioctl(struct tegra_soc_hwpm *hwpm,
-				void *ioctl_struct);
-
-static const struct tegra_soc_hwpm_ioctl ioctls[] = {
-	[TEGRA_SOC_HWPM_IOCTL_DEVICE_INFO] = {
-		.name			= "device_info",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_device_info),
-		.handler		= device_info_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_FLOORSWEEP_INFO] = {
-		.name			= "floorsweep_info",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_ip_floorsweep_info),
-		.handler		= floorsweep_info_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_RESOURCE_INFO] = {
-		.name			= "resource_info",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_resource_info),
-		.handler		= resource_info_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_RESERVE_RESOURCE] = {
-		.name			= "reserve_resource",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_reserve_resource),
-		.handler		= reserve_resource_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_ALLOC_PMA_STREAM] = {
-		.name			= "alloc_pma_stream",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_alloc_pma_stream),
-		.handler		= alloc_pma_stream_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_BIND] = {
-		.name			= "bind",
-		.struct_size		= 0,
-		.handler		= bind_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_QUERY_ALLOWLIST] = {
-		.name			= "query_allowlist",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_query_allowlist),
-		.handler		= query_allowlist_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_EXEC_REG_OPS] = {
-		.name			= "exec_reg_ops",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_exec_reg_ops),
-		.handler		= exec_reg_ops_ioctl,
-	},
-	[TEGRA_SOC_HWPM_IOCTL_UPDATE_GET_PUT] = {
-		.name			= "update_get_put",
-		.struct_size		= sizeof(struct tegra_soc_hwpm_update_get_put),
-		.handler		= update_get_put_ioctl,
-	},
-};
-
-static int device_info_ioctl(struct tegra_soc_hwpm *hwpm,
-			     void *ioctl_struct)
+static int tegra_hwpm_get_device_info_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_device_info *device_info)
 {
-	struct tegra_soc_hwpm_device_info *device_info =
-		(struct tegra_soc_hwpm_device_info *)ioctl_struct;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	device_info->chip = hwpm->device_info.chip;
@@ -130,12 +54,9 @@ static int device_info_ioctl(struct tegra_soc_hwpm *hwpm,
 	return 0;
 }
 
-static int floorsweep_info_ioctl(struct tegra_soc_hwpm *hwpm,
-			     void *ioctl_struct)
+static int tegra_hwpm_get_floorsweep_info_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info)
 {
-	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info =
-		(struct tegra_soc_hwpm_ip_floorsweep_info *)ioctl_struct;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (fs_info->num_queries > TEGRA_SOC_HWPM_IP_QUERIES_MAX) {
@@ -147,12 +68,9 @@ static int floorsweep_info_ioctl(struct tegra_soc_hwpm *hwpm,
 	return tegra_hwpm_get_floorsweep_info(hwpm, fs_info);
 }
 
-static int resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
-				void *ioctl_struct)
+static int tegra_hwpm_get_resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_resource_info *rsrc_info)
 {
-	struct tegra_soc_hwpm_resource_info *rsrc_info =
-		(struct tegra_soc_hwpm_resource_info *)ioctl_struct;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (rsrc_info->num_queries > TEGRA_SOC_HWPM_RESOURCE_QUERIES_MAX) {
@@ -165,11 +83,9 @@ static int resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
 
 }
 
-static int reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
-				  void *ioctl_struct)
+static int tegra_hwpm_reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_reserve_resource *reserve_resource)
 {
-	struct tegra_soc_hwpm_reserve_resource *reserve_resource =
-			(struct tegra_soc_hwpm_reserve_resource *)ioctl_struct;
 	u32 resource = reserve_resource->resource;
 	int ret = 0;
 
@@ -195,11 +111,9 @@ static int reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
 	return ret;
 }
 
-static int alloc_pma_stream_ioctl(struct tegra_soc_hwpm *hwpm,
-				  void *ioctl_struct)
+static int tegra_hwpm_alloc_pma_stream_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
-	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream =
-			(struct tegra_soc_hwpm_alloc_pma_stream *)ioctl_struct;
 	int ret = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
@@ -231,8 +145,7 @@ static int alloc_pma_stream_ioctl(struct tegra_soc_hwpm *hwpm,
 	return ret;
 }
 
-static int bind_ioctl(struct tegra_soc_hwpm *hwpm,
-		      void *ioctl_struct)
+static int tegra_hwpm_bind_ioctl(struct tegra_soc_hwpm *hwpm)
 {
 	int ret = 0;
 
@@ -248,12 +161,10 @@ static int bind_ioctl(struct tegra_soc_hwpm *hwpm,
 	return ret;
 }
 
-static int query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
-				 void *ioctl_struct)
+static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_query_allowlist *query_allowlist)
 {
 	int ret = 0;
-	struct tegra_soc_hwpm_query_allowlist *query_allowlist =
-		(struct tegra_soc_hwpm_query_allowlist *)ioctl_struct;
 
 	tegra_hwpm_fn(hwpm, " ");
 
@@ -287,8 +198,8 @@ static int query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 	return 0;
 }
 
-static int exec_reg_ops_ioctl(struct tegra_soc_hwpm *hwpm,
-			      void *ioctl_struct)
+static int tegra_hwpm_exec_reg_ops_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_exec_reg_ops *exec_reg_ops)
 {
 	tegra_hwpm_fn(hwpm, " ");
 
@@ -298,16 +209,12 @@ static int exec_reg_ops_ioctl(struct tegra_soc_hwpm *hwpm,
 		return -EPERM;
 	}
 
-	return tegra_hwpm_exec_regops(hwpm,
-		(struct tegra_soc_hwpm_exec_reg_ops *)ioctl_struct);
+	return tegra_hwpm_exec_regops(hwpm, exec_reg_ops);
 }
 
-static int update_get_put_ioctl(struct tegra_soc_hwpm *hwpm,
-				void *ioctl_struct)
+static int tegra_hwpm_update_get_put_ioctl(struct tegra_soc_hwpm *hwpm,
+	struct tegra_soc_hwpm_update_get_put *update_get_put)
 {
-	struct tegra_soc_hwpm_update_get_put *update_get_put =
-		(struct tegra_soc_hwpm_update_get_put *)ioctl_struct;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (!hwpm->bind_completed) {
@@ -330,29 +237,21 @@ static long tegra_hwpm_ioctl(struct file *file,
 				 unsigned long arg)
 {
 	int ret = 0;
-	enum tegra_soc_hwpm_ioctl_num ioctl_num = _IOC_NR(cmd);
-	u32 ioc_dir = _IOC_DIR(cmd);
-	u32 arg_size = _IOC_SIZE(cmd);
 	struct tegra_soc_hwpm *hwpm = NULL;
-	void *arg_copy = NULL;
+	u8 *buf;
 
 	if ((_IOC_TYPE(cmd) != TEGRA_SOC_HWPM_IOC_MAGIC) ||
-	    (ioctl_num < 0) ||
-	    (ioctl_num >= TERGA_SOC_HWPM_NUM_IOCTLS)) {
-		tegra_hwpm_err(hwpm, "Unsupported IOCTL call");
+	    (_IOC_NR(cmd) < 0) ||
+	    (_IOC_NR(cmd) >= TERGA_SOC_HWPM_NUM_IOCTLS) ||
+	    (_IOC_SIZE(cmd) > TEGRA_SOC_HWPM_MAX_ARG_SIZE)) {
+		tegra_hwpm_err(hwpm, "Invalid IOCTL call");
 		ret = -EINVAL;
-		goto end;
+		goto fail;
 	}
 
 	if (!file) {
 		tegra_hwpm_err(hwpm, "Invalid file");
 		ret = -ENODEV;
-		goto fail;
-	}
-
-	if (arg_size != ioctls[ioctl_num].struct_size) {
-		tegra_hwpm_err(hwpm, "Invalid userspace struct");
-		ret = -EINVAL;
 		goto fail;
 	}
 
@@ -371,57 +270,84 @@ static long tegra_hwpm_ioctl(struct file *file,
 		goto fail;
 	}
 
-	/* Only allocate a buffer if the IOCTL needs a buffer */
-	if (!(ioc_dir & _IOC_NONE)) {
-		arg_copy = kzalloc(arg_size, GFP_KERNEL);
-		if (!arg_copy) {
-			tegra_hwpm_err(hwpm,
-				"Can't allocate memory for kernel struct");
+	if (!(_IOC_DIR(cmd) & _IOC_NONE)) {
+		buf = kzalloc(TEGRA_SOC_HWPM_MAX_ARG_SIZE, GFP_KERNEL);
+		if (!buf) {
+			tegra_hwpm_err(hwpm, "Kernel buf allocation failed");
 			ret = -ENOMEM;
 			goto fail;
 		}
 	}
 
-	if (ioc_dir & _IOC_WRITE) {
-		if (copy_from_user(arg_copy, (void __user *)arg, arg_size)) {
-			tegra_hwpm_err(hwpm,
-				"Failed to copy data from userspace"
-				" struct into kernel struct");
+	if (_IOC_DIR(cmd) & _IOC_WRITE) {
+		if (copy_from_user(buf, (void __user *)arg, _IOC_SIZE(cmd))) {
+			tegra_hwpm_err(hwpm, "Copy data from userspace failed");
 			ret = -EFAULT;
 			goto fail;
 		}
 	}
 
-	/*
-	 * We don't goto fail here because even if the IOCTL fails, we have to
-	 * call copy_to_user() to pass back any valid output params to
-	 * userspace.
-	 */
-	ret = ioctls[ioctl_num].handler(hwpm, arg_copy);
-
-	if (ioc_dir & _IOC_READ) {
-		if (copy_to_user((void __user *)arg, arg_copy, arg_size)) {
-			tegra_hwpm_err(hwpm, "Failed to copy data from kernel"
-				" struct into userspace struct");
-			ret = -EFAULT;
-			goto fail;
-		}
-	}
-
-	if (ret < 0)
+	switch (cmd) {
+	case TEGRA_CTRL_CMD_SOC_HWPM_DEVICE_INFO:
+		ret = tegra_hwpm_get_device_info_ioctl(hwpm,
+			(struct tegra_soc_hwpm_device_info *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_IP_FLOORSWEEP_INFO:
+		ret = tegra_hwpm_get_floorsweep_info_ioctl(hwpm,
+			(struct tegra_soc_hwpm_ip_floorsweep_info *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_RESOURCE_INFO:
+		ret = tegra_hwpm_get_resource_info_ioctl(hwpm,
+			(struct tegra_soc_hwpm_resource_info *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_RESERVE_RESOURCE:
+		ret = tegra_hwpm_reserve_resource_ioctl(hwpm,
+			(struct tegra_soc_hwpm_reserve_resource *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_ALLOC_PMA_STREAM:
+		ret = tegra_hwpm_alloc_pma_stream_ioctl(hwpm,
+			(struct tegra_soc_hwpm_alloc_pma_stream *)buf);
+		break;
+	case TEGRA_CTRL_CMD_BIND:
+		ret = tegra_hwpm_bind_ioctl(hwpm);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_QUERY_ALLOWLIST:
+		ret = tegra_hwpm_query_allowlist_ioctl(hwpm,
+			(struct tegra_soc_hwpm_query_allowlist *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_EXEC_REG_OPS:
+		ret = tegra_hwpm_exec_reg_ops_ioctl(hwpm,
+			(struct tegra_soc_hwpm_exec_reg_ops *)buf);
+		break;
+	case TEGRA_CTRL_CMD_SOC_HWPM_UPDATE_GET_PUT:
+		ret = tegra_hwpm_update_get_put_ioctl(hwpm,
+			(struct tegra_soc_hwpm_update_get_put *)buf);
+		break;
+	default:
+		tegra_hwpm_err(hwpm, "Unknown IOCTL command");
+		ret = -ENOTTY;
 		goto fail;
+	}
 
-	tegra_hwpm_dbg(hwpm, hwpm_info, "The %s IOCTL completed successfully!",
-			   ioctls[ioctl_num].name);
-	goto cleanup;
+	if ((ret == 0) && (_IOC_DIR(cmd) & _IOC_READ)) {
+		if (copy_to_user((void __user *)arg, buf, _IOC_SIZE(cmd))) {
+			tegra_hwpm_err(hwpm, "Copy buffer to user failed");
+			ret = -EFAULT;
+			goto fail;
+		}
+	}
 
 fail:
-	tegra_hwpm_err(hwpm, "The %s IOCTL failed(%d)!",
-			   ioctls[ioctl_num].name, ret);
-cleanup:
-	if (arg_copy)
-		kfree(arg_copy);
-end:
+	if (buf) {
+		kfree(buf);
+	}
+
+	if (ret < 0) {
+		tegra_hwpm_err(hwpm, "IOCTL cmd %d failed(%d)!", cmd, ret);
+	} else {
+		tegra_hwpm_dbg(hwpm, hwpm_info,
+			"IOCTL cmd %d completed successfully!", cmd);
+	}
 	return ret;
 }
 
