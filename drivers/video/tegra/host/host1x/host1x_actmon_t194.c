@@ -630,7 +630,8 @@ static void host1x_actmon_obs_avg_norm(struct platform_device *pdev, u32 *avg)
 	if (val > pdata->cycles_per_actmon_sample)
 		val = pdata->cycles_per_actmon_sample;
 
-	*avg = (val * 100) / pdata->cycles_per_actmon_sample;
+	/* Using 10 times percentage value to be consistent with tegrastats */
+	*avg = (val * 1000) / pdata->cycles_per_actmon_sample;
 }
 
 /* Operations on actmon just for reading the usage, programming taken care by Server */
