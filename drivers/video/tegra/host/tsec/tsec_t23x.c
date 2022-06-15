@@ -46,8 +46,21 @@
 /* Version of bootloader struct, increment on struct changes (while on prod) */
 #define RM_RISCV_BOOTLDR_VERSION	1
 
+#define DO_IPC_OVER_GSC_CO (1)
+
 static bool s_init_msg_rcvd;
 static bool s_riscv_booted;
+
+#ifdef DO_IPC_OVER_GSC_CO
+static u64 s_ipc_gscco_base;
+static u64 s_ipc_gscco_size;
+static u64 s_ipc_gscco_page_base;
+static u64 s_ipc_gscco_page_size;
+static u64 s_ipc_gscco_page_count;
+struct TSEC_BOOT_INFO {
+	u32    bootFlag;
+};
+#endif
 
 /* Pointer to this device */
 static struct platform_device *tsec;
@@ -403,6 +416,21 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 	 */
 	host1x_writel(dev, riscv_irqmclr_r(), riscv_irqmclr_swgen1_set_f());
 
+#ifdef DO_IPC_OVER_GSC_CO
+	/* Set IPC CO Info before enabling Msg Interrupts from TSEC to CCPLEX */
+	s_ipc_gscco_base = (u64)ipc_co_va;
+	s_ipc_gscco_size = ipc_co_info.size;
+	s_ipc_gscco_page_size = (64 * 1024);
+	/* First Page Reserved */
+	if (s_ipc_gscco_size > s_ipc_gscco_page_size) {
+		s_ipc_gscco_page_count = (s_ipc_gscco_size -
+			s_ipc_gscco_page_size) / s_ipc_gscco_page_size;
+	} else {
+		s_ipc_gscco_page_count = 0;
+	}
+	s_ipc_gscco_page_base = s_ipc_gscco_page_count ?
+		s_ipc_gscco_base + s_ipc_gscco_page_size : 0;
+#endif
 	enable_irq(pdata->irq);
 
 	s_riscv_booted = true;
@@ -478,7 +506,11 @@ int nvhost_tsec_prepare_poweroff_t23x(struct platform_device *dev)
 	 * in $(srctree.nvidia)/drivers/video/tegra/host/tsec/tsec.c,
 	 * which needs to be reset.
 	 */
-	disable_irq(pdata->irq);
+	if (pdata->irq < 0) {
+		dev_err(&dev->dev, "found interrupt number to be negative\n");
+		return -ENODATA;
+	}
+	disable_irq((unsigned int) pdata->irq);
 	nvhost_tsec_prepare_poweroff(dev);
 	return 0;
 }
@@ -490,6 +522,48 @@ int nvhost_tsec_prepare_poweroff_t23x(struct platform_device *dev)
 #define TSEC_POLL_TIME_MS 2000
 #define TSEC_TAIL_POLL_TIME 50
 #define TSEC_SMMU_IDX BIT_ULL(40);
+
+#ifdef DO_IPC_OVER_GSC_CO
+
+static int ipc_gscco_txfr(struct platform_device *pdev, u32 offset, u8 *buff, u32 size, bool read)
+{
+	u8 *gscCo;
+	u32 idx;
+
+	if (offset < TSEC_EMEM_START) {
+		dev_err(&pdev->dev,
+			"Invalid Offset %x less than TSEC_EMEM_START\n", offset);
+		return -EINVAL;
+	}
+
+	offset -= TSEC_EMEM_START;
+
+	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
+		dev_err(&pdev->dev, "Invalid IPC GSC-CO address/size\n");
+		return -EINVAL;
+	}
+	if (!buff || !size) {
+		dev_err(&pdev->dev, "Invalid client buf/size\n");
+		return -EINVAL;
+	}
+	if (offset  > s_ipc_gscco_size || ((offset + size) > s_ipc_gscco_size)) {
+		dev_err(&pdev->dev, "Client buf beyond IPC GSC-CO limits\n");
+		return -EINVAL;
+	}
+
+	gscCo = (u8 *)(s_ipc_gscco_base + offset);
+	if (read) {
+		for (idx = 0; idx < size; idx++)
+			buff[idx] = gscCo[idx];
+	} else {
+		for (idx = 0; idx < size; idx++)
+			gscCo[idx] = buff[idx];
+	}
+
+	return 0;
+}
+
+#else
 
 static int emem_transfer(struct platform_device *pdev,
 	u32 dmem_addr, u8 *buff, u32 size, u8 port, bool copy_from)
@@ -572,6 +646,8 @@ static int emem_transfer(struct platform_device *pdev,
 	return 0;
 }
 
+#endif
+
 static irqreturn_t tsec_riscv_isr(int irq, void *dev_id)
 {
 	unsigned long flags;
@@ -596,14 +672,22 @@ static irqreturn_t tsec_riscv_isr(int irq, void *dev_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static int emem_copy_to(u32 head, u8 *pSrc, u32 num_bytes, u32 port)
+static int ipc_copy_to(u32 head, u8 *pSrc, u32 num_bytes, u32 port)
 {
+#ifdef DO_IPC_OVER_GSC_CO
+	return ipc_gscco_txfr(tsec, head, pSrc, num_bytes, false);
+#else
 	return emem_transfer(tsec, head, pSrc, num_bytes, port, false);
+#endif
 }
 
-static int emem_copy_from(u32 tail, u8 *pdst, u32 num_bytes, u32 port)
+static int ipc_copy_from(u32 tail, u8 *pdst, u32 num_bytes, u32 port)
 {
+#ifdef DO_IPC_OVER_GSC_CO
+	return ipc_gscco_txfr(tsec, tail, pdst, num_bytes, true);
+#else
 	return emem_transfer(tsec, tail, pdst, num_bytes, port, true);
+#endif
 }
 
 /* gspQueueCmdValidate */
@@ -724,7 +808,7 @@ rewind:
 	hdr.size = RM_FLCN_QUEUE_HDR_SIZE;
 	hdr.ctrlFlags = 0;
 	hdr.seqNumId = 0;
-	if (emem_copy_to(head, (u8 *)&hdr, hdr.size, 0))
+	if (ipc_copy_to(head, (u8 *)&hdr, hdr.size, 0))
 		return -EINVAL;
 	head = cmdq_start;
 	host1x_writel(tsec, (cmdq_head_base +
@@ -732,7 +816,7 @@ rewind:
 	pr_debug("CMDQ: rewind h=%x,t=%x\n", head, tail);
 
 enqueue:
-	if (emem_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0))
+	if (ipc_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0))
 		return -EINVAL;
 	head += cmd_size_aligned;
 	host1x_writel(tsec, (cmdq_head_base +
@@ -800,12 +884,14 @@ static irqreturn_t process_msg(int irq, void *args)
 	while (tail != head) {
 
 		/* read header */
-		emem_copy_from(tail, (u8 *)&gsp_msg.hdr,
+		ipc_copy_from(tail, (u8 *)&gsp_msg.hdr,
 			RM_FLCN_QUEUE_HDR_SIZE, 0);
 		pr_debug("seqNumId=%d\n", gsp_msg.hdr.seqNumId);
 		/* copy msg body */
-		emem_copy_from(tail + RM_FLCN_QUEUE_HDR_SIZE, (u8 *)&gsp_msg.msg,
-			gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE, 0);
+		if (gsp_msg.hdr.size > RM_FLCN_QUEUE_HDR_SIZE) {
+			ipc_copy_from(tail + RM_FLCN_QUEUE_HDR_SIZE, (u8 *)&gsp_msg.msg,
+				gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE, 0);
+		}
 
 		if (gsp_msg.hdr.unitId == RM_GSP_UNIT_INIT) {
 			dev_dbg(&tsec->dev, "MSGQ: %s(%d) init msg\n",
@@ -956,6 +1042,69 @@ void nvhost_tsec_free_payload_mem(size_t size, void *cpu_addr, dma_addr_t dma_ad
 	dma_free_attrs(&tsec->dev, size, cpu_addr, dma_addr, 0);
 }
 EXPORT_SYMBOL(nvhost_tsec_free_payload_mem);
+
+u32 nvhost_tsec_get_boot_flag(void)
+{
+#ifdef DO_IPC_OVER_GSC_CO
+	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
+
+	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
+		dev_err(&tsec->dev,
+			"%s: Invalid GSC-CO address/size\n", __func__);
+		return 0;
+	} else {
+		return bootInfo->bootFlag;
+	}
+#else
+	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
+	return 0;
+#endif
+}
+EXPORT_SYMBOL(nvhost_tsec_get_boot_flag);
+
+void nvhost_tsec_reset_boot_flag(void)
+{
+#ifdef DO_IPC_OVER_GSC_CO
+	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
+
+	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
+		dev_err(&tsec->dev,
+			"%s: Invalid GSC-CO address/size\n", __func__);
+	} else {
+		bootInfo->bootFlag = 0;
+	}
+#else
+	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
+#endif
+}
+EXPORT_SYMBOL(nvhost_tsec_reset_boot_flag);
+
+void *nvhost_tsec_get_gscco_page(u32 page_number, u32 *gscco_offset)
+{
+#ifdef DO_IPC_OVER_GSC_CO
+	u8 *page_va;
+
+	if (!s_ipc_gscco_page_base || (page_number >= s_ipc_gscco_page_count)) {
+		dev_err(&tsec->dev,
+			"%s: No reserved memory for Page %d\n",
+			__func__, page_number);
+		return NULL;
+	}
+
+	page_va = (u8 *)s_ipc_gscco_page_base;
+	page_va += (page_number * s_ipc_gscco_page_size);
+	if (gscco_offset) {
+		*gscco_offset =
+			(u32)((s_ipc_gscco_page_base - s_ipc_gscco_base) +
+			(page_number * s_ipc_gscco_page_size));
+	}
+	return page_va;
+#else
+	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
+	return NULL;
+#endif
+}
+EXPORT_SYMBOL(nvhost_tsec_get_gscco_page);
 
 int nvhost_tsec_cmdif_open(void)
 {

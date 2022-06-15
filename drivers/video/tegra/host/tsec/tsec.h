@@ -24,12 +24,17 @@
 #include <linux/types.h>
 #include <linux/nvhost.h>
 
+
+int nvhost_tsec_send_cmd(void *flcn_cmd, u32 queue_id,
+	void (*callback_func)(void *msg));
+u32 nvhost_tsec_get_boot_flag(void);
+void nvhost_tsec_reset_boot_flag(void);
+void *nvhost_tsec_get_gscco_page(u32 page_number, u32 *gscco_offset);
+
 int nvhost_tsec_finalize_poweron_t194(struct platform_device *dev);
 int nvhost_tsec_finalize_poweron(struct platform_device *dev);
 int nvhost_tsec_prepare_poweroff(struct platform_device *dev);
 void nvhost_tsec_isr(void);
-int nvhost_tsec_send_cmd(void *flcn_cmd, u32 queue_id,
-	void (*callback_func)(void *msg));
 int nvhost_t23x_tsec_intr_init(struct platform_device *pdev);
 int nvhost_tsec_cmdif_open(void);
 void nvhost_tsec_cmdif_close(void);
