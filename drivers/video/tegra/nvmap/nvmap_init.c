@@ -939,6 +939,7 @@ static int __init nvmap_init_driver(void)
 	    of_machine_is_compatible("nvidia,tegra194") ||
 	    of_machine_is_compatible("nvidia,tegra234") ||
 	    of_machine_is_compatible("nvidia,tegra239") ||
+	    of_machine_is_compatible("nvidia,tegra23x") ||
 	    of_machine_is_compatible("nvidia,tegra232"))) {
 		nvmap_heap_deinit();
 		return -ENODEV;
