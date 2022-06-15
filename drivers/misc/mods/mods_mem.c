@@ -115,7 +115,7 @@ static void mods_dma_unmap_page(struct mods_client *client,
 {
 	dev_addr = mods_expand_nvlink_addr(dev, dev_addr);
 
-	pci_unmap_page(dev,
+	dma_unmap_page(&dev->dev,
 		       dev_addr,
 		       PAGE_SIZE << order,
 		       DMA_BIDIRECTIONAL);
@@ -187,13 +187,13 @@ static int pci_map_chunk(struct mods_client     *client,
 			 struct MODS_PHYS_CHUNK *chunk,
 			 u64                    *out_dev_addr)
 {
-	u64 dev_addr = pci_map_page(dev,
+	u64 dev_addr = dma_map_page(&dev->dev,
 				    chunk->p_page,
 				    0,
 				    PAGE_SIZE << chunk->order,
 				    DMA_BIDIRECTIONAL);
 
-	int err = pci_dma_mapping_error(dev, dev_addr);
+	int err = dma_mapping_error(&dev->dev, dev_addr);
 
 	if (err) {
 		cl_error(

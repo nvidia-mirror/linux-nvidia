@@ -43,6 +43,10 @@
 #       define MODS_HASNT_NUMA_NO_NODE 1
 #endif
 
+#if KERNEL_VERSION(2, 6, 34) <= MODS_KERNEL_VERSION
+#       define MODS_HAS_SET_COHERENT_MASK 1
+#endif
+
 #if KERNEL_VERSION(2, 6, 38) <= MODS_KERNEL_VERSION
 #       if defined(CONFIG_X86)
 #               define MODS_HAS_CONSOLE_LOCK 1
@@ -98,6 +102,10 @@
 
 #if defined(CONFIG_ARM64) && KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
 #       define MODS_HAS_ARM64_READ_FTR_REG 1
+#endif
+
+#if KERNEL_VERSION(5, 17, 0) <= MODS_KERNEL_VERSION
+#       define MODS_HAS_ACPI_FETCH 1
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA)

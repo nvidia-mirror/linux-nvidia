@@ -100,7 +100,12 @@ static int acpi_get_dev_children(struct mods_client *client,
 
 	LOG_ENT();
 
+#ifdef MODS_HAS_ACPI_FETCH
+	device = acpi_fetch_acpi_dev(dev_handle);
+	status = device ? 0 : -EINVAL;
+#else
 	status = acpi_bus_get_device(dev_handle, &device);
+#endif
 	if (ACPI_FAILURE(status) || !device) {
 		cl_error("ACPI: device for fetching device children not found\n");
 		LOG_EXT();

@@ -879,7 +879,7 @@ int esc_mods_pci_set_dma_mask(struct mods_client       *client,
 
 	mask = dma_mask->num_bits == 64 ? ~0ULL : (1ULL<<dma_mask->num_bits)-1;
 
-	err = pci_set_dma_mask(dev, mask);
+	err = dma_set_mask(&dev->dev, mask);
 	if (err) {
 		cl_error(
 			"failed to set dma mask 0x%llx (%u) for dev %04x:%02x:%02x.%x\n",
@@ -895,7 +895,11 @@ int esc_mods_pci_set_dma_mask(struct mods_client       *client,
 			err = OK;
 #endif
 	} else {
+#if defined(MODS_HAS_SET_COHERENT_MASK)
+		err = dma_set_coherent_mask(&dev->dev, mask);
+#else
 		err = pci_set_consistent_dma_mask(dev, mask);
+#endif
 		if (err)
 			cl_error(
 				"failed to set consistent dma mask 0x%llx (%u) for dev %04x:%02x:%02x.%x\n",
