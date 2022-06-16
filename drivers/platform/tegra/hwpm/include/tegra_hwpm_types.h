@@ -16,6 +16,9 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+#include <linux/err.h>
+#include <linux/bug.h>
+#include <linux/bits.h>
 #endif
 
 #endif /* TEGRA_HWPM_TYPES_H */

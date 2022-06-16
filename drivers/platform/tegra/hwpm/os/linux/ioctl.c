@@ -29,8 +29,11 @@
 #include <tegra_hwpm_ip.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_soc.h>
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_mem_mgmt.h>
+
+#include <os/linux/driver.h>
 #include <os/linux/regops_utils.h>
 
 #define LA_CLK_RATE 625000000UL
@@ -38,12 +41,20 @@
 static int tegra_hwpm_get_device_info_ioctl(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_device_info *device_info)
 {
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
+
 	tegra_hwpm_fn(hwpm, " ");
 
-	device_info->chip = hwpm->device_info.chip;
-	device_info->chip_revision = hwpm->device_info.chip_revision;
-	device_info->revision = hwpm->device_info.revision;
-	device_info->platform = hwpm->device_info.platform;
+	hwpm_linux = tegra_hwpm_os_linux_from_hwpm(hwpm);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
+		return -ENODEV;
+	}
+
+	device_info->chip = hwpm_linux->device_info.chip;
+	device_info->chip_revision = hwpm_linux->device_info.chip_revision;
+	device_info->revision = hwpm_linux->device_info.revision;
+	device_info->platform = hwpm_linux->device_info.platform;
 
 	tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_device_info,
 		"chip id 0x%x", device_info->chip);
@@ -227,11 +238,6 @@ static int tegra_hwpm_update_get_put_ioctl(struct tegra_soc_hwpm *hwpm,
 			" after the BIND IOCTL.");
 		return -EPERM;
 	}
-	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
-		tegra_hwpm_err(hwpm,
-			"mem_bytes buffer is not mapped in the driver");
-		return -ENXIO;
-	}
 
 	return tegra_hwpm_update_mem_bytes(hwpm, update_get_put);
 }
@@ -275,7 +281,7 @@ static long tegra_hwpm_ioctl(struct file *file,
 	}
 
 	if (!(_IOC_DIR(cmd) & _IOC_NONE)) {
-		buf = kzalloc(TEGRA_SOC_HWPM_MAX_ARG_SIZE, GFP_KERNEL);
+		buf = tegra_hwpm_kzalloc(hwpm, TEGRA_SOC_HWPM_MAX_ARG_SIZE);
 		if (!buf) {
 			tegra_hwpm_err(hwpm, "Kernel buf allocation failed");
 			ret = -ENOMEM;
@@ -343,7 +349,7 @@ static long tegra_hwpm_ioctl(struct file *file,
 
 fail:
 	if (buf) {
-		kfree(buf);
+		tegra_hwpm_kfree(hwpm, buf);
 	}
 
 	if (ret < 0) {
@@ -360,51 +366,55 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 	int ret = 0;
 	unsigned int minor;
 	struct tegra_soc_hwpm *hwpm = NULL;
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
 
 	if (!inode) {
-		tegra_hwpm_err(hwpm, "Invalid inode");
+		tegra_hwpm_err(NULL, "Invalid inode");
 		return -EINVAL;
 	}
 
 	if (!filp) {
-		tegra_hwpm_err(hwpm, "Invalid file");
+		tegra_hwpm_err(NULL, "Invalid file");
 		return -EINVAL;
 	}
 
 	minor = iminor(inode);
 	if (minor > 0) {
-		tegra_hwpm_err(hwpm, "Incorrect minor number");
+		tegra_hwpm_err(NULL, "Incorrect minor number");
 		return -EBADFD;
 	}
 
-	hwpm = container_of(inode->i_cdev, struct tegra_soc_hwpm, cdev);
-	if (!hwpm) {
-		tegra_hwpm_err(hwpm, "Invalid hwpm struct");
+	hwpm_linux =
+		container_of(inode->i_cdev, struct tegra_hwpm_os_linux, cdev);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
 		return -EINVAL;
 	}
+	hwpm = &hwpm_linux->hwpm;
 	filp->private_data = hwpm;
 
 	tegra_hwpm_fn(hwpm, " ");
 
 	/* Initialize driver on first open call only */
-	if (!atomic_add_unless(&hwpm->hwpm_in_use, 1U, 1U)) {
+	if (!atomic_add_unless(&hwpm_linux->usage_count.var, 1U, 1U)) {
 		return -EAGAIN;
 	}
 
 	if (tegra_hwpm_is_platform_silicon()) {
-		ret = reset_control_assert(hwpm->hwpm_rst);
+		ret = reset_control_assert(hwpm_linux->hwpm_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "hwpm reset assert failed");
 			goto fail;
 		}
-		ret = reset_control_assert(hwpm->la_rst);
+		ret = reset_control_assert(hwpm_linux->la_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "la reset assert failed");
 			goto fail;
 		}
 		/* Set required parent for la_clk */
-		if (hwpm->la_clk && hwpm->la_parent_clk) {
-			ret = clk_set_parent(hwpm->la_clk, hwpm->la_parent_clk);
+		if (hwpm_linux->la_clk && hwpm_linux->la_parent_clk) {
+			ret = clk_set_parent(
+				hwpm_linux->la_clk, hwpm_linux->la_parent_clk);
 			if (ret < 0) {
 				tegra_hwpm_err(hwpm,
 					"la clk set parent failed");
@@ -412,22 +422,22 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 			}
 		}
 		/* set la_clk rate to 625 MHZ */
-		ret = clk_set_rate(hwpm->la_clk, LA_CLK_RATE);
+		ret = clk_set_rate(hwpm_linux->la_clk, LA_CLK_RATE);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "la clock set rate failed");
 			goto fail;
 		}
-		ret = clk_prepare_enable(hwpm->la_clk);
+		ret = clk_prepare_enable(hwpm_linux->la_clk);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "la clock enable failed");
 			goto fail;
 		}
-		ret = reset_control_deassert(hwpm->la_rst);
+		ret = reset_control_deassert(hwpm_linux->la_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "la reset deassert failed");
 			goto fail;
 		}
-		ret = reset_control_deassert(hwpm->hwpm_rst);
+		ret = reset_control_deassert(hwpm_linux->hwpm_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "hwpm reset deassert failed");
 			goto fail;
@@ -471,24 +481,32 @@ static ssize_t tegra_hwpm_read(struct file *file,
 static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 {
 	int ret = 0, err = 0;
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
 	struct tegra_soc_hwpm *hwpm = NULL;
 
 	if (!inode) {
-		tegra_hwpm_err(hwpm, "Invalid inode");
+		tegra_hwpm_err(NULL, "Invalid inode");
 		return -EINVAL;
 	}
 	if (!filp) {
-		tegra_hwpm_err(hwpm, "Invalid file");
+		tegra_hwpm_err(NULL, "Invalid file");
 		return -EINVAL;
 	}
 
-	hwpm = container_of(inode->i_cdev, struct tegra_soc_hwpm, cdev);
-	if (!hwpm) {
-		tegra_hwpm_err(hwpm, "Invalid hwpm struct");
+	hwpm_linux =
+		container_of(inode->i_cdev, struct tegra_hwpm_os_linux, cdev);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
 		return -EINVAL;
 	}
+	hwpm = &hwpm_linux->hwpm;
 
 	tegra_hwpm_fn(hwpm, " ");
+
+	/* De-init driver on last close call only */
+	if (!atomic_dec_and_test(&hwpm_linux->usage_count.var)) {
+		return 0;
+	}
 
 	if (hwpm->device_opened == false) {
 		/* Device was not opened, do nothing */
@@ -528,24 +546,19 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 	}
 
 	if (tegra_hwpm_is_platform_silicon()) {
-		ret = reset_control_assert(hwpm->hwpm_rst);
+		ret = reset_control_assert(hwpm_linux->hwpm_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "hwpm reset assert failed");
 			err = ret;
 			goto fail;
 		}
-		ret = reset_control_assert(hwpm->la_rst);
+		ret = reset_control_assert(hwpm_linux->la_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "la reset assert failed");
 			err = ret;
 			goto fail;
 		}
-		clk_disable_unprepare(hwpm->la_clk);
-	}
-
-	/* De-init driver on last close call only */
-	if (!atomic_dec_and_test(&hwpm->hwpm_in_use)) {
-		return 0;
+		clk_disable_unprepare(hwpm_linux->la_clk);
 	}
 
 	hwpm->device_opened = false;
@@ -554,7 +567,7 @@ fail:
 }
 
 /* File ops for device node */
-const struct file_operations tegra_soc_hwpm_ops = {
+const struct file_operations tegra_hwpm_ops = {
 	.owner = THIS_MODULE,
 	.open = tegra_hwpm_open,
 	.read = tegra_hwpm_read,

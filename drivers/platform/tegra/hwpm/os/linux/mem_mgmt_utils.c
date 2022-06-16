@@ -31,10 +31,20 @@
 #include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_static_analysis.h>
 
+#include <os/linux/driver.h>
+
 static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
+
 	tegra_hwpm_fn(hwpm, " ");
+
+	hwpm_linux = tegra_hwpm_os_linux_from_hwpm(hwpm);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
+		return -ENODEV;
+	}
 
 	hwpm->mem_mgmt->stream_buf_size = alloc_pma_stream->stream_buf_size;
 	hwpm->mem_mgmt->stream_dma_buf =
@@ -45,7 +55,7 @@ static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 		return PTR_ERR(hwpm->mem_mgmt->stream_dma_buf);
 	}
 	hwpm->mem_mgmt->stream_attach =
-		dma_buf_attach(hwpm->mem_mgmt->stream_dma_buf, hwpm->dev);
+		dma_buf_attach(hwpm->mem_mgmt->stream_dma_buf, hwpm_linux->dev);
 	if (IS_ERR(hwpm->mem_mgmt->stream_attach)) {
 		tegra_hwpm_err(hwpm, "Unable to attach stream dma_buf");
 		return PTR_ERR(hwpm->mem_mgmt->stream_attach);
@@ -74,7 +84,15 @@ static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
+
 	tegra_hwpm_fn(hwpm, " ");
+
+	hwpm_linux = tegra_hwpm_os_linux_from_hwpm(hwpm);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
+		return -ENODEV;
+	}
 
 	hwpm->mem_mgmt->mem_bytes_dma_buf =
 		dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
@@ -85,7 +103,7 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	}
 
 	hwpm->mem_mgmt->mem_bytes_attach = dma_buf_attach(
-		hwpm->mem_mgmt->mem_bytes_dma_buf, hwpm->dev);
+		hwpm->mem_mgmt->mem_bytes_dma_buf, hwpm_linux->dev);
 	if (IS_ERR(hwpm->mem_mgmt->mem_bytes_attach)) {
 		tegra_hwpm_err(hwpm, "Unable to attach mem bytes dma_buf");
 		return PTR_ERR(hwpm->mem_mgmt->mem_bytes_attach);

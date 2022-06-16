@@ -14,13 +14,6 @@
 #ifndef TEGRA_HWPM_H
 #define TEGRA_HWPM_H
 
-#include <linux/platform_device.h>
-#include <linux/device.h>
-#include <linux/cdev.h>
-#include <linux/delay.h>
-
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm_types.h>
 
 #define TEGRA_SOC_HWPM_IP_INACTIVE	~(0U)
@@ -431,54 +424,21 @@ struct tegra_soc_hwpm_chip {
 		u64 *full_alist_idx);
 	bool (*check_alist)(struct tegra_soc_hwpm *hwpm,
 		struct hwpm_ip_aperture *aperture, u64 phys_addr);
-
-	void (*release_sw_setup)(struct tegra_soc_hwpm *hwpm);
 };
-
-extern struct platform_device *tegra_soc_hwpm_pdev;
-extern const struct file_operations tegra_soc_hwpm_ops;
-struct allowlist;
-struct tegra_hwpm_mem_mgmt;
-struct tegra_hwpm_allowlist_map;
 
 /* Driver struct */
 struct tegra_soc_hwpm {
-	/* Device */
-	struct platform_device *pdev;
-	struct device *dev;
-	struct device_node *np;
-	struct class class;
-	dev_t dev_t;
-	struct cdev cdev;
-
-	/* Device info */
-	struct tegra_soc_hwpm_device_info device_info;
-
 	/* Active chip info */
 	struct tegra_soc_hwpm_chip *active_chip;
-
-	/* Clocks and resets */
-	struct clk *la_clk;
-	struct clk *la_parent_clk;
-	struct reset_control *la_rst;
-	struct reset_control *hwpm_rst;
 
 	/* Memory Management */
 	struct tegra_hwpm_mem_mgmt *mem_mgmt;
 	struct tegra_hwpm_allowlist_map *alist_map;
 
 	/* SW State */
+	u32 dbg_mask;
 	bool bind_completed;
 	bool device_opened;
-
-	atomic_t hwpm_in_use;
-
-	u32 dbg_mask;
-
-	/* Debugging */
-#ifdef CONFIG_DEBUG_FS
-	struct dentry *debugfs_root;
-#endif
 	bool fake_registers_enabled;
 };
 

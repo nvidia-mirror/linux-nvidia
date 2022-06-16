@@ -59,8 +59,6 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 	.zero_alist_regs = t234_hwpm_zero_alist_regs,
 	.copy_alist = t234_hwpm_copy_alist,
 	.check_alist = t234_hwpm_check_alist,
-
-	.release_sw_setup = tegra_hwpm_release_sw_setup,
 };
 
 static bool t234_hwpm_validate_hals(struct tegra_soc_hwpm *hwpm)
@@ -212,11 +210,6 @@ static bool t234_hwpm_validate_hals(struct tegra_soc_hwpm *hwpm)
 
 	if (hwpm->active_chip->check_alist == NULL) {
 		tegra_hwpm_err(hwpm, "check_alist uninitialized");
-		return false;
-	}
-
-	if (hwpm->active_chip->release_sw_setup == NULL) {
-		tegra_hwpm_err(hwpm, "release_sw_setup uninitialized");
 		return false;
 	}
 

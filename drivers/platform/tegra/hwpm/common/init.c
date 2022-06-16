@@ -24,32 +24,33 @@
 #include <tegra_hwpm_next_init.h>
 #endif
 
-static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm)
+
+static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm,
+	u32 chip_id, u32 chip_id_rev)
 {
 	int err = -EINVAL;
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	switch (hwpm->device_info.chip) {
+	switch (chip_id) {
 	case 0x23:
-		switch (hwpm->device_info.chip_revision) {
+		switch (chip_id_rev) {
 		case 0x4:
 			err = t234_hwpm_init_chip_info(hwpm);
 			break;
 		default:
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
-			err = tegra_hwpm_next1_init_chip_info(hwpm);
+			err = tegra_hwpm_next1_init_chip_info(hwpm,
+				chip_id, chip_id_rev);
 #else
 			tegra_hwpm_err(hwpm, "Chip 0x%x rev 0x%x not supported",
-				hwpm->device_info.chip,
-				hwpm->device_info.chip_revision);
+				chip_id, chip_id_rev);
 #endif
 			break;
 		}
 		break;
 	default:
-		tegra_hwpm_err(hwpm, "Chip 0x%x not supported",
-			hwpm->device_info.chip);
+		tegra_hwpm_err(hwpm, "Chip 0x%x not supported", chip_id);
 		break;
 	}
 
@@ -67,13 +68,16 @@ static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm)
 	return err;
 }
 
-int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm)
+int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm,
+	u32 chip_id, u32 chip_id_rev)
 {
 	int err = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	err = tegra_hwpm_init_chip_ip_structures(hwpm);
+	hwpm->dbg_mask = TEGRA_HWPM_DEFAULT_DBG_MASK;
+
+	err = tegra_hwpm_init_chip_ip_structures(hwpm, chip_id, chip_id_rev);
 	if (err != 0) {
 		tegra_hwpm_err(hwpm, "IP structure init failed");
 		return err;
@@ -86,17 +90,6 @@ int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm)
 	}
 
 	return 0;
-}
-
-void tegra_hwpm_release_sw_components(struct tegra_soc_hwpm *hwpm)
-{
-	tegra_hwpm_fn(hwpm, " ");
-
-	hwpm->active_chip->release_sw_setup(hwpm);
-
-	tegra_hwpm_kfree(hwpm, hwpm->active_chip->chip_ips);
-	tegra_hwpm_kfree(hwpm, hwpm);
-	tegra_soc_hwpm_pdev = NULL;
 }
 
 int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm)
@@ -210,6 +203,8 @@ void tegra_hwpm_release_sw_setup(struct tegra_soc_hwpm *hwpm)
 		tegra_hwpm_err(hwpm, "failed release IP structures");
 		return;
 	}
+
+	tegra_hwpm_kfree(hwpm, hwpm->active_chip->chip_ips);
 
 	return;
 }

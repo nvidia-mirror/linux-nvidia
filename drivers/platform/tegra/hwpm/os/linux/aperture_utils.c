@@ -20,24 +20,32 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
+#include <os/linux/driver.h>
 
 int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *perfmon)
 {
 	struct resource *res = NULL;
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
 
 	tegra_hwpm_fn(hwpm, " ");
 
+	hwpm_linux = tegra_hwpm_os_linux_from_hwpm(hwpm);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
+		return -ENODEV;
+	}
+
 	/* Reserve */
-	res = platform_get_resource_byname(hwpm->pdev,
-					IORESOURCE_MEM, perfmon->name);
+	res = platform_get_resource_byname(hwpm_linux->pdev,
+		IORESOURCE_MEM, perfmon->name);
 	if ((!res) || (res->start == 0) || (res->end == 0)) {
 		tegra_hwpm_err(hwpm, "Failed to get perfmon %s", perfmon->name);
 		return -ENOMEM;
 	}
 
-	perfmon->dt_mmio = devm_ioremap(hwpm->dev, res->start,
-					resource_size(res));
+	perfmon->dt_mmio = devm_ioremap(
+		hwpm_linux->dev, res->start, resource_size(res));
 	if (IS_ERR(perfmon->dt_mmio)) {
 		tegra_hwpm_err(hwpm, "Couldn't map perfmon %s", perfmon->name);
 		return PTR_ERR(perfmon->dt_mmio);
@@ -116,13 +124,21 @@ int tegra_hwpm_perfmux_reserve_impl(struct tegra_soc_hwpm *hwpm,
 int tegra_hwpm_perfmon_release_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon)
 {
+	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
+
 	tegra_hwpm_fn(hwpm, " ");
+
+	hwpm_linux = tegra_hwpm_os_linux_from_hwpm(hwpm);
+	if (!hwpm_linux) {
+		tegra_hwpm_err(NULL, "Invalid hwpm_linux struct");
+		return -ENODEV;
+	}
 
 	if (perfmon->dt_mmio == NULL) {
 		tegra_hwpm_err(hwpm, "Perfmon was not mapped");
 		return -EINVAL;
 	}
-	devm_iounmap(hwpm->dev, perfmon->dt_mmio);
+	devm_iounmap(hwpm_linux->dev, perfmon->dt_mmio);
 	perfmon->dt_mmio = NULL;
 	perfmon->start_pa = 0ULL;
 	perfmon->end_pa = 0ULL;

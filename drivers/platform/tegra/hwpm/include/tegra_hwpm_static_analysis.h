@@ -14,8 +14,7 @@
 #ifndef TEGRA_HWPM_STATIC_ANALYSIS_H
 #define TEGRA_HWPM_STATIC_ANALYSIS_H
 
-#include <linux/types.h>
-#include <linux/bug.h>
+#include <tegra_hwpm_types.h>
 
 /**
  * @brief Add two u32 values and check for overflow.

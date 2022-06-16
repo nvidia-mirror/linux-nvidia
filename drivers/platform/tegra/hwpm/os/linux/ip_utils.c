@@ -34,7 +34,8 @@ static int tegra_hwpm_alloc_ip_register_list_node(
 {
 	struct hwpm_ip_register_list *new_node = NULL;
 
-	new_node = kzalloc(sizeof(struct hwpm_ip_register_list), GFP_KERNEL);
+	new_node = tegra_hwpm_kzalloc(NULL,
+		sizeof(struct hwpm_ip_register_list));
 	if (new_node == NULL) {
 		tegra_hwpm_err(NULL,
 			"struct hwpm_ip_register_list node allocation failed");

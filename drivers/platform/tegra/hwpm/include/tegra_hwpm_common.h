@@ -26,8 +26,8 @@ struct hwpm_ip;
 struct hwpm_ip_inst;
 struct hwpm_ip_aperture;
 
-int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm);
-void tegra_hwpm_release_sw_components(struct tegra_soc_hwpm *hwpm);
+int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm,
+	u32 chip_id, u32 chip_id_rev);
 
 int tegra_hwpm_func_all_ip(struct tegra_soc_hwpm *hwpm,
 	struct tegra_hwpm_func_args *func_args,
