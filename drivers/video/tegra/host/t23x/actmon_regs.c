@@ -23,8 +23,39 @@ static struct nvhost_actmon_register __attribute__((__unused__))
 
 static struct nvhost_actmon_register __attribute__((__unused__))
 	t23x_nvdec_actmon_registers[] = {
-	/* NV_PNVDEC_TFBIF_ACTMON_ACTIVE_WEIGHT */
-	{ .addr = 0x00004e54, .val = 0x000000d8 },
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_MASK
+	 * - Mask out signals with associated bit field value equals to 1
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 0111
+	 * - STARVED signal is not used in nvdec
+	 */
+	{
+		.addr = 0x00004e4c,
+		.val = 0x00000007
+	},
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_BORPS
+	 * - 2 bits are used to describe the usage of each signal
+	 * - bit #0 => POLARITY, 1=NEGATIVE, 0=POSITIVE
+	 * - bit #1 => OPERATION, 1=AND, 0=OR
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 10000000
+	 */
+	{
+		.addr = 0x00004e50,
+		.val = 0x00000080
+	},
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_WEIGHT
+	 * - 32 bits are used to specify the count weight
+	 * - NVDEC will toggle active signal every `count_weight` cycle time
+	 * - count_weight formula = nvdec_fmax / actmon_clk * 4
+	 */
+	{
+		.addr = 0x00004e54,
+		.val = 0x000000d0
+	},
 	{}
 };
 
