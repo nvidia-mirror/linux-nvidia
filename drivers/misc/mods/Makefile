@@ -15,6 +15,7 @@ mods-y                             += mods_mem.o
 
 mods-$(CONFIG_ACPI)                += mods_acpi.o
 mods-$(CONFIG_TEGRA_NVADSP)        += mods_adsp.o
+mods-$(CONFIG_ARM_FFA_TRANSPORT)   += mods_arm_ffa.o
 mods-$(CONFIG_COMMON_CLK)          += mods_clock.o
 mods-$(CONFIG_DEBUG_FS)            += mods_debugfs.o
 mods-$(CONFIG_DMA_ENGINE)          += mods_dma.o

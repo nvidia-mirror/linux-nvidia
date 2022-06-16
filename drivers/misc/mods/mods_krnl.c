@@ -485,6 +485,13 @@ static int __init mods_init_module(void)
 	if (rc < 0)
 		return rc;
 #endif
+
+#endif
+
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+	rc = mods_ffa_abi_register();
+	if (rc < 0)
+		mods_warning_printk("error on mods_ffa_abi_register returned %d\n", rc);
 #endif
 
 	mods_info_printk("*** WARNING: DIAGNOSTIC DRIVER LOADED ***\n");
@@ -525,6 +532,10 @@ static void __exit mods_exit_module(void)
 #if defined(MODS_HAS_TEGRA) && defined(CONFIG_COMMON_CLK) && \
 	defined(CONFIG_OF_RESOLVE) && defined(CONFIG_OF_DYNAMIC)
 	mods_shutdown_clock_api();
+#endif
+
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+	mods_ffa_abi_unregister();
 #endif
 
 	mods_info_printk("driver unloaded\n");
@@ -2624,6 +2635,13 @@ static long mods_krnl_ioctl(struct file  *fp,
 	case MODS_ESC_MODS_SEND_IPI:
 		MODS_IOCTL(MODS_ESC_MODS_SEND_IPI,
 			   esc_mods_send_ipi, MODS_SEND_IPI);
+		break;
+
+#endif
+
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+	case MODS_ESC_FFA_CMD:
+		MODS_IOCTL(MODS_ESC_FFA_CMD, esc_mods_arm_ffa_cmd, MODS_FFA_PARAMS);
 		break;
 #endif
 

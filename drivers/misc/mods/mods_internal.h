@@ -261,7 +261,7 @@ struct NVL_TRAINED {
 #define DEBUG_TEGRADMA		0x400
 #define DEBUG_ISR_DETAILED	(DEBUG_ISR | DEBUG_DETAILED)
 #define DEBUG_MEM_DETAILED	(DEBUG_MEM | DEBUG_DETAILED)
-#define DEBUG_ALL	        (DEBUG_IOCTL | DEBUG_PCI | DEBUG_ACPI | \
+#define DEBUG_ALL		(DEBUG_IOCTL | DEBUG_PCI | DEBUG_ACPI | \
 	DEBUG_ISR | DEBUG_MEM | DEBUG_FUNC | DEBUG_CLOCK | DEBUG_DETAILED | \
 	DEBUG_TEGRADC | DEBUG_TEGRADMA)
 
@@ -711,6 +711,13 @@ int esc_mods_send_trustzone_msg(struct mods_client         *client,
 int esc_mods_invoke_optee_ta(struct mods_client *client,
 	struct MODS_OPTEE_PARAMS *p);
 #endif
+
+#endif
+
+/* MODS SP call */
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+int esc_mods_arm_ffa_cmd(struct mods_client *client,
+			 struct MODS_FFA_PARAMS *p);
 #endif
 
 #ifdef CONFIG_DEBUG_FS
@@ -741,6 +748,11 @@ void smmu_driver_exit(void);
 
 #if defined(MODS_HAS_TEGRA)
 int esc_mods_send_ipi(struct mods_client *client, struct MODS_SEND_IPI *p);
+#endif
+
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+int mods_ffa_abi_register(void);
+void mods_ffa_abi_unregister(void);
 #endif
 
 #endif	/* _MODS_INTERNAL_H_  */
