@@ -2258,7 +2258,7 @@ static void clear_contiguous_cache(struct mods_client *client,
 	}
 #endif
 
-	d_size = 4 << d_line_shift;
+	d_size = (u64)4 << d_line_shift;
 	cur = virt_start & ~(d_size - 1);
 	do {
 		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
