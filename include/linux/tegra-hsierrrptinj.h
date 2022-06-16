@@ -31,15 +31,13 @@
 #include "tegra-epl.h"
 
 /* ==================[Type Definitions]===================================== */
-/* Number of regiestred IPs */
+/* Number of registered IPs */
 #define NUM_IPS 10U
 
 /**
- * Note: Any update to IP ID enum should be reflected in the macro NUM_IPS.
- */
-
-/**
- * @brief IP Ids
+ * @brief IP IDs
+ *
+ * Note: Any update to this enum must be reflected in the macro NUM_IPS.
  */
 typedef enum {
 IP_EQOS  = 0x0000,
@@ -58,6 +56,7 @@ IP_DLA   = 0x0009
 /**
  * @brief Callback signature for initiating HSI error reports to FSI
  *
+ * @param[in]   instance_id             Instance of supported IP.
  * @param[in]   err_rpt_frame           Error frame to be reported.
  *
  * API signature for the common callback function that will be
@@ -70,7 +69,7 @@ IP_DLA   = 0x0009
  *  -EFAULT     (On IP driver failure to report error)
  *  -ETIME      (On timeout in IP driver)
  */
-typedef int (*hsierrrpt_inj)(struct epl_error_report_frame err_rpt_frame);
+typedef int (*hsierrrpt_inj)(unsigned int instance_id, struct epl_error_report_frame err_rpt_frame);
 
 #if IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ)
 

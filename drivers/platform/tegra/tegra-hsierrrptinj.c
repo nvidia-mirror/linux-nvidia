@@ -123,10 +123,10 @@ int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
 /* Parse user entered data via debugfs interface and trigger IP Driver callback */
 static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lbuf, loff_t *ppos)
 {
-	struct epl_error_report_frame error_report;
+	struct epl_error_report_frame error_report = {0};
 	int count = 0, ret = -EINVAL;
 	unsigned long val = 0;
-	hsierrrpt_ipid_t ip_id = IP_EQOS;
+	unsigned int ip_id = 0;
 	unsigned int instance_id = 0x0000;
 	char ubuf[ERR_RPT_LEN] = {0};
 	char *token, *cur = ubuf;
@@ -178,7 +178,7 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 			count++;
 			break;
 		case 2: /* Error Code */
-			pr_debug("tegra-hsierrrptinj: Error Code: 0x%04lx\n", val);
+			pr_debug("tegra-hsierrrptinj: HSI Error ID: 0x%04lx\n", val);
 			error_report.error_code = val;
 			count++;
 			break;
@@ -209,7 +209,7 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 		return -EINVAL;
 	}
 
-	/* Add timestamp */
+	/* Get current timestamp */
 	asm volatile("mrs %0, cntvct_el0" : "=r" (error_report.timestamp));
 
 	/* IPs not in the hsierrrpt_ipid_t list normally report HSI errors to the FSI
@@ -218,34 +218,37 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 	 */
 	if (ip_id >= NUM_IPS) {
 		ret = hsierrrpt_report_to_fsi(error_report);
-		pr_debug("tegra-hsierrrptinj: Report error to FSI\n");
+		pr_debug("tegra-hsierrrptinj: Reported error to FSI\n");
 		goto done;
 	}
 
-	/* Trigger IP driver registered callback */
+	/* Trigger IP driver registered callback. If no callback has been registered,
+	 * call the EPD-provided API.
+	 *
+	 * We want certain logging statements to appear in the kernel log with the
+	 * OOTB level configuration. Therefore use pr_err for those statements.
+	 */
 	if (ip_driver_cb[ip_id][instance_id] != NULL) {
-		ret = ip_driver_cb[ip_id][instance_id](error_report);
+		ret = ip_driver_cb[ip_id][instance_id](instance_id, error_report);
+		pr_err("tegra-hsierrrptinj: Triggered registered error report callback\n");
 	} else {
-		pr_err("tegra-hsierrrptinj: IP Driver 0x%04x\n", ip_id);
-		pr_err("tegra-hsierrrptinj: Instance 0x%04x\n", instance_id);
-		pr_err("tegra-hsierrrptinj: No registered error trigger callback found\n");
 		ret = epl_report_error(error_report);
-		pr_err("tegra-hsierrrptinj: Reporting error to FSI\n");
+		pr_err("tegra-hsierrrptinj: No registered error report trigger callback found\n");
+		pr_err("tegra-hsierrrptinj: Reporting HSI error to FSI directly\n");
 	}
-
-	pr_err("tegra-hsierrrptinj: Timestamp: %u\n", error_report.timestamp);
 
 done:
 	if (ret != 0) {
-		pr_err("tegra-hsierrrptinj: Failed to trigger error report callback\n");
-		pr_err("tegra-hsierrrptinj: IP Driver: 0x%04x\n", ip_id);
-		pr_err("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
-		pr_err("tegra-hsierrrptinj: Error Code: %d", ret);
+		pr_err("tegra-hsierrrptinj: Failed to report HSI error to FSI\n");
+		pr_err("tegra-hsierrrptinj: Error code: %d", ret);
 	} else {
-		pr_debug("tegra-hsierrrptinj: Successfully triggered registered error callback\n");
-		pr_debug("tegra-hsierrrptinj: IP Driver: 0x%04x\n", ip_id);
-		pr_debug("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
+		pr_err("tegra-hsierrrptinj: Successfully reported HSI error to FSI\n");
 	}
+
+	pr_err("tegra-hsierrrptinj: IP ID: 0x%04x\n", ip_id);
+	pr_err("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
+	pr_err("tegra-hsierrrptinj: HSI Error ID: 0x%04x\n", error_report.error_code);
+	pr_err("tegra-hsierrrptinj: Timestamp: %u\n", error_report.timestamp);
 
 	return ret;
 }
