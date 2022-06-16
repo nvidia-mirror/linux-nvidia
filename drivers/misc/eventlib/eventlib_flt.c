@@ -301,6 +301,10 @@ static int flt_writer_init(struct eventlib_ctx *ctx)
 	if (size != sizeof(struct eventlib_flt_w2r))
 		return -ENOSPC;
 
+	if (!flt->w2r) {
+		pr_err("flt->w2r is NULL\n");
+		return -EPERM;
+	}
 	flt->w2r->compat = FLT_COMPAT_INFO;
 	memcpy(flt->w2r->num_bits, ctx->flt_num_bits,
 		sizeof(ctx->flt_num_bits));
