@@ -413,6 +413,10 @@ ioctl_export_obj(struct stream_ext_ctx_t *ctx,
 		return -EINVAL;
 
 	filep = fget(args->in.handle);
+	if (!filep) {
+		pr_err("filep is NULL\n");
+		return -EINVAL;
+	}
 	stream_obj = filep->private_data;
 
 	/*
