@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -73,6 +73,7 @@ struct psc_debug_dev {
 	struct completion rx_complete;
 
 	u8 rx_msg[MBOX_MSG_LEN];
+	struct mbox_controller *mbox;	/* our mbox controller */
 };
 
 static struct psc_debug_dev psc_debug;
@@ -90,7 +91,7 @@ static int psc_debug_open(struct inode *inode, struct file *file)
 
 	file->private_data = dbg;
 
-	chan = mbox_request_channel(&dbg->cl, 0);
+	chan = psc_mbox_request_channel0(dbg->mbox, &dbg->cl);
 	if (IS_ERR(chan) && (PTR_ERR(chan) != -EPROBE_DEFER)) {
 		dev_err(&pdev->dev, "failed to get channel, err %lx\n",
 			PTR_ERR(chan));
@@ -154,8 +155,11 @@ static int send_msg_block(struct psc_debug_dev *dbg, void *tx)
 	mbox_client_txdone(dbg->chan, 0);
 	ret = wait_for_completion_timeout(&dbg->rx_complete,
 			msecs_to_jiffies(dbg->cl.tx_tout));
-	return ret == 0 ? -ETIME : 0;
-
+	if (ret == 0)  {
+		pr_info("%s:%d wait_for_completion_timeout timed out!\n", __func__, __LINE__);
+		return -ETIME;
+	}
+	return 0;
 }
 
 static ssize_t psc_debug_write(struct file *file, const char __user *buffer,
@@ -211,7 +215,6 @@ static long xfer_data(struct file *file, char __user *data)
 		return -ENOMEM;
 
 	if (info.tx_buf && info.tx_size > 0) {
-
 		tx_virt = dma_alloc_coherent(dev, info.tx_size,
 					&tx_phys, GFP_KERNEL);
 		if (tx_virt == NULL || tx_phys == 0) {
@@ -230,7 +233,6 @@ static long xfer_data(struct file *file, char __user *data)
 	}
 
 	if (info.rx_buf && info.rx_size > 0) {
-
 		rx_virt = dma_alloc_coherent(dev, info.rx_size,
 				&rx_phys, GFP_KERNEL);
 		if (rx_virt == NULL || rx_phys == 0) {
@@ -249,7 +251,8 @@ static long xfer_data(struct file *file, char __user *data)
 	msg.tx_size = info.tx_size;
 	msg.rx_size = info.rx_size;
 
-	if (send_msg_block(dbg, &msg) != 0)
+	ret = send_msg_block(dbg, &msg);
+	if (ret != 0)
 		goto free_rx;
 
 	/* copy mbox payload */
@@ -331,7 +334,11 @@ setup_extcfg(struct platform_device *pdev, struct psc_debug_dev *dbg,
 	void __iomem *base;
 	u32 value;
 
+	/* second mailbox address */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "extcfg");
+	/* we have res == 0 in case of ACPI and not DT */
+	if (res == NULL)
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(base))
 		return -EINVAL;
@@ -341,31 +348,25 @@ setup_extcfg(struct platform_device *pdev, struct psc_debug_dev *dbg,
 	if (!of_property_read_u8_array(np, NV(sidtable),
 				(u8 *)&value, sizeof(value))) {
 		dev_dbg(&pdev->dev, "sidtable:%08x\n", value);
-		writel(value, base + EXT_CFG_SIDTABLE);
+		writel(value, base + EXT_CFG_SIDTABLE); /* PSC_EXT_CFG_SIDTABLE_VM0_0 */
 	}
 
 	if (!of_property_read_u32(np, NV(sidconfig), &value)) {
 		dev_dbg(&pdev->dev, "sidcfg:%08x\n", value);
-		writel(value, base + EXT_CFG_SIDCONFIG);
+		writel(value, base + EXT_CFG_SIDCONFIG);    /* PSC_EXT_CFG_SIDCONFIG_VM0_0 */
 	}
 
 	return 0;
 }
 
-int psc_debugfs_create(struct platform_device *pdev)
+int psc_debugfs_create(struct platform_device *pdev, struct mbox_controller *mbox)
 {
 	struct psc_debug_dev *dbg = &psc_debug;
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
-	int count;
 
-	if (!debugfs_initialized())
+	if (!debugfs_initialized()) {
+		dev_err(dev, "debugfs is not initialized\n");
 		return -ENODEV;
-
-	count = of_count_phandle_with_args(np, "mboxes", "#mbox-cells");
-	if (count != 1) {
-		dev_err(dev, "incorrect mboxes property in '%pOF'\n", np);
-		return -EINVAL;
 	}
 
 	debugfs_root = debugfs_create_dir("psc", NULL);
@@ -380,6 +381,7 @@ int psc_debugfs_create(struct platform_device *pdev)
 	dbg->cl.tx_tout = DEFAULT_TX_TIMEOUT;
 	dbg->cl.knows_txdone = false;
 	dbg->pdev = pdev;
+	dbg->mbox = mbox;	/* our controller */
 
 	mutex_init(&dbg->lock);
 

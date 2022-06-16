@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -12,12 +12,14 @@
  *
  */
 
+#include <linux/acpi.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/mailbox_controller.h>
+#include <linux/mailbox_client.h>
 
 /* from drivers/mailbox/mailbox.h */
 #include "mailbox.h"
@@ -124,8 +126,16 @@ static int psc_mbox_startup(struct mbox_chan *chan)
 
 static void psc_mbox_shutdown(struct mbox_chan *chan)
 {
-	struct mbox_vm_chan  *vm_chan = chan->con_priv;
-	struct device *dev = vm_chan->parent->dev;
+	struct mbox_vm_chan  *vm_chan;
+	struct device *dev;
+
+	if (chan == NULL) {
+		pr_err("%s: chan == NULL, exiting\n", __func__);
+		return;
+	}
+
+	vm_chan = chan->con_priv;
+	dev = vm_chan->parent->dev;
 
 	dev_dbg(dev, "%s\n", __func__);
 	writel(0, vm_chan->base + MBOX_CHAN_EXT_CTRL);
@@ -152,6 +162,7 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 	if (!psc)
 		return -ENOMEM;
 
+	// first mailbox address (name mbox-regs)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(base)) {
@@ -182,10 +193,10 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 		psc->vm_chan[i].base = base + (MBOX_REG_OFFSET * i);
 		dev_dbg(dev, "vm_chan[%d].base:%p, chan_id:0x%x, irq:%d\n",
 			i, psc->vm_chan[i].base,
-			readl(psc->vm_chan[i].base), irq);
+			readl(psc->vm_chan[i].base + MBOX_CHAN_ID), irq);
 	}
 	psc->mbox.dev = dev;
-	psc->mbox.chans = &psc->chan[0];
+	psc->mbox.chans = &psc->chan[0];	/* mbox_request_channel(cl,0) returns this one */
 	psc->mbox.num_chans = MBOX_NUM;
 	psc->mbox.ops = &psc_mbox_ops;
 	/* drive txdone by mailbox client ACK with tx_block set to false */
@@ -194,13 +205,14 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, psc);
 
+	/* adds to global kernel mbox_cons */
 	ret = mbox_controller_register(&psc->mbox);
 	if (ret) {
 		dev_err(dev, "Failed to register mailboxes %d\n", ret);
 		return ret;
 	}
 
-	psc_debugfs_create(pdev);
+	psc_debugfs_create(pdev, &psc->mbox);
 	dev_info(dev, "init done\n");
 
 	return 0;
@@ -209,8 +221,6 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 static int tegra234_psc_remove(struct platform_device *pdev)
 {
 	struct psc_mbox *psc = platform_get_drvdata(pdev);
-
-	dev_err(&pdev->dev, "%s:%d\n", __func__, __LINE__);
 
 	psc_debugfs_remove(pdev);
 
@@ -225,6 +235,17 @@ static const struct of_device_id tegra234_psc_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra234_psc_match);
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id tegra23x_psc_acpi_match[] = {
+	{
+		.id = "NVDA2003",
+		.driver_data = 0
+	},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, tegra23x_psc_acpi_match);
+#endif
+
 static struct platform_driver tegra234_psc_driver = {
 	.probe          = tegra234_psc_probe,
 	.remove         = tegra234_psc_remove,
@@ -232,10 +253,65 @@ static struct platform_driver tegra234_psc_driver = {
 		.owner  = THIS_MODULE,
 		.name   = "tegra23x-psc",
 		.of_match_table = of_match_ptr(tegra234_psc_match),
+#ifdef CONFIG_ACPI
+		.acpi_match_table = ACPI_PTR(tegra23x_psc_acpi_match),
+#endif
 	},
 };
 
+struct mbox_chan *psc_mbox_request_channel0(struct mbox_controller *mbox, struct mbox_client *cl)
+{
+	struct device *dev = cl->dev;
+	struct mbox_chan *chan;
+	unsigned long flags;
+	int ret;
+
+	if (!dev) {
+		pr_err("%s: device is NULL\n", __func__);
+		return ERR_PTR(-ENODEV);
+	}
+
+	chan = &mbox->chans[0];
+	if (IS_ERR(chan)) {
+		dev_err(dev, "%s: channel [0] has an error\n", __func__);
+		return chan;
+	}
+
+	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+		dev_err(dev, "%s: mailbox not free\n", __func__);
+		return ERR_PTR(-EBUSY);
+	}
+	spin_lock_irqsave(&chan->lock, flags);
+	chan->msg_free = 0;
+	chan->msg_count = 0;
+	chan->active_req = NULL;
+	chan->cl = cl;
+	init_completion(&chan->tx_complete);
+
+	if (chan->txdone_method	== TXDONE_BY_POLL && cl->knows_txdone)
+		chan->txdone_method |= TXDONE_BY_ACK;
+
+	chan->mbox = mbox;
+
+	spin_unlock_irqrestore(&chan->lock, flags);
+
+	if (chan->mbox->ops == NULL || chan->mbox->ops->startup == NULL) {
+		pr_err("%s%d invalid ops\n", __func__, __LINE__);
+		return NULL;
+	}
+
+	ret = chan->mbox->ops->startup(chan);
+	if (ret) {
+		dev_err(dev, "Unable to startup the channel (%d)\n", ret);
+		mbox_free_channel(chan);
+		chan = ERR_PTR(ret);
+	}
+
+	return chan;
+}
+
 module_platform_driver(tegra234_psc_driver);
+
 MODULE_DESCRIPTION("Tegra PSC driver");
 MODULE_AUTHOR("dpu@nvidia.com");
 MODULE_LICENSE("GPL v2");

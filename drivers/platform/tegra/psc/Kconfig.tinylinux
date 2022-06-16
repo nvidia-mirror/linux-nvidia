@@ -1,0 +1,13 @@
+menu "PSC driver for testing"
+
+config TEGRA_PSC
+        tristate "Enable Tegra PSC driver"
+        help
+         Enable the tegra23x_psc driver for PSCFW debugging from
+         Linux user space.
+
+         The driver creates /sys/kernel/debug/psc/mbox_dbg file system
+         used by pscfw_sanity* tools
+        default m
+
+endmenu
