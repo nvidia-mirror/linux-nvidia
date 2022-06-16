@@ -27,13 +27,13 @@
 
 #include "dev.h"
 #include "bus_client.h"
+#include "tsec_comms/tsec_comms.h"
 #include "tsec.h"
 #include "tsec_t23x.h"
 #include "hw_tsec_t23x.h"
 #include "flcn/flcn.h"
 #include "flcn/hw_flcn.h"
 #include "riscv/riscv.h"
-#include "hw_tsec_t23x.h"
 #include "rm_flcn_cmds.h"
 
 #define TSEC_RISCV_INIT_SUCCESS		(0xa5a5a5a5)
@@ -52,30 +52,10 @@
  * configured via BCT files to allow access via CCPLEX to GSC-CO
  */
 // #define TSEC_RM_ON_DCE (1)
-static bool s_init_msg_rcvd;
 static bool s_riscv_booted;
-static struct RM_FLCN_MSG_GSP s_gsp_init_msg;
-
-#ifdef DO_IPC_OVER_GSC_CO
-static u64 s_ipc_gscco_base;
-static u64 s_ipc_gscco_size;
-static u64 s_ipc_gscco_page_base;
-static u64 s_ipc_gscco_page_size;
-static u64 s_ipc_gscco_page_count;
-struct TSEC_BOOT_INFO {
-	u32    bootFlag;
-};
-#endif
 
 /* Pointer to this device */
-static struct platform_device *tsec;
-
-/* Struct to register client callback function */
-struct callback_t {
-	callback_func_t cb_func;
-	void            *cb_ctx;
-};
-static struct callback_t s_callbacks[RM_GSP_UNIT_END];
+struct platform_device *tsec;
 
 DEFINE_MUTEX(sCommsMutex);
 
@@ -141,6 +121,22 @@ void plat_queue_work(work_cb_t cb, void *ctx)
 	tsec_dev->initmsg_cb = cb;
 	tsec_dev->initmsg_cb_ctx = ctx;
 	schedule_work(&tsec_dev->initmsg_work);
+
+}
+
+void plat_udelay(u64 usec)
+{
+	udelay(usec);
+}
+
+void plat_tsec_reg_write(u32 r, u32 v)
+{
+	host1x_writel(tsec, r, v);
+}
+
+u32 plat_tsec_reg_read(u32 r)
+{
+	return host1x_readl(tsec, r);
 }
 
 static int tsec_read_riscv_bin(struct platform_device *dev,
@@ -317,7 +313,6 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 	void __iomem *ipc_co_va = NULL;
 	dma_addr_t ipc_co_iova = 0;
 	dma_addr_t ipc_co_iova_with_streamid;
-
 	err = nvhost_tsec_riscv_init_sw(dev);
 	if (err)
 		return err;
@@ -472,18 +467,7 @@ static int nvhost_tsec_riscv_poweron(struct platform_device *dev)
 
 #ifdef DO_IPC_OVER_GSC_CO
 	/* Set IPC CO Info before enabling Msg Interrupts from TSEC to CCPLEX */
-	s_ipc_gscco_base = (u64)ipc_co_va;
-	s_ipc_gscco_size = ipc_co_info.size;
-	s_ipc_gscco_page_size = (64 * 1024);
-	/* First Page Reserved */
-	if (s_ipc_gscco_size > s_ipc_gscco_page_size) {
-		s_ipc_gscco_page_count = (s_ipc_gscco_size -
-			s_ipc_gscco_page_size) / s_ipc_gscco_page_size;
-	} else {
-		s_ipc_gscco_page_count = 0;
-	}
-	s_ipc_gscco_page_base = s_ipc_gscco_page_count ?
-		s_ipc_gscco_base + s_ipc_gscco_page_size : 0;
+	tsec_comms_init((u64)ipc_co_va, ipc_co_info.size);
 #endif
 	enable_irq(pdata->irq);
 
@@ -577,131 +561,6 @@ int nvhost_tsec_prepare_poweroff_t23x(struct platform_device *dev)
 #define TSEC_TAIL_POLL_TIME 50
 #define TSEC_SMMU_IDX BIT_ULL(40);
 
-#ifdef DO_IPC_OVER_GSC_CO
-
-static int ipc_gscco_txfr(struct platform_device *pdev, u32 offset, u8 *buff, u32 size, bool read)
-{
-	u8 *gscCo;
-	u32 idx;
-
-	if (offset < TSEC_EMEM_START) {
-		dev_err(&pdev->dev,
-			"Invalid Offset %x less than TSEC_EMEM_START\n", offset);
-		return -EINVAL;
-	}
-
-	offset -= TSEC_EMEM_START;
-
-	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
-		dev_err(&pdev->dev, "Invalid IPC GSC-CO address/size\n");
-		return -EINVAL;
-	}
-	if (!buff || !size) {
-		dev_err(&pdev->dev, "Invalid client buf/size\n");
-		return -EINVAL;
-	}
-	if (offset  > s_ipc_gscco_size || ((offset + size) > s_ipc_gscco_size)) {
-		dev_err(&pdev->dev, "Client buf beyond IPC GSC-CO limits\n");
-		return -EINVAL;
-	}
-
-	gscCo = (u8 *)(s_ipc_gscco_base + offset);
-	if (read) {
-		for (idx = 0; idx < size; idx++)
-			buff[idx] = gscCo[idx];
-	} else {
-		for (idx = 0; idx < size; idx++)
-			gscCo[idx] = buff[idx];
-	}
-
-	return 0;
-}
-
-#else
-
-static int emem_transfer(struct platform_device *pdev,
-	u32 dmem_addr, u8 *buff, u32 size, u8 port, bool copy_from)
-{
-	u32     num_words;
-	u32     num_bytes;
-	u32    *pData = (u32 *)buff;
-	u32     reg32;
-	u32     i;
-	u32     ememc_offset = tsec_ememc_r(port);
-	u32     ememd_offset = tsec_ememd_r(port);
-	u32     emem_start = TSEC_EMEM_START;
-	u32     emem_end = TSEC_EMEM_START + TSEC_EMEM_SIZE;
-
-	if (!size || (port >= TSEC_CMD_EMEM_SIZE))
-		return -EINVAL;
-
-	if ((dmem_addr < emem_start) || ((dmem_addr + size) > emem_end)) {
-		dev_err(&pdev->dev, "CMD: FAILED: copy must be in EMEM aperature [0x%x, 0x%x)\n",
-			emem_start, emem_end);
-		return -EINVAL;
-	}
-
-	dmem_addr -= emem_start;
-
-	num_words = size >> 2;
-	num_bytes = size & 0x3; /* MASK_BITS(2); */
-
-	/* (DRF_SHIFTMASK(NV_PGSP_EMEMC_OFFS) |
-	 * DRF_SHIFTMASK(NV_PGSP_EMEMC_BLK));
-	 */
-	reg32 = dmem_addr & 0x00007ffc;
-
-	if (copy_from) {
-		/* PSEC_EMEMC EMEMC_AINCR enable
-		 * indicate auto increment on read
-		 */
-		reg32 = reg32 | 0x02000000;
-	} else {
-		/* PSEC_EMEMC EMEMC_AINCW enable
-		 * mark auto-increment on write
-		 */
-		reg32 = reg32 | 0x01000000;
-	}
-
-	host1x_writel(pdev, ememc_offset, reg32);
-
-	for (i = 0; i < num_words; i++) {
-		if (copy_from)
-			pData[i] = host1x_readl(pdev, ememd_offset);
-		else
-			host1x_writel(pdev, ememd_offset, pData[i]);
-	}
-
-	/* Check if there are leftover bytes to copy */
-	if (num_bytes > 0) {
-		u32 bytes_copied = num_words << 2;
-
-		/* Read the contents first. If we're copying to the EMEM,
-		 * we've set autoincrement on write,
-		 * so reading does not modify the pointer.
-		 * We can, thus, do a read/modify/write without needing
-		 * to worry about the pointer having moved forward.
-		 * There is no special explanation needed
-		 * if we're copying from the EMEM since this is the last
-		 * access to HW in that case.
-		 */
-		reg32 = host1x_readl(pdev, ememd_offset);
-		if (copy_from) {
-			for (i = 0; i < num_bytes; i++)
-				buff[bytes_copied + i] = ((u8 *)&reg32)[i];
-		} else {
-			for (i = 0; i < num_bytes; i++)
-				((u8 *)&reg32)[i] = buff[bytes_copied + i];
-
-			host1x_writel(pdev, ememd_offset, reg32);
-		}
-	}
-
-	return 0;
-}
-
-#endif
-
 static irqreturn_t tsec_riscv_isr(int irq, void *dev_id)
 {
 	unsigned long flags;
@@ -726,441 +585,17 @@ static irqreturn_t tsec_riscv_isr(int irq, void *dev_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static int ipc_copy_to(u32 head, u8 *pSrc, u32 num_bytes, u32 port)
-{
-#ifdef DO_IPC_OVER_GSC_CO
-	return ipc_gscco_txfr(tsec, head, pSrc, num_bytes, false);
-#else
-	return emem_transfer(tsec, head, pSrc, num_bytes, port, false);
-#endif
-}
-
-static int ipc_copy_from(u32 tail, u8 *pdst, u32 num_bytes, u32 port)
-{
-#ifdef DO_IPC_OVER_GSC_CO
-	return ipc_gscco_txfr(tsec, tail, pdst, num_bytes, true);
-#else
-	return emem_transfer(tsec, tail, pdst, num_bytes, port, true);
-#endif
-}
-
-/* gspQueueCmdValidate */
-static int validate_cmd(union RM_FLCN_CMD *flcn_cmd,  u32 queue_id)
-{
-	if (flcn_cmd == NULL)
-		return -EINVAL;
-
-	if ((flcn_cmd->cmdGen.hdr.size < RM_FLCN_QUEUE_HDR_SIZE) ||
-		(queue_id != RM_DPU_CMDQ_LOG_ID) ||
-		(flcn_cmd->cmdGen.hdr.unitId  >= RM_GSP_UNIT_END)) {
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/*
- * cmd - Falcon command
- * queue_id - ID of queue (usually 0)
- * callback_func - callback func to caller on command completion
- *
- */
-int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
-	callback_func_t cb_func, void *cb_ctx)
-{
-	int i;
-	int placeholder;
-	u32 head;
-	u32 tail;
-	u8 cmd_size;
-	u32 cmd_size_aligned;
-	u32 cmdq_head_base;
-	u32 cmdq_tail_base;
-	u32 cmdq_head_stride;
-	u32 cmdq_tail_stride;
-	u32 cmdq_size = 0x80;
-	static u32 cmdq_start;
-	union RM_FLCN_CMD *flcn_cmd;
-	struct RM_FLCN_QUEUE_HDR hdr;
-
-	if (!s_init_msg_rcvd) {
-		pr_err_once("TSEC RISCV hasn't booted successfully\n");
-		return -ENODEV;
-	}
-
-	cmdq_head_base = tsec_queue_head_r(0);
-	cmdq_head_stride = tsec_queue_head_r(1) - tsec_queue_head_r(0);
-	cmdq_tail_base = tsec_queue_tail_r(0);
-	cmdq_tail_stride = tsec_queue_tail_r(1) - tsec_queue_tail_r(0);
-
-	for (i = 0; !cmdq_start && i < TSEC_POLL_TIME_MS; i++) {
-		cmdq_start = host1x_readl(tsec, (cmdq_tail_base +
-						(queue_id * cmdq_tail_stride)));
-		if (!cmdq_start)
-			udelay(TSEC_TAIL_POLL_TIME);
-	}
-
-	if (!cmdq_start) {
-		dev_warn(&tsec->dev, "cmdq_start=0x%x\n", cmdq_start);
-		return -ENODEV;
-	}
-
-	if (validate_cmd(cmd, queue_id != 0)) {
-		dev_dbg(&tsec->dev, "CMD: %s: %d Invalid command\n",
-			__func__, __LINE__);
-		return -EINVAL;
-	}
-
-	flcn_cmd = (union RM_FLCN_CMD *)cmd;
-	plat_acquire_comms_mutex();
-	if (s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func) {
-		plat_release_comms_mutex();
-		dev_err(&tsec->dev, "CMD: %s: %d More than 1 outstanding cmd for unit 0x%x\n",
-			__func__, __LINE__, flcn_cmd->cmdGen.hdr.unitId);
-		return -EINVAL;
-	}
-	plat_release_comms_mutex();
-	cmd_size = flcn_cmd->cmdGen.hdr.size;
-	placeholder = ALIGN(cmd_size, 4);
-	if (placeholder < 0) {
-		dev_err(&tsec->dev, "Alignment found to be negative\n");
-		return -EINVAL;
-	}
-	cmd_size_aligned = (unsigned int) placeholder;
-	head = host1x_readl(tsec,
-		(cmdq_head_base + (queue_id * cmdq_head_stride)));
-
-check_space:
-	tail = host1x_readl(tsec, (cmdq_tail_base +
-				   (queue_id * cmdq_tail_stride)));
-	if (head < cmdq_start || tail < cmdq_start)
-		pr_err("***** head/tail invalid, h=0x%x,t=0x%x\n", head, tail);
-	if (UINT_MAX - head < cmd_size_aligned) {
-		pr_err("addition of head and offset wraps\n");
-		return -EINVAL;
-	}
-	if (tail > head) {
-		if ((head + cmd_size_aligned) < tail)
-			goto enqueue;
-		udelay(TSEC_TAIL_POLL_TIME);
-		goto check_space;
-	} else {
-
-		if ((head + cmd_size_aligned) < (cmdq_start + cmdq_size)) {
-			goto enqueue;
-		} else {
-			if ((cmdq_start + cmd_size_aligned) < tail) {
-				goto rewind;
-			} else {
-				udelay(TSEC_TAIL_POLL_TIME);
-				goto check_space;
-			}
-		}
-	}
-
-rewind:
-	hdr.unitId = RM_GSP_UNIT_REWIND;
-	hdr.size = RM_FLCN_QUEUE_HDR_SIZE;
-	hdr.ctrlFlags = 0;
-	hdr.seqNumId = 0;
-	if (ipc_copy_to(head, (u8 *)&hdr, hdr.size, 0))
-		return -EINVAL;
-	head = cmdq_start;
-	host1x_writel(tsec, (cmdq_head_base +
-			     (queue_id * cmdq_head_stride)), head);
-	pr_debug("CMDQ: rewind h=%x,t=%x\n", head, tail);
-
-enqueue:
-	plat_acquire_comms_mutex();
-	s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func = cb_func;
-	s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_ctx  = cb_ctx;
-	plat_release_comms_mutex();
-	if (ipc_copy_to(head, (u8 *)flcn_cmd, cmd_size, 0)) {
-		plat_acquire_comms_mutex();
-		s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_func = NULL;
-		s_callbacks[flcn_cmd->cmdGen.hdr.unitId].cb_ctx  = NULL;
-		plat_release_comms_mutex();
-		return -EINVAL;
-	}
-	head += cmd_size_aligned;
-	host1x_writel(tsec, (cmdq_head_base +
-		(queue_id * cmdq_head_stride)), head);
-
-	dev_dbg(&tsec->dev, "Cmd sent to unit 0x%x\n", flcn_cmd->cmdGen.hdr.unitId);
-
-	return 0;
-}
-EXPORT_SYMBOL(nvhost_tsec_send_cmd);
-
-#ifdef DO_IPC_OVER_GSC_CO
-#define TSEC_BOOT_POLL_TIME_US     (100000)
-#define TSEC_BOOT_POLL_INTERVAL_US (50)
-#define TSEC_BOOT_POLL_COUNT       (TSEC_BOOT_POLL_TIME_US / TSEC_BOOT_POLL_INTERVAL_US)
-#define TSEC_BOOT_FLAG_MAGIC       (0xA5A5A5A5)
-#endif
-
-#ifdef DO_IPC_OVER_GSC_CO
-static u32 tsec_get_boot_flag(void)
-{
-	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
-
-	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
-		dev_err(&tsec->dev, "%s: Invalid GSC-CO address/size\n", __func__);
-		return 0;
-	} else {
-		return bootInfo->bootFlag;
-	}
-}
-
-static void tsec_reset_boot_flag(void)
-{
-	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
-
-	if (!s_ipc_gscco_base || !s_ipc_gscco_size) {
-		dev_err(&tsec->dev, "%s: Invalid GSC-CO address/size\n", __func__);
-	} else {
-		bootInfo->bootFlag = 0;
-	}
-}
-#endif
-
-static void drain_msg(bool invoke_cb)
-{
-	int i;
-	u32 tail = 0;
-	u32 head = 0;
-	u32 queue_id = 0;
-	u32 msgq_head_base;
-	u32 msgq_tail_base;
-	u32 msgq_head_stride;
-	u32 msgq_tail_stride;
-	static u32 msgq_start;
-	struct RM_FLCN_MSG_GSP gsp_msg;
-	struct RM_GSP_INIT_MSG_GSP_INIT *gsp_init_msg;
-	callback_func_t cb_func;
-	void *cb_ctx;
-
-#ifndef TSEC_RM_ON_DCE
-	return;
-#endif
-
-	msgq_head_base = tsec_msgq_head_r(TSEC_MSG_QUEUE_PORT);
-	msgq_tail_base = tsec_msgq_tail_r(TSEC_MSG_QUEUE_PORT);
-
-	msgq_head_stride = tsec_msgq_head_r(1) - tsec_msgq_head_r(0);
-	msgq_tail_stride = tsec_msgq_tail_r(1) - tsec_msgq_tail_r(0);
-	gsp_init_msg = (struct RM_GSP_INIT_MSG_GSP_INIT *) &gsp_msg.msg;
-
-	for (i = 0; !msgq_start && i < TSEC_POLL_TIME_MS; i++) {
-		msgq_start = host1x_readl(tsec, (msgq_tail_base +
-						 (msgq_tail_stride * queue_id)));
-		if (!msgq_start)
-			udelay(TSEC_TAIL_POLL_TIME);
-	}
-
-	if (!msgq_start)
-		dev_warn(&tsec->dev, "msgq_start=0x%x\n", msgq_start);
-
-	for (i = 0; i < TSEC_POLL_TIME_MS; i++) {
-		tail = host1x_readl(tsec, (msgq_tail_base +
-					   (msgq_tail_stride * queue_id)));
-		head = host1x_readl(tsec, (msgq_head_base +
-					   (msgq_head_stride * queue_id)));
-		if (tail != head)
-			break;
-		udelay(TSEC_TAIL_POLL_TIME);
-	}
-
-	if (head == 0 || tail == 0) {
-		dev_err(&tsec->dev, "Err: Invalid MSGQ head=0x%x, tail=0x%x\n",
-			head, tail);
-		goto exit;
-	}
-
-	if (tail == head) {
-		dev_dbg(&tsec->dev, "Empty MSGQ tail(0x%x): 0x%x head(0x%x): 0x%x\n",
-			(msgq_tail_base + (msgq_tail_stride * queue_id)),
-			tail,
-			(msgq_head_base + (msgq_head_stride * queue_id)),
-			head);
-		goto exit;
-	}
-
-	while (tail != head) {
-
-		/* read header */
-		ipc_copy_from(tail, (u8 *)&gsp_msg.hdr,
-			RM_FLCN_QUEUE_HDR_SIZE, 0);
-		pr_debug("seqNumId=%d\n", gsp_msg.hdr.seqNumId);
-		/* copy msg body */
-		if (gsp_msg.hdr.size > RM_FLCN_QUEUE_HDR_SIZE) {
-			ipc_copy_from(tail + RM_FLCN_QUEUE_HDR_SIZE, (u8 *)&gsp_msg.msg,
-				gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE, 0);
-		}
-
-		if (gsp_msg.hdr.unitId == RM_GSP_UNIT_INIT) {
-			dev_dbg(&tsec->dev, "MSGQ: %s(%d) init msg\n",
-				__func__, __LINE__);
-			if (gsp_init_msg->numQueues < 2) {
-				dev_err(&tsec->dev, "MSGQ: Initing less queues than expected %d\n",
-					gsp_init_msg->numQueues);
-				goto FAIL;
-			}
-#ifdef DO_IPC_OVER_GSC_CO
-			/* DCE can access the GSC-CO hence can poll for the Tsec
-			 * booted flag and also reset it
-			 */
-			for (i = 0; i < TSEC_BOOT_POLL_COUNT; i++) {
-				if (tsec_get_boot_flag() == TSEC_BOOT_FLAG_MAGIC)
-					break;
-				udelay(TSEC_BOOT_POLL_INTERVAL_US);
-			}
-			if (i >= TSEC_BOOT_POLL_COUNT) {
-				dev_err(&tsec->dev, "Tsec GSC-CO Boot Flag not set\n");
-				goto FAIL;
-			} else {
-				tsec_reset_boot_flag();
-				dev_dbg(&tsec->dev, "Tsec GSC-CO Boot Flag reset done\n");
-			}
-#endif
-			memcpy(&s_gsp_init_msg.hdr, &gsp_msg.hdr, RM_FLCN_QUEUE_HDR_SIZE);
-			memcpy(&s_gsp_init_msg.msg, &gsp_msg.msg,
-				gsp_msg.hdr.size - RM_FLCN_QUEUE_HDR_SIZE);
-
-			/* Invoke the callback and clear it */
-			plat_acquire_comms_mutex();
-			s_init_msg_rcvd = true;
-			if (invoke_cb) {
-				cb_func = s_callbacks[gsp_msg.hdr.unitId].cb_func;
-				cb_ctx  = s_callbacks[gsp_msg.hdr.unitId].cb_ctx;
-				s_callbacks[gsp_msg.hdr.unitId].cb_func = NULL;
-				s_callbacks[gsp_msg.hdr.unitId].cb_ctx = NULL;
-			}
-			plat_release_comms_mutex();
-			if (cb_func && invoke_cb) {
-				cb_func(cb_ctx, (void *)&gsp_msg);
-			}
-		} else if (gsp_msg.hdr.unitId < RM_GSP_UNIT_END) {
-			dev_dbg(&tsec->dev, "Msg received from unit 0x%x\n", gsp_msg.hdr.unitId);
-
-			if (gsp_msg.hdr.unitId == RM_GSP_UNIT_HDCP22WIRED) {
-				dev_dbg(&tsec->dev, "MSGQ: %s(%d) RM_GSP_UNIT_HDCP22WIRED\n",
-					__func__, __LINE__);
-			} else if (gsp_msg.hdr.unitId == RM_GSP_UNIT_REWIND) {
-				tail = msgq_start;
-				host1x_writel(tsec, (msgq_tail_base +
-						     (msgq_tail_stride * queue_id)), tail);
-				head = host1x_readl(tsec,
-					(msgq_head_base + (msgq_head_stride * queue_id)));
-				pr_debug("MSGQ tail rewinded\n");
-				continue;
-			} else {
-				dev_dbg(&tsec->dev, "MSGQ: %s(%d) what msg could it be 0x%x?\n",
-					__func__, __LINE__, gsp_msg.hdr.unitId);
-			}
-
-			/* Invoke the callback and clear it */
-			if (invoke_cb) {
-				plat_acquire_comms_mutex();
-				cb_func = s_callbacks[gsp_msg.hdr.unitId].cb_func;
-				cb_ctx  = s_callbacks[gsp_msg.hdr.unitId].cb_ctx;
-				s_callbacks[gsp_msg.hdr.unitId].cb_func = NULL;
-				s_callbacks[gsp_msg.hdr.unitId].cb_ctx = NULL;
-				plat_release_comms_mutex();
-				if (cb_func)
-					cb_func(cb_ctx, (void *)&gsp_msg);
-			}
-		} else {
-			dev_err(&tsec->dev, "MSGQ: %s(%d) invalid msg uintId 0x%x?\n",
-				__func__, __LINE__, gsp_msg.hdr.unitId);
-		}
-
-FAIL:
-		tail += ALIGN(gsp_msg.hdr.size, 4);
-		head = host1x_readl(tsec,
-			(msgq_head_base + (msgq_head_stride * queue_id)));
-		host1x_writel(tsec,
-			(msgq_tail_base + (msgq_tail_stride * queue_id)), tail);
-	}
-
-exit:
-	return;
-}
-
 static irqreturn_t process_msg(int irq, void *args)
 {
-	drain_msg(true);
+	tsec_drain_msg(true);
 
 	/* Set RISCV Mask for SWGEN0, so that it is re-enabled
 	 * and if it is pending the CCPLEX will be interrupted
 	 * by this the top half
 	 */
 	host1x_writel(tsec, riscv_irqmset_r(), riscv_irqmset_swgen0_set_f());
-
 	return IRQ_HANDLED;
 }
-
-static void invoke_init_cb(void *unused)
-{
-	callback_func_t cb_func;
-	void *cb_ctx;
-
-	plat_acquire_comms_mutex();
-	cb_func = s_callbacks[RM_GSP_UNIT_INIT].cb_func;
-	cb_ctx  = s_callbacks[RM_GSP_UNIT_INIT].cb_ctx;
-	s_callbacks[RM_GSP_UNIT_INIT].cb_func = NULL;
-	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx  = NULL;
-	plat_release_comms_mutex();
-
-	if (cb_func)
-		cb_func(cb_ctx, &s_gsp_init_msg);
-}
-
-int nvhost_tsec_set_init_cb(callback_func_t cb_func, void *cb_ctx)
-{
-	int err = 0;
-
-	plat_acquire_comms_mutex();
-
-	if (s_callbacks[RM_GSP_UNIT_INIT].cb_func) {
-		dev_err(&tsec->dev, "%s: %d: INIT unit cb_func already set\n",
-			__func__, __LINE__);
-		err = -EINVAL;
-		goto FAIL;
-	}
-	if (!cb_func) {
-		dev_err(&tsec->dev, "%s: %d: Init CallBack NULL\n",
-			__func__, __LINE__);
-		err = -EINVAL;
-		goto FAIL;
-	}
-
-	s_callbacks[RM_GSP_UNIT_INIT].cb_func = cb_func;
-	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx = cb_ctx;
-
-	if (s_init_msg_rcvd) {
-		dev_dbg(&tsec->dev, "Init msg already received invoking callback\n");
-		plat_queue_work(invoke_init_cb, NULL);
-	}
-#ifdef DO_IPC_OVER_GSC_CO
-	else if (tsec_get_boot_flag() == TSEC_BOOT_FLAG_MAGIC) {
-		dev_dbg(&tsec->dev, "Doorbell missed tsec booted first, invoke init callback\n");
-		/* Interrupt missed as tsec booted first
-		 * Explicitly call drain_msg
-		 */
-		plat_release_comms_mutex();
-		drain_msg(false);
-		plat_acquire_comms_mutex();
-		/* Init message is drained now, hence queue the work item to invoke init callback*/
-		plat_queue_work(invoke_init_cb, NULL);
-	}
-#endif
-
-FAIL:
-	plat_release_comms_mutex();
-	return err;
-}
-EXPORT_SYMBOL(nvhost_tsec_set_init_cb);
 
 static void tsec_poweron_handler(struct work_struct *work)
 {
@@ -1261,33 +696,6 @@ void nvhost_tsec_free_payload_mem(size_t size, void *cpu_addr, dma_addr_t dma_ad
 	dma_free_attrs(&tsec->dev, size, cpu_addr, dma_addr, 0);
 }
 EXPORT_SYMBOL(nvhost_tsec_free_payload_mem);
-
-void *nvhost_tsec_get_gscco_page(u32 page_number, u32 *gscco_offset)
-{
-#ifdef DO_IPC_OVER_GSC_CO
-	u8 *page_va;
-
-	if (!s_ipc_gscco_page_base || (page_number >= s_ipc_gscco_page_count)) {
-		dev_err(&tsec->dev,
-			"%s: No reserved memory for Page %d\n",
-			__func__, page_number);
-		return NULL;
-	}
-
-	page_va = (u8 *)s_ipc_gscco_page_base;
-	page_va += (page_number * s_ipc_gscco_page_size);
-	if (gscco_offset) {
-		*gscco_offset =
-			(u32)((s_ipc_gscco_page_base - s_ipc_gscco_base) +
-			(page_number * s_ipc_gscco_page_size));
-	}
-	return page_va;
-#else
-	dev_err(&tsec->dev, "%s: IPC over GSC-CO not enabled\n", __func__);
-	return NULL;
-#endif
-}
-EXPORT_SYMBOL(nvhost_tsec_get_gscco_page);
 
 int nvhost_tsec_cmdif_open(void)
 {

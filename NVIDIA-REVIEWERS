@@ -376,6 +376,13 @@ B:	Mobile Driver Touchscreen
 S:	Supported
 F:	drivers/input/touchscreen/*
 
+TSEC
+M:	Hyung Taek Ryoo <hryoo@nvidia.com>
+M:	Nikesh Oswal <noswal@nvidia.com>
+M:	Sahil Mukund Patki <spatki@nvidia.com>
+S:	Maintained
+F:	drivers/video/tegra/host/tsec/*
+
 UDRM
 M:	Yogish Kulkarni <yogishk@nvidia.com>
 L:	sw-libdrm@exchange.nvidia.com

@@ -18,17 +18,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __NVHOST_TSEC_H__
-#define __NVHOST_TSEC_H__
+#ifndef NVHOST_TSEC_H
+#define NVHOST_TSEC_H
 
 #include <linux/types.h>
 #include <linux/nvhost.h>
-
-typedef void (*callback_func_t)(void *, void *);
-int nvhost_tsec_set_init_cb(callback_func_t cb_func, void *cb_ctx);
-int nvhost_tsec_send_cmd(void *cmd, u32 queue_id,
-	callback_func_t cb_func, void *cb_ctx);
-void *nvhost_tsec_get_gscco_page(u32 page_number, u32 *gscco_offset);
 
 int nvhost_tsec_finalize_poweron_t194(struct platform_device *dev);
 int nvhost_tsec_finalize_poweron(struct platform_device *dev);
