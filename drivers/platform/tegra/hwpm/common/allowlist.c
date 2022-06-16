@@ -15,13 +15,14 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_static_analysis.h>
 
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
 {
 	int ret = 0;
 
-	hwpm->full_alist_size = 0ULL;
+	hwpm->alist_map->full_alist_size = 0ULL;
 
 	tegra_hwpm_fn(hwpm, " ");
 
@@ -51,11 +52,12 @@ int tegra_hwpm_combine_alist(struct tegra_soc_hwpm *hwpm, u64 *alist)
 		return err;
 	}
 
-	/* Check size of full alist with hwpm->full_alist_size*/
-	if (func_args.full_alist_idx != hwpm->full_alist_size) {
+	/* Check size of full alist with hwpm->alist_map->full_alist_size*/
+	if (func_args.full_alist_idx != hwpm->alist_map->full_alist_size) {
 		tegra_hwpm_err(hwpm, "full_alist_size 0x%llx doesn't match "
 			"max full_alist_idx 0x%llx",
-			hwpm->full_alist_size, func_args.full_alist_idx);
+			hwpm->alist_map->full_alist_size,
+			func_args.full_alist_idx);
 		err = -EINVAL;
 	}
 

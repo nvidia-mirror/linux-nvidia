@@ -14,9 +14,38 @@
 #ifndef TEGRA_HWPM_OS_LINUX_MEM_MGMT_UTILS_H
 #define TEGRA_HWPM_OS_LINUX_MEM_MGMT_UTILS_H
 
+#include <linux/types.h>
+
+/* This macro is copy of TEGRA_SOC_HWPM_MEM_BYTES_INVALID */
+#define TEGRA_HWPM_MEM_BYTES_INVALID	0xffffffff
+
 struct tegra_soc_hwpm;
 struct tegra_soc_hwpm_alloc_pma_stream;
 struct tegra_soc_hwpm_update_get_put;
+struct sg_table;
+struct dma_buf;
+struct dma_buf_attachment;
+struct tegra_soc_hwpm_update_get_put;
+
+struct tegra_hwpm_mem_mgmt {
+	struct sg_table *stream_sgt;
+	struct sg_table *mem_bytes_sgt;
+	struct dma_buf *stream_dma_buf;
+	struct dma_buf_attachment *stream_attach;
+	u64 stream_buf_size;
+	u64 stream_buf_va;
+	struct dma_buf *mem_bytes_dma_buf;
+	struct dma_buf_attachment *mem_bytes_attach;
+	u64 mem_bytes_buf_va;
+	void *mem_bytes_kernel;
+};
+
+struct tegra_hwpm_allowlist_map {
+	u64 full_alist_size;
+	u64 num_pages;
+	struct page **pages;
+	void *full_alist_map;
+};
 
 int tegra_hwpm_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream);
@@ -25,5 +54,7 @@ int tegra_hwpm_update_mem_bytes(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_update_get_put *update_get_put);
 int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 	void *ioctl_struct);
+void tegra_hwpm_release_alist_map(struct tegra_soc_hwpm *hwpm);
+void tegra_hwpm_release_mem_mgmt(struct tegra_soc_hwpm *hwpm);
 
 #endif /* TEGRA_HWPM_OS_LINUX_MEM_MGMT_UTILS_H */

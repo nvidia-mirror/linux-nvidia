@@ -99,8 +99,7 @@ int t234_hwpm_perfmon_disable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon);
 
 int t234_hwpm_disable_mem_mgmt(struct tegra_soc_hwpm *hwpm);
-int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream);
+int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_invalidate_mem_config(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_stream_mem_bytes(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_disable_pma_streaming(struct tegra_soc_hwpm *hwpm);

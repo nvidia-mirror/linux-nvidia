@@ -11,10 +11,7 @@
  * more details.
  */
 
-#include <linux/kernel.h>
-#include <linux/dma-buf.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
@@ -65,14 +62,13 @@ int t234_hwpm_disable_mem_mgmt(struct tegra_soc_hwpm *hwpm)
 	return 0;
 }
 
-int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
+int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm)
 {
 	int err = 0;
 	u32 outbase_lo = 0;
 	u32 outbase_hi = 0;
 	u32 outsize = 0;
-	u32 mem_bytes_addr = 0;
+	u64 mem_bytes_addr = 0ULL;
 	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
 	struct hwpm_ip *chip_ip = active_chip->chip_ips[
 		active_chip->get_rtr_int_idx(hwpm)];
@@ -81,11 +77,11 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *pma_perfmux = &ip_inst_pma->element_info[
 		TEGRA_HWPM_APERTURE_TYPE_PERFMUX].element_static_array[
 			T234_HWPM_IP_RTR_PERMUX_INDEX];
+	struct tegra_hwpm_mem_mgmt *mem_mgmt = hwpm->mem_mgmt;
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	outbase_lo = alloc_pma_stream->stream_buf_pma_va &
-			pmasys_channel_outbase_ptr_m();
+	outbase_lo = mem_mgmt->stream_buf_va & pmasys_channel_outbase_ptr_m();
 	err = tegra_hwpm_writel(hwpm, pma_perfmux,
 		pmasys_channel_outbase_r(0), outbase_lo);
 	if (err != 0) {
@@ -94,7 +90,7 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
 	}
 	tegra_hwpm_dbg(hwpm, hwpm_verbose, "OUTBASE = 0x%x", outbase_lo);
 
-	outbase_hi = (alloc_pma_stream->stream_buf_pma_va >> 32) &
+	outbase_hi = (mem_mgmt->stream_buf_va >> 32) &
 			pmasys_channel_outbaseupper_ptr_m();
 	err = tegra_hwpm_writel(hwpm, pma_perfmux,
 		pmasys_channel_outbaseupper_r(0), outbase_hi);
@@ -104,7 +100,7 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
 	}
 	tegra_hwpm_dbg(hwpm, hwpm_verbose, "OUTBASEUPPER = 0x%x", outbase_hi);
 
-	outsize = alloc_pma_stream->stream_buf_size &
+	outsize = mem_mgmt->stream_buf_size &
 			pmasys_channel_outsize_numbytes_m();
 	err = tegra_hwpm_writel(hwpm, pma_perfmux,
 		pmasys_channel_outsize_r(0), outsize);
@@ -114,7 +110,7 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
 	}
 	tegra_hwpm_dbg(hwpm, hwpm_verbose, "OUTSIZE = 0x%x", outsize);
 
-	mem_bytes_addr = sg_dma_address(hwpm->mem_bytes_sgt->sgl) &
+	mem_bytes_addr = mem_mgmt->mem_bytes_buf_va &
 			pmasys_channel_mem_bytes_addr_ptr_m();
 	err = tegra_hwpm_writel(hwpm, pma_perfmux,
 		pmasys_channel_mem_bytes_addr_r(0), mem_bytes_addr);
@@ -125,7 +121,8 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm,
 	tegra_hwpm_dbg(hwpm, hwpm_verbose,
 		"MEM_BYTES_ADDR = 0x%x", mem_bytes_addr);
 
-	err = tegra_hwpm_writel(hwpm, pma_perfmux, pmasys_channel_mem_block_r(0),
+	err = tegra_hwpm_writel(hwpm, pma_perfmux,
+		pmasys_channel_mem_block_r(0),
 		pmasys_channel_mem_block_valid_f(
 			pmasys_channel_mem_block_valid_true_v()));
 	if (err != 0) {
@@ -165,7 +162,8 @@ int t234_hwpm_stream_mem_bytes(struct tegra_soc_hwpm *hwpm)
 {
 	int err = 0;
 	u32 reg_val = 0U;
-	u32 *mem_bytes_kernel_u32 = (u32 *)(hwpm->mem_bytes_kernel);
+	u32 *mem_bytes_kernel_u32 =
+		(u32 *)(hwpm->mem_mgmt->mem_bytes_kernel);
 	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
 	struct hwpm_ip *chip_ip = active_chip->chip_ips[
 		active_chip->get_rtr_int_idx(hwpm)];
@@ -177,7 +175,7 @@ int t234_hwpm_stream_mem_bytes(struct tegra_soc_hwpm *hwpm)
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	*mem_bytes_kernel_u32 = TEGRA_SOC_HWPM_MEM_BYTES_INVALID;
+	*mem_bytes_kernel_u32 = TEGRA_HWPM_MEM_BYTES_INVALID;
 
 	err = tegra_hwpm_readl(hwpm, pma_perfmux,
 		pmasys_channel_control_user_r(0), &reg_val);

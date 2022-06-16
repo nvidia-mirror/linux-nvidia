@@ -11,12 +11,13 @@
  * more details.
  */
 
+#include <tegra_hwpm_mem_mgmt.h>
+#include <tegra_hwpm_common.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm_ip.h>
 #include <tegra_hwpm.h>
-#include <tegra_hwpm_common.h>
 
 #include <hal/t234/t234_init.h>
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
@@ -139,7 +140,7 @@ int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm)
 
 	/* Initialize SW state */
 	hwpm->bind_completed = false;
-	hwpm->full_alist_size = 0;
+	hwpm->alist_map->full_alist_size = 0;
 
 	return 0;
 }

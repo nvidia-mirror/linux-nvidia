@@ -25,12 +25,12 @@
 #include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
+#include <tegra_hwpm_ip.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
-#include <os/linux/mem_mgmt_utils.h>
-#include <os/linux/ip_utils.h>
 #include <os/linux/regops_utils.h>
 
 #define LA_CLK_RATE 625000000UL
@@ -180,7 +180,7 @@ static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 
 	if (query_allowlist->allowlist == NULL) {
 		/* Userspace is querying allowlist size only */
-		if (hwpm->full_alist_size == 0) {
+		if (hwpm->alist_map->full_alist_size == 0) {
 			/*Full alist size is not computed yet */
 			ret = tegra_hwpm_get_allowlist_size(hwpm);
 			if (ret != 0) {
@@ -189,7 +189,8 @@ static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 				return ret;
 			}
 		}
-		query_allowlist->allowlist_size = hwpm->full_alist_size;
+		query_allowlist->allowlist_size =
+			hwpm->alist_map->full_alist_size;
 	} else {
 		/* Concatenate allowlists and return */
 		ret = tegra_hwpm_map_update_allowlist(hwpm, query_allowlist);
@@ -226,7 +227,7 @@ static int tegra_hwpm_update_get_put_ioctl(struct tegra_soc_hwpm *hwpm,
 			" after the BIND IOCTL.");
 		return -EPERM;
 	}
-	if (!hwpm->mem_bytes_kernel) {
+	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
 		tegra_hwpm_err(hwpm,
 			"mem_bytes buffer is not mapped in the driver");
 		return -ENXIO;
@@ -515,6 +516,9 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 		err = ret;
 		goto fail;
 	}
+
+	tegra_hwpm_release_alist_map(hwpm);
+	tegra_hwpm_release_mem_mgmt(hwpm);
 
 	ret = tegra_hwpm_release_hw(hwpm);
 	if (ret < 0) {

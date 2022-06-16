@@ -11,11 +11,6 @@
  * more details.
  */
 
-#include <soc/tegra/fuse.h>
-#include <linux/of_address.h>
-#include <linux/dma-buf.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>

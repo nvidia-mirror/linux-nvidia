@@ -371,8 +371,7 @@ struct tegra_soc_hwpm_chip {
 		struct hwpm_ip_aperture *perfmux);
 
 	int (*disable_mem_mgmt)(struct tegra_soc_hwpm *hwpm);
-	int (*enable_mem_mgmt)(struct tegra_soc_hwpm *hwpm,
-		struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream);
+	int (*enable_mem_mgmt)(struct tegra_soc_hwpm *hwpm);
 	int (*invalidate_mem_config)(struct tegra_soc_hwpm *hwpm);
 	int (*stream_mem_bytes)(struct tegra_soc_hwpm *hwpm);
 	int (*disable_pma_streaming)(struct tegra_soc_hwpm *hwpm);
@@ -395,9 +394,11 @@ struct tegra_soc_hwpm_chip {
 	void (*release_sw_setup)(struct tegra_soc_hwpm *hwpm);
 };
 
-struct allowlist;
 extern struct platform_device *tegra_soc_hwpm_pdev;
 extern const struct file_operations tegra_soc_hwpm_ops;
+struct allowlist;
+struct tegra_hwpm_mem_mgmt;
+struct tegra_hwpm_allowlist_map;
 
 /* Driver struct */
 struct tegra_soc_hwpm {
@@ -422,18 +423,12 @@ struct tegra_soc_hwpm {
 	struct reset_control *hwpm_rst;
 
 	/* Memory Management */
-	struct dma_buf *stream_dma_buf;
-	struct dma_buf_attachment *stream_attach;
-	struct sg_table *stream_sgt;
-	struct dma_buf *mem_bytes_dma_buf;
-	struct dma_buf_attachment *mem_bytes_attach;
-	struct sg_table *mem_bytes_sgt;
-	void *mem_bytes_kernel;
+	struct tegra_hwpm_mem_mgmt *mem_mgmt;
+	struct tegra_hwpm_allowlist_map *alist_map;
 
 	/* SW State */
 	bool bind_completed;
 	bool device_opened;
-	u64 full_alist_size;
 
 	atomic_t hwpm_in_use;
 

@@ -11,13 +11,11 @@
  * more details.
  */
 
-#include <linux/bitops.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
+#include <tegra_hwpm_static_analysis.h>
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
-#include <tegra_hwpm_static_analysis.h>
 #include <hal/t234/t234_internal.h>
 #include <hal/t234/t234_regops_allowlist.h>
 
@@ -64,7 +62,7 @@ int t234_hwpm_copy_alist(struct tegra_soc_hwpm *hwpm,
 	}
 
 	for (alist_idx = 0ULL; alist_idx < aperture->alist_size; alist_idx++) {
-		if (f_alist_idx >= hwpm->full_alist_size) {
+		if (f_alist_idx >= hwpm->alist_map->full_alist_size) {
 			tegra_hwpm_err(hwpm, "No space in full_alist");
 			return -ENOMEM;
 		}

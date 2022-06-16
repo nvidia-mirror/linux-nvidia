@@ -12,6 +12,7 @@
  */
 
 #include <tegra_hwpm_static_analysis.h>
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_aperture.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_kmem.h>
@@ -269,8 +270,10 @@ static int tegra_hwpm_func_single_element(struct tegra_soc_hwpm *hwpm,
 			return 0;
 		}
 		if (element->alist) {
-			hwpm->full_alist_size = tegra_hwpm_safe_add_u64(
-				hwpm->full_alist_size, element->alist_size);
+			hwpm->alist_map->full_alist_size =
+				tegra_hwpm_safe_add_u64(
+					hwpm->alist_map->full_alist_size,
+					element->alist_size);
 		} else {
 			tegra_hwpm_err(hwpm, "IP %d"
 				" element type %d static_idx %d NULL alist",

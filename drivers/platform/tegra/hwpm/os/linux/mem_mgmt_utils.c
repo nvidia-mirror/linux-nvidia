@@ -22,38 +22,43 @@
 #include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_static_analysis.h>
-#include <os/linux/mem_mgmt_utils.h>
 
 static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
 	tegra_hwpm_fn(hwpm, " ");
 
-	hwpm->stream_dma_buf = dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
+	hwpm->mem_mgmt->stream_buf_size = alloc_pma_stream->stream_buf_size;
+	hwpm->mem_mgmt->stream_dma_buf =
+		dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
 		alloc_pma_stream->stream_buf_fd));
-	if (IS_ERR(hwpm->stream_dma_buf)) {
+	if (IS_ERR(hwpm->mem_mgmt->stream_dma_buf)) {
 		tegra_hwpm_err(hwpm, "Unable to get stream dma_buf");
-		return PTR_ERR(hwpm->stream_dma_buf);
+		return PTR_ERR(hwpm->mem_mgmt->stream_dma_buf);
 	}
-	hwpm->stream_attach = dma_buf_attach(hwpm->stream_dma_buf, hwpm->dev);
-	if (IS_ERR(hwpm->stream_attach)) {
+	hwpm->mem_mgmt->stream_attach =
+		dma_buf_attach(hwpm->mem_mgmt->stream_dma_buf, hwpm->dev);
+	if (IS_ERR(hwpm->mem_mgmt->stream_attach)) {
 		tegra_hwpm_err(hwpm, "Unable to attach stream dma_buf");
-		return PTR_ERR(hwpm->stream_attach);
+		return PTR_ERR(hwpm->mem_mgmt->stream_attach);
 	}
-	hwpm->stream_sgt = dma_buf_map_attachment(hwpm->stream_attach,
-						  DMA_FROM_DEVICE);
-	if (IS_ERR(hwpm->stream_sgt)) {
+	hwpm->mem_mgmt->stream_sgt = dma_buf_map_attachment(
+		hwpm->mem_mgmt->stream_attach, DMA_FROM_DEVICE);
+	if (IS_ERR(hwpm->mem_mgmt->stream_sgt)) {
 		tegra_hwpm_err(hwpm, "Unable to map stream attachment");
-		return PTR_ERR(hwpm->stream_sgt);
+		return PTR_ERR(hwpm->mem_mgmt->stream_sgt);
 	}
 
-	alloc_pma_stream->stream_buf_pma_va =
-					sg_dma_address(hwpm->stream_sgt->sgl);
+	hwpm->mem_mgmt->stream_buf_va =
+		sg_dma_address(hwpm->mem_mgmt->stream_sgt->sgl);
+	alloc_pma_stream->stream_buf_pma_va = hwpm->mem_mgmt->stream_buf_va;
 	if (alloc_pma_stream->stream_buf_pma_va == 0) {
 		tegra_hwpm_err(hwpm, "Invalid stream buffer SMMU IOVA");
 		return -ENXIO;
@@ -70,34 +75,39 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 {
 	tegra_hwpm_fn(hwpm, " ");
 
-	hwpm->mem_bytes_dma_buf = dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
+	hwpm->mem_mgmt->mem_bytes_dma_buf =
+		dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
 		alloc_pma_stream->mem_bytes_buf_fd));
-	if (IS_ERR(hwpm->mem_bytes_dma_buf)) {
+	if (IS_ERR(hwpm->mem_mgmt->mem_bytes_dma_buf)) {
 		tegra_hwpm_err(hwpm, "Unable to get mem bytes dma_buf");
-		return PTR_ERR(hwpm->mem_bytes_dma_buf);
+		return PTR_ERR(hwpm->mem_mgmt->mem_bytes_dma_buf);
 	}
 
-	hwpm->mem_bytes_attach = dma_buf_attach(hwpm->mem_bytes_dma_buf,
-						hwpm->dev);
-	if (IS_ERR(hwpm->mem_bytes_attach)) {
+	hwpm->mem_mgmt->mem_bytes_attach = dma_buf_attach(
+		hwpm->mem_mgmt->mem_bytes_dma_buf, hwpm->dev);
+	if (IS_ERR(hwpm->mem_mgmt->mem_bytes_attach)) {
 		tegra_hwpm_err(hwpm, "Unable to attach mem bytes dma_buf");
-		return PTR_ERR(hwpm->mem_bytes_attach);
+		return PTR_ERR(hwpm->mem_mgmt->mem_bytes_attach);
 	}
 
-	hwpm->mem_bytes_sgt = dma_buf_map_attachment(hwpm->mem_bytes_attach,
-						     DMA_FROM_DEVICE);
-	if (IS_ERR(hwpm->mem_bytes_sgt)) {
+	hwpm->mem_mgmt->mem_bytes_sgt = dma_buf_map_attachment(
+			hwpm->mem_mgmt->mem_bytes_attach, DMA_FROM_DEVICE);
+	if (IS_ERR(hwpm->mem_mgmt->mem_bytes_sgt)) {
 		tegra_hwpm_err(hwpm, "Unable to map mem bytes attachment");
-		return PTR_ERR(hwpm->mem_bytes_sgt);
+		return PTR_ERR(hwpm->mem_mgmt->mem_bytes_sgt);
 	}
 
-	hwpm->mem_bytes_kernel = dma_buf_vmap(hwpm->mem_bytes_dma_buf);
-	if (!hwpm->mem_bytes_kernel) {
+	hwpm->mem_mgmt->mem_bytes_buf_va =
+		sg_dma_address(hwpm->mem_mgmt->mem_bytes_sgt->sgl);
+
+	hwpm->mem_mgmt->mem_bytes_kernel =
+		dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf);
+	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
 		tegra_hwpm_err(hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
-	memset(hwpm->mem_bytes_kernel, 0, 32);
+	memset(hwpm->mem_mgmt->mem_bytes_kernel, 0, 32);
 
 	return 0;
 }
@@ -106,45 +116,54 @@ static int tegra_hwpm_reset_stream_buf(struct tegra_soc_hwpm *hwpm)
 {
 	tegra_hwpm_fn(hwpm, " ");
 
-	if (hwpm->stream_sgt && (!IS_ERR(hwpm->stream_sgt))) {
-		dma_buf_unmap_attachment(hwpm->stream_attach,
-					 hwpm->stream_sgt,
-					 DMA_FROM_DEVICE);
+	if (hwpm->mem_mgmt->stream_sgt &&
+		(!IS_ERR(hwpm->mem_mgmt->stream_sgt))) {
+		dma_buf_unmap_attachment(hwpm->mem_mgmt->stream_attach,
+			hwpm->mem_mgmt->stream_sgt, DMA_FROM_DEVICE);
 	}
-	hwpm->stream_sgt = NULL;
+	hwpm->mem_mgmt->stream_sgt = NULL;
 
-	if (hwpm->stream_attach && (!IS_ERR(hwpm->stream_attach))) {
-		dma_buf_detach(hwpm->stream_dma_buf, hwpm->stream_attach);
+	if (hwpm->mem_mgmt->stream_attach &&
+		(!IS_ERR(hwpm->mem_mgmt->stream_attach))) {
+		dma_buf_detach(hwpm->mem_mgmt->stream_dma_buf,
+			hwpm->mem_mgmt->stream_attach);
 	}
-	hwpm->stream_attach = NULL;
+	hwpm->mem_mgmt->stream_attach = NULL;
+	hwpm->mem_mgmt->stream_buf_size = 0ULL;
+	hwpm->mem_mgmt->stream_buf_va = 0ULL;
 
-	if (hwpm->stream_dma_buf && (!IS_ERR(hwpm->stream_dma_buf))) {
-		dma_buf_put(hwpm->stream_dma_buf);
+	if (hwpm->mem_mgmt->stream_dma_buf &&
+		(!IS_ERR(hwpm->mem_mgmt->stream_dma_buf))) {
+		dma_buf_put(hwpm->mem_mgmt->stream_dma_buf);
 	}
-	hwpm->stream_dma_buf = NULL;
+	hwpm->mem_mgmt->stream_dma_buf = NULL;
 
-	if (hwpm->mem_bytes_kernel) {
-		dma_buf_vunmap(hwpm->mem_bytes_dma_buf,
-			       hwpm->mem_bytes_kernel);
-		hwpm->mem_bytes_kernel = NULL;
+	if (hwpm->mem_mgmt->mem_bytes_kernel) {
+		dma_buf_vunmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
+			       hwpm->mem_mgmt->mem_bytes_kernel);
+		hwpm->mem_mgmt->mem_bytes_kernel = NULL;
 	}
 
-	if (hwpm->mem_bytes_sgt && (!IS_ERR(hwpm->mem_bytes_sgt))) {
-		dma_buf_unmap_attachment(hwpm->mem_bytes_attach,
-					 hwpm->mem_bytes_sgt,
-					 DMA_FROM_DEVICE);
+	if (hwpm->mem_mgmt->mem_bytes_sgt &&
+		(!IS_ERR(hwpm->mem_mgmt->mem_bytes_sgt))) {
+		dma_buf_unmap_attachment(hwpm->mem_mgmt->mem_bytes_attach,
+			hwpm->mem_mgmt->mem_bytes_sgt, DMA_FROM_DEVICE);
 	}
-	hwpm->mem_bytes_sgt = NULL;
+	hwpm->mem_mgmt->mem_bytes_sgt = NULL;
+	hwpm->mem_mgmt->mem_bytes_buf_va = 0ULL;
 
-	if (hwpm->mem_bytes_attach && (!IS_ERR(hwpm->mem_bytes_attach))) {
-		dma_buf_detach(hwpm->mem_bytes_dma_buf, hwpm->mem_bytes_attach);
+	if (hwpm->mem_mgmt->mem_bytes_attach &&
+		(!IS_ERR(hwpm->mem_mgmt->mem_bytes_attach))) {
+		dma_buf_detach(hwpm->mem_mgmt->mem_bytes_dma_buf,
+			hwpm->mem_mgmt->mem_bytes_attach);
 	}
-	hwpm->mem_bytes_attach = NULL;
+	hwpm->mem_mgmt->mem_bytes_attach = NULL;
 
-	if (hwpm->mem_bytes_dma_buf && (!IS_ERR(hwpm->mem_bytes_dma_buf))) {
-		dma_buf_put(hwpm->mem_bytes_dma_buf);
+	if (hwpm->mem_mgmt->mem_bytes_dma_buf &&
+		(!IS_ERR(hwpm->mem_mgmt->mem_bytes_dma_buf))) {
+		dma_buf_put(hwpm->mem_mgmt->mem_bytes_dma_buf);
 	}
-	hwpm->mem_bytes_dma_buf = NULL;
+	hwpm->mem_mgmt->mem_bytes_dma_buf = NULL;
 
 	return 0;
 }
@@ -155,6 +174,17 @@ int tegra_hwpm_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	int ret = 0, err = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
+
+	if (hwpm->mem_mgmt == NULL) {
+		/* Allocate tegra_hwpm_mem_mgmt */
+		hwpm->mem_mgmt = tegra_hwpm_kzalloc(hwpm,
+			sizeof(struct tegra_hwpm_mem_mgmt));
+		if (!hwpm->mem_mgmt) {
+			tegra_hwpm_err(NULL,
+				"Couldn't allocate memory for mem_mgmt struct");
+			return -ENOMEM;
+		}
+	}
 
 	/* Memory map stream buffer */
 	ret = tegra_hwpm_dma_map_stream_buffer(hwpm, alloc_pma_stream);
@@ -171,7 +201,7 @@ int tegra_hwpm_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	}
 
 	/* Configure memory management */
-	ret = hwpm->active_chip->enable_mem_mgmt(hwpm, alloc_pma_stream);
+	ret = hwpm->active_chip->enable_mem_mgmt(hwpm);
 	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to configure stream memory");
 		goto fail;
@@ -200,6 +230,8 @@ fail:
 		tegra_hwpm_err(hwpm, "Failed to reset stream buffer");
 	}
 
+	tegra_hwpm_release_mem_mgmt(hwpm);
+
 	return ret;
 }
 
@@ -210,10 +242,11 @@ int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm)
 	tegra_hwpm_fn(hwpm, " ");
 
 	/* Stream MEM_BYTES to clear pipeline */
-	if (hwpm->mem_bytes_kernel) {
+	if (hwpm->mem_mgmt->mem_bytes_kernel) {
 		s32 timeout_msecs = 1000;
 		u32 sleep_msecs = 100;
-		u32 *mem_bytes_kernel_u32 = (u32 *)(hwpm->mem_bytes_kernel);
+		u32 *mem_bytes_kernel_u32 =
+			(u32 *)(hwpm->mem_mgmt->mem_bytes_kernel);
 
 		do {
 			ret = hwpm->active_chip->stream_mem_bytes(hwpm);
@@ -265,6 +298,12 @@ int tegra_hwpm_update_mem_bytes(struct tegra_soc_hwpm *hwpm,
 
 	tegra_hwpm_fn(hwpm, " ");
 
+	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
+		tegra_hwpm_err(hwpm,
+			"mem_bytes buffer is not mapped in the driver");
+		return -ENXIO;
+	}
+
 	/* Update SW get pointer */
 	ret = hwpm->active_chip->update_mem_bytes_get_ptr(hwpm,
 		update_get_put->mem_bump);
@@ -306,12 +345,8 @@ int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 {
 	int err = 0;
 	u64 pinned_pages = 0;
-	u64 page_idx = 0;
 	u64 alist_buf_size = 0;
-	u64 num_pages = 0;
 	u64 *full_alist_u64 = NULL;
-	void *full_alist = NULL;
-	struct page **pages = NULL;
 	struct tegra_soc_hwpm_query_allowlist *query_allowlist =
 			(struct tegra_soc_hwpm_query_allowlist *)ioctl_struct;
 	unsigned long user_va = (unsigned long)(query_allowlist->allowlist);
@@ -319,13 +354,25 @@ int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	if (hwpm->full_alist_size == 0ULL) {
+	if (hwpm->alist_map->full_alist_size == 0ULL) {
 		tegra_hwpm_err(hwpm, "Invalid allowlist size");
 		return -EINVAL;
 	}
 
-	alist_buf_size = tegra_hwpm_safe_mult_u64(hwpm->full_alist_size,
-		hwpm->active_chip->get_alist_buf_size(hwpm));
+	if (hwpm->alist_map == NULL) {
+		/* Allocate tegra_hwpm_allowlist_map */
+		hwpm->alist_map = tegra_hwpm_kzalloc(hwpm,
+			sizeof(struct tegra_hwpm_allowlist_map));
+		if (!hwpm->alist_map) {
+			tegra_hwpm_err(NULL,
+				"Couldn't allocate allowlist map structure");
+			return -ENOMEM;
+		}
+	}
+
+	alist_buf_size =
+		tegra_hwpm_safe_mult_u64(hwpm->alist_map->full_alist_size,
+			hwpm->active_chip->get_alist_buf_size(hwpm));
 
 	tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_allowlist,
 		"alist_buf_size 0x%llx", alist_buf_size);
@@ -336,54 +383,72 @@ int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 	/* Round-up and Divide */
 	alist_buf_size = tegra_hwpm_safe_sub_u64(
 		tegra_hwpm_safe_add_u64(alist_buf_size, PAGE_SIZE), 1ULL);
-	num_pages = alist_buf_size / PAGE_SIZE;
+	hwpm->alist_map->num_pages = alist_buf_size / PAGE_SIZE;
 
-	pages = tegra_hwpm_kcalloc(hwpm, num_pages, sizeof(*pages));
-	if (!pages) {
+	hwpm->alist_map->pages = (struct page **)tegra_hwpm_kcalloc(
+		hwpm, hwpm->alist_map->num_pages, sizeof(struct page *));
+	if (!hwpm->alist_map->pages) {
 		tegra_hwpm_err(hwpm,
 			"Couldn't allocate memory for pages array");
 		err = -ENOMEM;
-		goto alist_unmap;
+		goto fail;
 	}
 
-	pinned_pages = get_user_pages(user_va & PAGE_MASK, num_pages, 0,
-				pages, NULL);
-	if (pinned_pages != num_pages) {
+	pinned_pages = get_user_pages(user_va & PAGE_MASK,
+		hwpm->alist_map->num_pages, 0, hwpm->alist_map->pages, NULL);
+	if (pinned_pages != hwpm->alist_map->num_pages) {
 		tegra_hwpm_err(hwpm, "Requested %llu pages / Got %ld pages",
-				num_pages, pinned_pages);
+			hwpm->alist_map->num_pages, pinned_pages);
 		err = -ENOMEM;
-		goto alist_unmap;
+		goto fail;
 	}
 
-	full_alist = vmap(pages, num_pages, VM_MAP, PAGE_KERNEL);
-	if (!full_alist) {
-		tegra_hwpm_err(hwpm, "Couldn't map allowlist buffer into"
-				   " kernel address space");
+	hwpm->alist_map->full_alist_map = vmap(hwpm->alist_map->pages,
+		hwpm->alist_map->num_pages, VM_MAP, PAGE_KERNEL);
+	if (!hwpm->alist_map->full_alist_map) {
+		tegra_hwpm_err(hwpm,
+			"Couldn't map allowlist buffer in kernel addr space");
 		err = -ENOMEM;
-		goto alist_unmap;
+		goto fail;
 	}
-	full_alist_u64 = (u64 *)(full_alist + offset);
+	full_alist_u64 = (u64 *)(hwpm->alist_map->full_alist_map + offset);
 
 	err = tegra_hwpm_combine_alist(hwpm, full_alist_u64);
 	if (err != 0) {
-		goto alist_unmap;
+		goto fail;
 	}
 
-	query_allowlist->allowlist_size = hwpm->full_alist_size;
+	query_allowlist->allowlist_size = hwpm->alist_map->full_alist_size;
 	return 0;
 
-alist_unmap:
-	if (full_alist)
-		vunmap(full_alist);
-	if (pinned_pages > 0) {
-		for (page_idx = 0ULL; page_idx < pinned_pages; page_idx++) {
-			set_page_dirty(pages[page_idx]);
-			put_page(pages[page_idx]);
-		}
-	}
-	if (pages) {
-		tegra_hwpm_kfree(hwpm, pages);
+fail:
+	tegra_hwpm_release_alist_map(hwpm);
+	return err;
+}
+
+void tegra_hwpm_release_alist_map(struct tegra_soc_hwpm *hwpm)
+{
+	u64 idx = 0U;
+
+	if (hwpm->alist_map->full_alist_map) {
+		vunmap(hwpm->alist_map->full_alist_map);
 	}
 
-	return err;
+	for (idx = 0ULL; idx < hwpm->alist_map->num_pages; idx++) {
+		set_page_dirty(hwpm->alist_map->pages[idx]);
+		put_page(hwpm->alist_map->pages[idx]);
+	}
+
+	if (hwpm->alist_map->pages) {
+		tegra_hwpm_kfree(hwpm, hwpm->alist_map->pages);
+	}
+
+	if (hwpm->alist_map) {
+		tegra_hwpm_kfree(hwpm, hwpm->alist_map);
+	}
+}
+
+void tegra_hwpm_release_mem_mgmt(struct tegra_soc_hwpm *hwpm)
+{
+	tegra_hwpm_kfree(hwpm, hwpm->mem_mgmt);
 }
