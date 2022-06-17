@@ -229,7 +229,7 @@ send_msg(struct comm_channel_ctx_t *comm_ctx, struct comm_msg *msg)
 }
 
 int
-comm_channel_bootstrap_msg_send(void *comm_channel_h, struct comm_msg *msg)
+comm_channel_ctrl_msg_send(void *comm_channel_h, struct comm_msg *msg)
 {
 	struct comm_channel_ctx_t *comm_ctx =
 				(struct comm_channel_ctx_t *)comm_channel_h;
@@ -237,35 +237,18 @@ comm_channel_bootstrap_msg_send(void *comm_channel_h, struct comm_msg *msg)
 	if (WARN_ON(!comm_ctx || !msg))
 		return -EINVAL;
 
-	if (WARN_ON(msg->type != COMM_MSG_TYPE_BOOTSTRAP))
+	if (WARN_ON(msg->type != COMM_MSG_TYPE_BOOTSTRAP &&
+		    msg->type != COMM_MSG_TYPE_EDMA_RX_DESC_IOVA_RETURN &&
+		    msg->type != COMM_MSG_TYPE_SHUTDOWN &&
+		    msg->type != COMM_MSG_TYPE_LINK))
 		return -EINVAL;
 
 	/*
-	 * this is a special one-time message where the sender: @DRV_MODE_EPC
-	 * shares it's own iova with @DRV_MODE_EPF for @DRV_MODE_EPF CPU
-	 * access towards @DRV_MODE_EPC. We do not check for PCIe link here
-	 * and therefore must be send by @DRV_MODE_EPC only when @DRV_MODE_EPF
-	 * has initialized it's own comm-channel interface (during _bind() api).
-	 */
-
-	return send_msg(comm_ctx, msg);
-}
-
-int
-comm_channel_edma_rx_desc_iova_send(void *comm_channel_h, struct comm_msg *msg)
-{
-	struct comm_channel_ctx_t *comm_ctx =
-				(struct comm_channel_ctx_t *)comm_channel_h;
-
-	if (WARN_ON(!comm_ctx || !msg))
-		return -EINVAL;
-
-	if (WARN_ON(msg->type != COMM_MSG_TYPE_EDMA_RX_DESC_IOVA_RETURN))
-		return -EINVAL;
-
-	/*
-	 * this is a special one-time message where the sender: @DRV_MODE_EPF
-	 * shares it's iova of edma rx descriptors to peer x86 @DRV_MODE_EPC
+	 * this is a special ctrl message where the sender: @DRV_MODE_EPC
+	 * or @DRV_MODE_EPF shares control information with peer. We do not
+	 * check for nvscic2c-pcie link status as these messages can flow
+	 * even when nvscic2c-pcie link status is down but possibly with
+	 * PCIE physical link between PCIe RP SoC and PCIe EP SoC alive.
 	 */
 
 	return send_msg(comm_ctx, msg);
@@ -281,9 +264,8 @@ comm_channel_msg_send(void *comm_channel_h, struct comm_msg *msg)
 	if (WARN_ON(!comm_ctx || !msg))
 		return -EINVAL;
 
-	if (WARN_ON(msg->type <= COMM_MSG_TYPE_INVALID ||
-		    msg->type >= COMM_MSG_TYPE_MAXIMUM ||
-		    msg->type == COMM_MSG_TYPE_BOOTSTRAP))
+	if (WARN_ON(msg->type != COMM_MSG_TYPE_REGISTER &&
+		    msg->type != COMM_MSG_TYPE_UNREGISTER))
 		return -EINVAL;
 
 	link = pci_client_query_link_status(comm_ctx->pci_client_h);

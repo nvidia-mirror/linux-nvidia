@@ -766,7 +766,7 @@ stream_extension_init(struct stream_ext_params *params, void **stream_ext_h)
 	return 0;
 }
 
-#define MAX_TRANSFER_TIMEOUT_MS	(5000)
+#define MAX_TRANSFER_TIMEOUT_MSEC	(5000)
 void
 stream_extension_deinit(void **stream_ext_h)
 {
@@ -780,12 +780,14 @@ stream_extension_deinit(void **stream_ext_h)
 	if (!ctx)
 		return;
 
-	/* wait for any on-going eDMA/copy(ies). */
-	ret = wait_event_timeout(ctx->transfer_waitq,
-				 !(atomic_read(&ctx->transfer_count)),
-				 msecs_to_jiffies(MAX_TRANSFER_TIMEOUT_MS));
+	/* wait for eDMA/copy(ies) to complete/abort. */
+	ret =
+	wait_event_timeout(ctx->transfer_waitq,
+			   !(atomic_read(&ctx->transfer_count)),
+			   msecs_to_jiffies(MAX_TRANSFER_TIMEOUT_MSEC));
 	if (ret <= 0)
-		pr_err("eDMA transfers are still in progress\n");
+		pr_err("(%s): timed-out waiting for eDMA callbacks to return\n",
+		       ctx->ep_name);
 
 	mutex_lock(&ctx->free_lock);
 	list_for_each_safe(curr, next, &ctx->free_list) {
@@ -804,8 +806,10 @@ stream_extension_deinit(void **stream_ext_h)
 	list_for_each_safe(curr, next, &ctx->obj_list) {
 		stream_obj = list_entry(curr, struct stream_ext_obj, node);
 		filep = fget(stream_obj->handle);
-		filep->private_data = NULL;
-		fput(filep);
+		if (filep) {
+			filep->private_data = NULL;
+			fput(filep);
+		}
 		list_del(curr);
 		stream_obj->marked_for_del = true;
 		kref_put(&stream_obj->refcount, streamobj_free);
@@ -951,8 +955,8 @@ callback_edma_xfer(void *priv, edma_xfer_status_t status,
 	list_add_tail(&cr->node, &cr->ctx->free_list);
 	mutex_unlock(&cr->ctx->free_lock);
 
-	atomic_dec(&cr->ctx->transfer_count);
-	wake_up_all(&cr->ctx->transfer_waitq);
+	if (atomic_dec_and_test(&cr->ctx->transfer_count))
+		wake_up_all(&cr->ctx->transfer_waitq);
 }
 
 static int

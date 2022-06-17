@@ -103,7 +103,7 @@ struct endpoint_t {
 	struct pci_aper_t peer_mem;
 
 	/* poll/notifications.*/
-	wait_queue_head_t waitq;
+	wait_queue_head_t poll_waitq;
 
 	/* syncpoint shim for notifications (rx). */
 	struct syncpt_t syncpt;
@@ -126,6 +126,13 @@ struct endpoint_t {
 	atomic_t in_use;
 	wait_queue_head_t close_waitq;
 
+	/* when the endpoints are undergoing shutdown.*/
+	atomic_t shutdown;
+
+	/* signal eps driver context on ep in use.*/
+	atomic_t *eps_in_use;
+	wait_queue_head_t *eps_close_waitq;
+
 	/* pci client handle.*/
 	void *pci_client_h;
 
@@ -136,6 +143,8 @@ struct endpoint_t {
 
 /* Overall context for the endpoint sub-module of  nvscic2c-pcie driver.*/
 struct endpoint_drv_ctx_t {
+	char drv_name[NAME_MAX];
+
 	/* entire char device region allocated for all endpoints.*/
 	dev_t char_dev;
 
@@ -148,6 +157,10 @@ struct endpoint_drv_ctx_t {
 
 	/* nvscic2c-pcie DT node reference, used in getting syncpoint shim. */
 	struct device_node *of_node;
+
+	/* total count of endpoints opened/in-use.*/
+	atomic_t eps_in_use;
+	wait_queue_head_t eps_close_waitq;
 };
 
 /*
@@ -190,15 +203,23 @@ endpoint_fops_open(struct inode *inode, struct file *filp)
 
 	mutex_lock(&endpoint->fops_lock);
 
-	link = pci_client_query_link_status(endpoint->pci_client_h);
-	if (link != NVSCIC2C_PCIE_LINK_UP) {
-		mutex_unlock(&endpoint->fops_lock);
-		return -ENOLINK;
-	}
 	if (atomic_read(&endpoint->in_use)) {
 		/* already in use.*/
-		mutex_unlock(&endpoint->fops_lock);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto err;
+	}
+
+	if (atomic_read(&endpoint->shutdown)) {
+		/* do not open when module is undergoing shutdown.*/
+		ret = -ESHUTDOWN;
+		goto err;
+	}
+
+	link = pci_client_query_link_status(endpoint->pci_client_h);
+	if (link != NVSCIC2C_PCIE_LINK_UP) {
+		/* do not open when link is not established.*/
+		ret = -ENOLINK;
+		goto err;
 	}
 
 	/* create stream extension handle.*/
@@ -215,6 +236,12 @@ endpoint_fops_open(struct inode *inode, struct file *filp)
 
 	atomic_set(&endpoint->in_use, 1);
 	filp->private_data = endpoint;
+
+	/*
+	 * increment the total opened endpoints in endpoint_drv_ctx_t.
+	 * Doesn't need to be guarded in lock, atomic variable.
+	 */
+	atomic_inc(endpoint->eps_in_use);
 err:
 	mutex_unlock(&endpoint->fops_lock);
 	return ret;
@@ -232,10 +259,11 @@ endpoint_fops_release(struct inode *inode, struct file *filp)
 
 	mutex_lock(&endpoint->fops_lock);
 	filp->private_data = NULL;
-	atomic_set(&endpoint->in_use, 0);
 	disable_event_handling(endpoint);
 	stream_extension_deinit(&endpoint->stream_ext_h);
-	wake_up_interruptible_all(&endpoint->close_waitq);
+	atomic_set(&endpoint->in_use, 0);
+	if (atomic_dec_and_test(endpoint->eps_in_use))
+		wake_up_interruptible_all(endpoint->eps_close_waitq);
 	mutex_unlock(&endpoint->fops_lock);
 
 	return ret;
@@ -326,7 +354,7 @@ exit:
  *
  * If we are able to read(), write() or there is a pending state change event
  * to be serviced, we return letting application call get_event(), otherwise
- * kernel f/w will wait for waitq activity to occur.
+ * kernel f/w will wait for poll_waitq activity to occur.
  */
 static __poll_t
 endpoint_fops_poll(struct file *filp, poll_table *wait)
@@ -344,7 +372,7 @@ endpoint_fops_poll(struct file *filp, poll_table *wait)
 	}
 
 	/* add all waitq if they are different for read, write & link+state.*/
-	poll_wait(filp, &endpoint->waitq, wait);
+	poll_wait(filp, &endpoint->poll_waitq, wait);
 
 	/*
 	 * wake up read, write (& exception - those who want to use) fd on
@@ -510,7 +538,7 @@ link_event_callback(void *data, void *ctx)
 	/* notify only if the endpoint was openend.*/
 	if (atomic_read(&endpoint->event_handling)) {
 		atomic_inc(&endpoint->linkevent_count);
-		wake_up_interruptible_all(&endpoint->waitq);
+		wake_up_interruptible_all(&endpoint->poll_waitq);
 	}
 }
 
@@ -543,7 +571,7 @@ syncpt_callback(void *data)
 	/* notify only if the endpoint was openend - else drain.*/
 	if (atomic_read(&endpoint->event_handling)) {
 		atomic_inc(&endpoint->dataevent_count);
-		wake_up_interruptible_all(&endpoint->waitq);
+		wake_up_interruptible_all(&endpoint->poll_waitq);
 	}
 
 	/* look for next increment. */
@@ -794,14 +822,6 @@ remove_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 	if (!eps_ctx || !endpoint)
 		return ret;
 
-	/* allow, open() or close() to complete.*/
-	mutex_lock(&endpoint->fops_lock);
-	mutex_unlock(&endpoint->fops_lock);
-
-	/* wait for user-land to close the device.*/
-	wait_event_interruptible(endpoint->close_waitq,
-				 !(atomic_read(&endpoint->in_use)));
-
 	pci_client_unregister_for_link_event(endpoint->pci_client_h,
 					     endpoint->linkevent_id);
 	free_syncpoint(eps_ctx, endpoint);
@@ -811,7 +831,6 @@ remove_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 		cdev_del(&endpoint->cdev);
 		endpoint->device = NULL;
 	}
-	atomic_set(&endpoint->in_use, 0);
 	mutex_destroy(&endpoint->fops_lock);
 	return ret;
 }
@@ -831,7 +850,8 @@ create_endpoint_device(struct endpoint_drv_ctx_t *eps_ctx,
 	/* initialise the endpoint internals.*/
 	mutex_init(&endpoint->fops_lock);
 	atomic_set(&endpoint->in_use, 0);
-	init_waitqueue_head(&endpoint->waitq);
+	atomic_set(&endpoint->shutdown, 0);
+	init_waitqueue_head(&endpoint->poll_waitq);
 	init_waitqueue_head(&endpoint->close_waitq);
 
 	/* create the nvscic2c endpoint char device.*/
@@ -913,6 +933,9 @@ endpoints_setup(struct driver_ctx_t *drv_ctx, void **endpoints_h)
 		    drv_ctx->drv_param.nr_endpoint > MAX_ENDPOINTS))
 		return -EINVAL;
 
+	if (WARN_ON(strlen(drv_ctx->drv_name) > (NAME_MAX - 1)))
+		return -EINVAL;
+
 	/* start by allocating the endpoint driver (global for all eps) ctx.*/
 	eps_ctx = kzalloc(sizeof(*eps_ctx), GFP_KERNEL);
 	if (WARN_ON(!eps_ctx))
@@ -920,14 +943,16 @@ endpoints_setup(struct driver_ctx_t *drv_ctx, void **endpoints_h)
 
 	eps_ctx->nr_endpoint = drv_ctx->drv_param.nr_endpoint;
 	eps_ctx->of_node = drv_ctx->drv_param.of_node;
+	strcpy(eps_ctx->drv_name, drv_ctx->drv_name);
+	init_waitqueue_head(&eps_ctx->eps_close_waitq);
 
 	/* allocate the whole chardev range */
 	ret = alloc_chrdev_region(&eps_ctx->char_dev, 0,
-				  eps_ctx->nr_endpoint, drv_ctx->drv_name);
+				  eps_ctx->nr_endpoint, eps_ctx->drv_name);
 	if (ret < 0)
 		goto err;
 
-	eps_ctx->class = class_create(THIS_MODULE, drv_ctx->drv_name);
+	eps_ctx->class = class_create(THIS_MODULE, eps_ctx->drv_name);
 	if (IS_ERR_OR_NULL(eps_ctx->class)) {
 		ret = PTR_ERR(eps_ctx->class);
 		goto err;
@@ -954,6 +979,8 @@ endpoints_setup(struct driver_ctx_t *drv_ctx, void **endpoints_h)
 		endpoint->nframes = ep_prop->nframes;
 		endpoint->frame_sz = ep_prop->frame_sz;
 		endpoint->pci_client_h = drv_ctx->pci_client_h;
+		endpoint->eps_in_use = &eps_ctx->eps_in_use;
+		endpoint->eps_close_waitq = &eps_ctx->eps_close_waitq;
 		/* set index of the msi-x interruper vector
 		 * where the first one is reserved for comm-channel
 		 */
@@ -982,6 +1009,65 @@ err:
 	return ret;
 }
 
+/* Exit point for nvscic2c-pcie endpoints: Wait for all endpoints to close.*/
+#define MAX_WAITFOR_CLOSE_TIMEOUT_MSEC	(5000)
+int
+endpoints_waitfor_close(void *endpoints_h)
+{
+	u32 i = 0;
+	int ret = 0;
+	long timeout = 0;
+	struct endpoint_drv_ctx_t *eps_ctx =
+				 (struct endpoint_drv_ctx_t *)endpoints_h;
+
+	if (!eps_ctx || !eps_ctx->endpoints)
+		return ret;
+
+	/*
+	 * Signal all endpoints about exit/shutdown. This also doesn't
+	 * allow them to be opened again unless reinitialized.
+	 */
+	for (i = 0; i < eps_ctx->nr_endpoint; i++) {
+		struct endpoint_t *endpoint = &eps_ctx->endpoints[i];
+
+		atomic_set(&endpoint->shutdown, 1);
+
+		/* allow fops_open() or fops_release() to complete.*/
+		mutex_lock(&endpoint->fops_lock);
+		mutex_unlock(&endpoint->fops_lock);
+	}
+
+	/* wait for endpoints to be closed. */
+	while (timeout == 0) {
+		timeout = wait_event_interruptible_timeout
+				(eps_ctx->eps_close_waitq,
+				 !(atomic_read(&eps_ctx->eps_in_use)),
+				 msecs_to_jiffies(MAX_WAITFOR_CLOSE_TIMEOUT_MSEC));
+
+		for (i = 0; i < eps_ctx->nr_endpoint; i++) {
+			struct endpoint_t *endpoint = &eps_ctx->endpoints[i];
+
+			if (atomic_read(&endpoint->in_use)) {
+				if (timeout == -ERESTARTSYS) {
+					ret = timeout;
+					pr_err("(%s): Wait for endpoint:(%s) close - Interrupted\n",
+					       eps_ctx->drv_name, endpoint->name);
+				} else if (timeout == 0) {
+					pr_err("(%s): Still waiting for endpoint:(%s) to close\n",
+					       eps_ctx->drv_name, endpoint->name);
+				} else {
+					/* erroneous case - should not happen.*/
+					ret = -EFAULT;
+					pr_err("(%s): Error: Endpoint: (%s) is still open\n",
+					       eps_ctx->drv_name, endpoint->name);
+				}
+			}
+		}
+	}
+
+	return ret;
+}
+
 /* exit point for nvscic2c-pcie endpoints char device sub-module/abstraction.*/
 int
 endpoints_release(void **endpoints_h)
@@ -992,6 +1078,11 @@ endpoints_release(void **endpoints_h)
 				 (struct endpoint_drv_ctx_t *)(*endpoints_h);
 	if (!eps_ctx)
 		return ret;
+
+	/* all endpoints must be closed.*/
+	if (atomic_read(&eps_ctx->eps_in_use))
+		pr_err("(%s): Unexpected. Endpoint(s) are still in-use.\n",
+		       eps_ctx->drv_name);
 
 	/* remove all the endpoints char devices.*/
 	if (eps_ctx->endpoints) {

@@ -29,14 +29,11 @@ struct driver_ctx_t;
 int
 endpoints_setup(struct driver_ctx_t *drv_ctx, void **endpoints_h);
 
+/* Exit point for nvscic2c-pcie endpoints: Wait for all endpoints to close.*/
+int
+endpoints_waitfor_close(void *endpoints_h);
+
 /* exit point for nvscic2c-pcie endpoints char device sub-module/abstraction.*/
 int
 endpoints_release(void **endpoints_h);
-
-/*
- * Wait for ack from user space process for PCIe link status change.
- * Deinit edma handle with stream-extension.
- */
-int
-endpoints_core_deinit(void *endpoints_h);
 #endif /*__ENDPOINT_H__ */

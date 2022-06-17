@@ -174,7 +174,7 @@ pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
 	ret = pci_client_map_addr(ctx, ctx->edma_ch_desc_iova,
 				  phys_addr, 60 * SZ_1K, prot);
 	if (ret) {
-		pr_err("ci client failed to map iova to 60K physical backing\n");
+		pr_err("pci client failed to map iova to 60K physical backing\n");
 		return ret;
 	}
 	ctx->edma_ch_desc_iova_mapped = true;
@@ -655,13 +655,15 @@ pci_client_raise_irq(void *pci_client_h, enum pci_epc_irq_type type, u16 num)
 	drv_ctx = pci_client_ctx->drv_ctx;
 	if (WARN_ON(!drv_ctx))
 		return -EINVAL;
-	epf_ctx = (struct epf_context_t *)drv_ctx->epf_ctx;
+
+	epf_ctx = drv_ctx->epf_ctx;
 	if (WARN_ON(!epf_ctx))
 		return -EINVAL;
 	if (WARN_ON(!epf_ctx->epf))
 		return -EINVAL;
 	if (WARN_ON(drv_ctx->drv_mode != DRV_MODE_EPF))
 		return -EINVAL;
+
 	ret = pci_epc_raise_irq(epf_ctx->epf->epc, epf_ctx->epf->func_no, type, num);
 	return ret;
 }

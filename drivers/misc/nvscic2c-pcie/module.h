@@ -19,6 +19,7 @@
 #ifndef __MODULE_H__
 #define __MODULE_H__
 
+#include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/types.h>
 #include <linux/pci-epc.h>
@@ -83,6 +84,25 @@ struct driver_param_t {
 	} endpoint_props[MAX_ENDPOINTS];
 };
 
+/* nvscic2c-pcie epf specific context. */
+struct epf_context_t {
+	bool notifier_registered;
+	struct pci_epf_header header;
+	struct pci_epf *epf;
+	void *drv_ctx;
+	struct work_struct initialization_work;
+	struct work_struct deinitialization_work;
+	atomic_t core_initialized;
+	atomic_t epf_initialized;
+	wait_queue_head_t core_initialized_waitq;
+};
+
+/* nvscic2c-pcie epc specific context. */
+struct epc_context_t {
+	struct completion epf_ready_cmpl;
+	struct completion epf_shutdown_cmpl;
+};
+
 /*
  * nvscic2c-pcie module context.
  * Contains all the information for all
@@ -126,22 +146,13 @@ struct driver_ctx_t {
 	/* endpoint absraction handle.*/
 	void *endpoints_h;
 
-	/* EPF specific.*/
-	void *epf_ctx;
+	/* DRV_MODE specific.*/
+	struct epf_context_t *epf_ctx;
+	struct epc_context_t *epc_ctx;
+
 	/* peer cpu */
 	enum peer_cpu_t  peer_cpu;
 
-};
-
-/* nvscic2c-pcie epf specific context. */
-struct epf_context_t {
-	bool notifier_registered;
-	struct pci_epf_header header;
-	struct pci_epf *epf;
-	void *drv_ctx;
-	struct work_struct initialization_work;
-	atomic_t initialized;
-	wait_queue_head_t initialized_waitq;
 };
 
 /*

@@ -44,6 +44,12 @@ enum comm_msg_type {
 	/* return edma rx descriptor iova to peer x86 */
 	COMM_MSG_TYPE_EDMA_RX_DESC_IOVA_RETURN,
 
+	/*
+	 * One time message from peer @DRV_MODE_EPC (PCIe RP) towards
+	 * @DRV_MODE_EPF(PCIe EP) for initiating shutdown.
+	 */
+	COMM_MSG_TYPE_SHUTDOWN,
+
 	/* Maximum. */
 	COMM_MSG_TYPE_MAXIMUM,
 };
@@ -118,7 +124,7 @@ int
 comm_channel_msg_send(void *comm_channel_h, struct comm_msg *msg);
 
 int
-comm_channel_bootstrap_msg_send(void *comm_channel_h, struct comm_msg *msg);
+comm_channel_ctrl_msg_send(void *comm_channel_h, struct comm_msg *msg);
 
 int
 comm_channel_register_msg_cb(void *comm_channel_h, enum comm_msg_type type,

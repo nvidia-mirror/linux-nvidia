@@ -152,7 +152,7 @@ assign_outbound_area(struct pci_dev *pdev, size_t win_size,
 	return ret;
 }
 
-/* Handle link message from @DRV_MODE_EPC. */
+/* Handle link message from @DRV_MODE_EPF. */
 static void
 link_msg_cb(void *data, void *ctx)
 {
@@ -162,14 +162,34 @@ link_msg_cb(void *data, void *ctx)
 	if (WARN_ON(!msg || !drv_ctx))
 		return;
 
+	if (msg->u.link.status == NVSCIC2C_PCIE_LINK_UP) {
+		complete_all(&drv_ctx->epc_ctx->epf_ready_cmpl);
+	} else if (msg->u.link.status == NVSCIC2C_PCIE_LINK_DOWN) {
+		complete_all(&drv_ctx->epc_ctx->epf_shutdown_cmpl);
+	} else {
+		pr_err("(%s): spurious link message received from EPF\n",
+		       drv_ctx->drv_name);
+		return;
+	}
+
 	/* inidicate link status to application.*/
 	pci_client_change_link_status(drv_ctx->pci_client_h,
 				      msg->u.link.status);
 }
 
+/*
+ * PCIe subsystem invokes .shutdown()/.remove() handler when the PCIe EP
+ * is hot-unplugged (gracefully) or @DRV_MODE_EPC(this) is unloaded while
+ * the PCIe link was still active or when PCIe EP goes abnormal shutdown/
+ * reboot.
+ */
+#define MAX_EPF_SHUTDOWN_TIMEOUT_MSEC	(5000)
 static void
 nvscic2c_pcie_epc_remove(struct pci_dev *pdev)
 {
+	int ret = 0;
+	long timeout = 0;
+	struct comm_msg msg = {0};
 	struct driver_ctx_t *drv_ctx = NULL;
 
 	if (!pdev)
@@ -179,11 +199,81 @@ nvscic2c_pcie_epc_remove(struct pci_dev *pdev)
 	if (!drv_ctx)
 		return;
 
+	/*
+	 * send link down message to EPF. EPF apps can stop processing when
+	 * they see this, else the EPF apps can continue processing as EPC
+	 * waits for its apps to close before sending SHUTDOWN msg.
+	 */
+	msg.type = COMM_MSG_TYPE_LINK;
+	msg.u.link.status = NVSCIC2C_PCIE_LINK_DOWN;
+	ret = comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg);
+	if (ret)
+		pr_err("(%s): Failed to send LINK(DOWN) message\n",
+		       drv_ctx->drv_name);
+
+	/* local apps can stop processing if they see this.*/
 	pci_client_change_link_status(drv_ctx->pci_client_h,
 				      NVSCIC2C_PCIE_LINK_DOWN);
+	/*
+	 * stop ongoing and pending edma xfers, this edma module shall not
+	 * accept new xfer submissions after this.
+	 */
+	edma_module_stop(drv_ctx);
+
+	/* wait for @DRV_MODE_EPC (local) endpoints to close. */
+	ret = endpoints_waitfor_close(drv_ctx->endpoints_h);
+	if (ret)
+		pr_err("(%s): Error waiting for endpoints to close\n",
+		       drv_ctx->drv_name);
+
+	/* if PCIe EP SoC went away abruptly already, jump to local deinit. */
+	if (!pci_device_is_present(pdev))
+		goto deinit;
+
+	/*
+	 * Wait for @DRV_MODE_EPF to ACK it's closure too.
+	 *
+	 * Before this @DRV_MODE_EPC(this) endpoints must be closed already
+	 * as @DRV_MODE_EPF in response to this msg shall free all it's
+	 * endpoint mappings.
+	 */
+	reinit_completion(&drv_ctx->epc_ctx->epf_shutdown_cmpl);
+	msg.type = COMM_MSG_TYPE_SHUTDOWN;
+	if (comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg)) {
+		pr_err("(%s): Failed to send shutdown message\n",
+		       drv_ctx->drv_name);
+		goto deinit;
+	}
+
+	while (timeout == 0) {
+		timeout = wait_for_completion_interruptible_timeout
+				(&drv_ctx->epc_ctx->epf_shutdown_cmpl,
+				 msecs_to_jiffies(MAX_EPF_SHUTDOWN_TIMEOUT_MSEC));
+		if (timeout == -ERESTARTSYS) {
+			pr_err("(%s): Wait for nvscic2c-pcie-epf to close - interrupted\n",
+			       drv_ctx->drv_name);
+		} else if (timeout == 0) {
+			/*
+			 * continue wait only if PCIe EP SoC is still there. It can
+			 * go away abruptly waiting for it's own endpoints to close.
+			 */
+			if (pci_device_is_present(pdev)) {
+				pr_err("(%s): Still waiting for nvscic2c-pcie-epf to close\n",
+				       drv_ctx->drv_name);
+			} else {
+				pr_debug("(%s): nvscic2c-pcie-epf went away\n",
+					 drv_ctx->drv_name);
+				break;
+			}
+		} else if (timeout > 0) {
+			pr_debug("(%s): nvscic2c-pcie-epf closed\n",
+				 drv_ctx->drv_name);
+		}
+	}
+
+deinit:
 	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
 				       COMM_MSG_TYPE_LINK);
-	edma_module_stop(drv_ctx);
 	endpoints_release(&drv_ctx->endpoints_h);
 	edma_module_deinit(drv_ctx);
 	vmap_deinit(&drv_ctx->vmap_h);
@@ -199,10 +289,12 @@ nvscic2c_pcie_epc_remove(struct pci_dev *pdev)
 	dt_release(&drv_ctx->drv_param);
 
 	pci_set_drvdata(pdev, NULL);
+	kfree(drv_ctx->epc_ctx);
 	kfree_const(drv_ctx->drv_name);
 	kfree(drv_ctx);
 }
 
+#define MAX_EPF_SETUP_TIMEOUT_MSEC	(5000)
 static int
 nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 			const struct pci_device_id *id)
@@ -211,8 +303,10 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 	char *name = NULL;
 	size_t win_size = 0;
 	struct comm_msg msg = {0};
+	unsigned long timeout = 0;
 	struct callback_ops cb_ops = {0};
 	struct driver_ctx_t *drv_ctx = NULL;
+	struct epc_context_t *epc_ctx = NULL;
 	struct pci_client_params params = {0};
 
 	/* allocate module context.*/
@@ -226,8 +320,18 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 
+	epc_ctx = kzalloc(sizeof(*epc_ctx), GFP_KERNEL);
+	if (WARN_ON(!epc_ctx)) {
+		kfree(name);
+		kfree(drv_ctx);
+		return -ENOMEM;
+	}
+	init_completion(&epc_ctx->epf_ready_cmpl);
+	init_completion(&epc_ctx->epf_shutdown_cmpl);
+
 	drv_ctx->drv_mode = DRV_MODE_EPC;
 	drv_ctx->drv_name = name;
+	drv_ctx->epc_ctx = epc_ctx;
 	pci_set_drvdata(pdev, drv_ctx);
 
 	/* check for the device tree node against this Id, must be only one.*/
@@ -256,7 +360,8 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 	params.peer_mem = &drv_ctx->peer_mem;
 	ret = pci_client_init(&params, &drv_ctx->pci_client_h);
 	if (ret) {
-		pr_err("pci_client_init() failed\n");
+		pr_err("(%s): pci_client_init() failed\n",
+		       drv_ctx->drv_name);
 		goto err_pci_client;
 	}
 	pci_client_save_driver_ctx(drv_ctx->pci_client_h, drv_ctx);
@@ -264,25 +369,29 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 
 	ret = comm_channel_init(drv_ctx, &drv_ctx->comm_channel_h);
 	if (ret) {
-		pr_err("Failed to initialize comm-channel\n");
+		pr_err("(%s): Failed to initialize comm-channel\n",
+		       drv_ctx->drv_name);
 		goto err_comm_init;
 	}
 
 	ret = vmap_init(drv_ctx, &drv_ctx->vmap_h);
 	if (ret) {
-		pr_err("Failed to initialize vmap\n");
+		pr_err("(%s): Failed to initialize vmap\n",
+		       drv_ctx->drv_name);
 		goto err_vmap_init;
 	}
 
 	ret = edma_module_init(drv_ctx);
 	if (ret) {
-		pr_err("Failed to initialize edma module\n");
+		pr_err("(%s): Failed to initialize edma module\n",
+		       drv_ctx->drv_name);
 		goto err_edma_init;
 	}
 
 	ret = endpoints_setup(drv_ctx, &drv_ctx->endpoints_h);
 	if (ret) {
-		pr_err("Failed to initialize endpoints\n");
+		pr_err("(%s): Failed to initialize endpoints\n",
+		       drv_ctx->drv_name);
 		goto err_endpoints_init;
 	}
 
@@ -292,7 +401,8 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 	ret = comm_channel_register_msg_cb(drv_ctx->comm_channel_h,
 					   COMM_MSG_TYPE_LINK, &cb_ops);
 	if (ret) {
-		pr_err("Failed to register for link message from EP\n");
+		pr_err("(%s): Failed to register for link message\n",
+		       drv_ctx->drv_name);
 		goto err_register_msg;
 	}
 
@@ -303,19 +413,35 @@ nvscic2c_pcie_epc_probe(struct pci_dev *pdev,
 	 * message shall send link-up message over comm-channel and possibly
 	 * applications can also start endpoint negotiation, therefore.
 	 */
+	reinit_completion(&drv_ctx->epc_ctx->epf_ready_cmpl);
 	msg.type = COMM_MSG_TYPE_BOOTSTRAP;
 	msg.u.bootstrap.iova = drv_ctx->self_mem.dma_handle;
 	msg.u.bootstrap.peer_cpu = NVCPU_ORIN;
-	ret = comm_channel_bootstrap_msg_send(drv_ctx->comm_channel_h, &msg);
+	ret = comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg);
 	if (ret) {
-		pr_err("Failed to send comm bootstrap message\n");
+		pr_err("(%s): Failed to send comm bootstrap message\n",
+		       drv_ctx->drv_name);
 		goto err_msg_send;
+	}
+
+	/* wait for @DRV_MODE_EPF to acknowledge it's endpoints are created.*/
+	timeout =
+	wait_for_completion_timeout(&drv_ctx->epc_ctx->epf_ready_cmpl,
+				    msecs_to_jiffies(MAX_EPF_SETUP_TIMEOUT_MSEC));
+	if (timeout == 0) {
+		ret = -ENOLINK;
+		pr_err("(%s): Timed-out waiting for nvscic2c-pcie-epf\n",
+		       drv_ctx->drv_name);
+		goto err_epf_ready;
 	}
 
 	pci_set_drvdata(pdev, drv_ctx);
 	return ret;
 
+err_epf_ready:
 err_msg_send:
+	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
+				       COMM_MSG_TYPE_LINK);
 err_register_msg:
 	endpoints_release(&drv_ctx->endpoints_h);
 
@@ -360,6 +486,7 @@ static struct pci_driver nvscic2c_pcie_epc_driver = {
 	.id_table	= nvscic2c_pcie_epc_tbl,
 	.probe		= nvscic2c_pcie_epc_probe,
 	.remove		= nvscic2c_pcie_epc_remove,
+	.shutdown	= nvscic2c_pcie_epc_remove,
 };
 module_pci_driver(nvscic2c_pcie_epc_driver);
 

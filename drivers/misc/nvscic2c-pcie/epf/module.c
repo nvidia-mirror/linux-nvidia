@@ -237,7 +237,7 @@ edma_rx_desc_iova_send(struct driver_ctx_t *drv_ctx)
 	msg.type = COMM_MSG_TYPE_EDMA_RX_DESC_IOVA_RETURN;
 	msg.u.edma_rx_desc_iova.iova = pci_client_get_edma_rx_desc_iova(drv_ctx->pci_client_h);
 
-	ret = comm_channel_edma_rx_desc_iova_send(drv_ctx->comm_channel_h, &msg);
+	ret = comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg);
 	if (ret)
 		pr_err("failed sending COMM_MSG_TYPE_EDMA_CH_DESC_IOVA_RETURN  message\n");
 }
@@ -248,7 +248,6 @@ bootstrap_msg_cb(void *data, void *ctx)
 {
 	int ret = 0;
 	struct driver_ctx_t *drv_ctx = NULL;
-	struct epf_context_t *epf_ctx = NULL;
 	struct pci_epf *epf = (struct pci_epf *)ctx;
 	struct comm_msg *msg = (struct comm_msg *)data;
 
@@ -274,17 +273,20 @@ bootstrap_msg_cb(void *data, void *ctx)
 		return;
 	}
 
-	/*
-	 * schedule initialization of remaining interfaces as it could not
-	 * be done in _notifier()(PCIe EP controller is still uninitialized
-	 * then).
-	 */
-	epf_ctx = (struct epf_context_t *)drv_ctx->epf_ctx;
 	pci_client_save_peer_cpu(drv_ctx->pci_client_h, msg->u.bootstrap.peer_cpu);
+
 	/* send edma rx desc iova  to x86 peer(rp) */
 	if (msg->u.bootstrap.peer_cpu == NVCPU_X86_64)
 		edma_rx_desc_iova_send(drv_ctx);
-	schedule_work(&epf_ctx->initialization_work);
+
+	/*
+	 * schedule initialization of remaining interfaces as it could not
+	 * be done in _notifier()(PCIe EP controller is still uninitialized
+	 * then). Also abstraction: vmap registers with comm-channel, such
+	 * callback registrations cannot happen while in the context of
+	 * another comm-channel callback (this function).
+	 */
+	schedule_work(&drv_ctx->epf_ctx->initialization_work);
 }
 
 /*
@@ -304,51 +306,100 @@ init_work(struct work_struct *work)
 		container_of(work, struct epf_context_t, initialization_work);
 	struct driver_ctx_t *drv_ctx = (struct driver_ctx_t *)epf_ctx->drv_ctx;
 
+	if (atomic_read(&drv_ctx->epf_ctx->epf_initialized)) {
+		pr_err("(%s): Already initialized\n", drv_ctx->drv_name);
+		goto err;
+	}
+
 	ret = vmap_init(drv_ctx, &drv_ctx->vmap_h);
 	if (ret) {
-		pr_err("vmap_init() failed\n");
-		return;
+		pr_err("(%s): vmap_init() failed\n", drv_ctx->drv_name);
+		goto err;
 	}
 
 	ret = edma_module_init(drv_ctx);
 	if (ret) {
-		pr_err("edma_module_init() failed\n");
-		return;
+		pr_err("(%s): edma_module_init() failed\n", drv_ctx->drv_name);
+		goto err_edma_init;
 	}
 
 	ret = endpoints_setup(drv_ctx, &drv_ctx->endpoints_h);
 	if (ret) {
-		pr_err("endpoints_setup() failed\n");
-		return;
+		pr_err("(%s): endpoints_setup() failed\n", drv_ctx->drv_name);
+		goto err_endpoint;
 	}
 
-	/* inidicate link-up to application and peer.*/
-	pci_client_change_link_status(drv_ctx->pci_client_h,
-				      NVSCIC2C_PCIE_LINK_UP);
-
+	/*
+	 * this is an acknowledgment to @DRV_MODE_EPC in response to it's
+	 * bootstrap message to indicate @DRV_MODE_EPF endpoints are ready.
+	 */
 	msg.type = COMM_MSG_TYPE_LINK;
 	msg.u.link.status = NVSCIC2C_PCIE_LINK_UP;
-	ret = comm_channel_msg_send(drv_ctx->comm_channel_h, &msg);
-	if (ret)
-		pr_err("Failed to send COMM_MSG_TYPE_LINK message\n");
+	ret = comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg);
+	if (ret) {
+		pr_err("(%s): Failed to send LINK(UP) message\n",
+		       drv_ctx->drv_name);
+		goto err_msg_send;
+	}
 
-	atomic_set(&epf_ctx->initialized, 1);
+	/* inidicate link-up to applications.*/
+	atomic_set(&drv_ctx->epf_ctx->epf_initialized, 1);
+	pci_client_change_link_status(drv_ctx->pci_client_h,
+				      NVSCIC2C_PCIE_LINK_UP);
+	return;
+
+err_msg_send:
+	endpoints_release(&drv_ctx->endpoints_h);
+err_endpoint:
+	edma_module_deinit(drv_ctx);
+err_edma_init:
+	vmap_deinit(&drv_ctx->vmap_h);
+err:
+	return;
 }
 
+/*
+ * PCIe subsystem sends CORE_INIT when PCIe hot-plug is initiated and
+ * before link trainig starts with PCIe RP SoC (before @DRV_MODE_EPC .probe()
+ * handler is invoked)
+ *
+ * Because, CORE_INIT impacts link training timeout, it shall do only minimum
+ * required for @DRV_MODE_EPF for PCIe EP initialization.
+ *
+ * This is received in interrupt context.
+ */
 static int
 nvscic2c_pcie_epf_notifier(struct notifier_block *nb,
 			   unsigned long val, void *data)
 {
 	int ret = 0;
 	struct pci_epf *epf = NULL;
+	struct driver_ctx_t *drv_ctx = NULL;
 
 	if (WARN_ON(!nb))
-		return -EINVAL;
+		return NOTIFY_BAD;
 	epf = container_of(nb, struct pci_epf, nb);
+
+	drv_ctx = epf_get_drvdata(epf);
+	if (!drv_ctx)
+		return NOTIFY_BAD;
 
 	switch (val) {
 	case CORE_INIT:
+		if (atomic_read(&drv_ctx->epf_ctx->core_initialized)) {
+			pr_err("(%s): Received CORE_INIT again\n",
+			       drv_ctx->drv_name);
+			return NOTIFY_BAD;
+		}
+
 		ret = set_inbound_translation(epf);
+		if (ret) {
+			pr_err("(%s): set_inbound_translation() failed\n",
+			       drv_ctx->drv_name);
+			return NOTIFY_BAD;
+		}
+
+		atomic_set(&drv_ctx->epf_ctx->core_initialized, 1);
 		break;
 
 	case LINK_UP:
@@ -361,8 +412,98 @@ nvscic2c_pcie_epf_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+/* Handle link message from @DRV_MODE_EPC. */
+static void
+shutdown_msg_cb(void *data, void *ctx)
+{
+	struct driver_ctx_t *drv_ctx = NULL;
+	struct pci_epf *epf = (struct pci_epf *)ctx;
+	struct comm_msg *msg = (struct comm_msg *)data;
+
+	if (WARN_ON(!msg || !epf))
+		return;
+
+	drv_ctx = epf_get_drvdata(epf);
+	if (!drv_ctx)
+		return;
+
+	if (!atomic_read(&drv_ctx->epf_ctx->epf_initialized)) {
+		pr_err("(%s): Unexpected shutdown msg from nvscic2c-pcie-epc\n",
+		       drv_ctx->drv_name);
+		return;
+	}
+
+	/* schedule deinitialization of epf interfaces. */
+	schedule_work(&drv_ctx->epf_ctx->deinitialization_work);
+}
+
 /*
- * PCIe subsystem sends CORE_DEINIT when RP controller goes down.
+ * tasklet/scheduled work for de-initialization of @DRV_MODE_EPF(this)
+ * interfaces. It is done in a tasklet for the following scenario:
+ * @DRV_MODE_EPC can get unloaded(rmmod) and reinserted(insmod) while the
+ * PCIe link with PCIe EP SoC still active. So before we receive
+ * bootstrap message again when @DRV_MODE_EPC is reinserted, we would need
+ * to clean-up all abstractions before they can be reinit again.
+ *
+ * In case of abnormal shutdown of PCIe RP SoC, @DRV_MODE_EPF shall receive
+ * CORE_DEINIT directly from PCIe sub-system without any comm-message from
+ * @DRV_MODE_EPC.
+ */
+static void
+deinit_work(struct work_struct *work)
+{
+	int ret = 0;
+	struct comm_msg msg = {0};
+	struct epf_context_t *epf_ctx =
+		container_of(work, struct epf_context_t, deinitialization_work);
+	struct driver_ctx_t *drv_ctx = (struct driver_ctx_t *)epf_ctx->drv_ctx;
+
+	if (!atomic_read(&drv_ctx->epf_ctx->epf_initialized))
+		return;
+
+	/* local apps can stop processing if they see this.*/
+	pci_client_change_link_status(drv_ctx->pci_client_h,
+				      NVSCIC2C_PCIE_LINK_DOWN);
+	/*
+	 * stop ongoing and pending edma xfers, this edma module shall not
+	 * accept new xfer submissions after this.
+	 */
+	edma_module_stop(drv_ctx);
+
+	/* wait for @DRV_MODE_EPF (local)endpoints to close. */
+	ret = endpoints_waitfor_close(drv_ctx->endpoints_h);
+	if (ret) {
+		pr_err("(%s): Error waiting for endpoints to close\n",
+		       drv_ctx->drv_name);
+	}
+	/* Even in case of error, continue to deinit - cannot be recovered.*/
+
+	/*
+	 * Acknowledge @DRV_MODE_EPC that @DRV_MODE_EPF(this) endpoints are
+	 * closed. If PCIe RP SoC went abnormally away(halt/reset/kernel oops)
+	 * signal anyway (sending signal will not cause local SoC fault when
+	 * PCIe RP SoC (@DRV_MODE_EPC) went abnormally away).
+	 */
+	msg.type = COMM_MSG_TYPE_LINK;
+	msg.u.link.status = NVSCIC2C_PCIE_LINK_DOWN;
+	ret = comm_channel_ctrl_msg_send(drv_ctx->comm_channel_h, &msg);
+	if (ret)
+		pr_err("(%s): Failed to send LINK (DOWN) message\n",
+		       drv_ctx->drv_name);
+
+	endpoints_release(&drv_ctx->endpoints_h);
+	edma_module_deinit(drv_ctx);
+	vmap_deinit(&drv_ctx->vmap_h);
+	clear_outbound_translation(drv_ctx->epf_ctx->epf, &drv_ctx->peer_mem);
+	atomic_set(&drv_ctx->epf_ctx->epf_initialized, 0);
+}
+
+/*
+ * Graceful shutdown: PCIe subsystem sends CORE_DEINIT when @DRV_MODE_EPC
+ * .remove() or .shutdown() handlers are completed/exited.
+ * Abnormal shutdown (when PCIe RP SoC - gets halted, or it's kernel oops):
+ * PCIe subsystem also sends CORE_DEINIT but @DRV_MODE_EPC would have already
+ * gone then by the time CORE_DEINIT is called.
  */
 static int
 nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
@@ -370,32 +511,33 @@ nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
 {
 	struct pci_epf *epf = NULL;
 	struct driver_ctx_t *drv_ctx = NULL;
-	struct epf_context_t *epf_ctx = NULL;
 
 	if (WARN_ON(!nb))
-		return -EINVAL;
+		return NOTIFY_BAD;
 	epf = container_of(nb, struct pci_epf, block_nb);
 
 	drv_ctx = epf_get_drvdata(epf);
 	if (!drv_ctx)
-		return -EINVAL;
-
-	epf_ctx = drv_ctx->epf_ctx;
+		return NOTIFY_BAD;
 
 	switch (val) {
 	case CORE_DEINIT:
-		if (atomic_read(&epf_ctx->initialized)) {
-			pci_client_change_link_status(drv_ctx->pci_client_h,
-						      NVSCIC2C_PCIE_LINK_DOWN);
-			edma_module_stop(drv_ctx);
-			endpoints_release(&drv_ctx->endpoints_h);
-			edma_module_deinit(drv_ctx);
-			vmap_deinit(&drv_ctx->vmap_h);
-			clear_outbound_translation(epf, &drv_ctx->peer_mem);
+		if (atomic_read(&drv_ctx->epf_ctx->core_initialized)) {
+			/*
+			 * in case of PCIe RP SoC abnormal shutdown, comm-channel
+			 * shutdown message from @DRV_MODE_EPC won't come and
+			 * therefore scheduling the deinit work here is required
+			 * If its already scheduled, it won't be scheduled again.
+			 * Wait for deinit work to complete in either case.
+			 */
+			schedule_work(&drv_ctx->epf_ctx->deinitialization_work);
+			flush_work(&drv_ctx->epf_ctx->deinitialization_work);
+
 			clear_inbound_translation(epf);
+			atomic_set(&drv_ctx->epf_ctx->core_initialized, 0);
 		}
-		atomic_set(&epf_ctx->initialized, 0);
-		wake_up_all(&epf_ctx->initialized_waitq);
+		wake_up_interruptible_all(&drv_ctx->epf_ctx->core_initialized_waitq);
+
 		break;
 
 	default:
@@ -405,6 +547,32 @@ nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+/* Handle link message from @DRV_MODE_EPC. */
+static void
+link_msg_cb(void *data, void *ctx)
+{
+	struct pci_epf *epf = (struct pci_epf *)ctx;
+	struct comm_msg *msg = (struct comm_msg *)data;
+	struct driver_ctx_t *drv_ctx = (struct driver_ctx_t *)ctx;
+
+	if (WARN_ON(!msg || !epf))
+		return;
+
+	drv_ctx = epf_get_drvdata(epf);
+	if (!drv_ctx)
+		return;
+
+	if (msg->u.link.status != NVSCIC2C_PCIE_LINK_DOWN) {
+		pr_err("(%s): spurious link message received from EPC\n",
+		       drv_ctx->drv_name);
+		return;
+	}
+
+	/* inidicate link status to application.*/
+	pci_client_change_link_status(drv_ctx->pci_client_h,
+				      msg->u.link.status);
+}
+
 /*
  * ASSUMPTION: applications on and @DRV_MODE_EPC(PCIe RP) must have stopped
  * communicating with application and @DRV_MODE_EPF (this) before this point.
@@ -412,8 +580,8 @@ nvscic2c_pcie_epf_block_notifier(struct notifier_block *nb,
 static void
 nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 {
+	int ret = 0;
 	struct driver_ctx_t *drv_ctx = NULL;
-	struct epf_context_t *epf_ctx = NULL;
 
 	if (!epf)
 		return;
@@ -422,9 +590,16 @@ nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 	if (!drv_ctx)
 		return;
 
-	epf_ctx = drv_ctx->epf_ctx;
-	wait_event(epf_ctx->initialized_waitq,
-		   !(atomic_read(&epf_ctx->initialized)));
+	/* timeout should be higher than that of endpoints to close.*/
+	ret = wait_event_interruptible
+			(drv_ctx->epf_ctx->core_initialized_waitq,
+			 !(atomic_read(&drv_ctx->epf_ctx->core_initialized)));
+	if (ret == -ERESTARTSYS)
+		pr_err("(%s): Interrupted waiting for CORE_DEINIT to complete\n",
+		       drv_ctx->drv_name);
+
+	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
+				       COMM_MSG_TYPE_SHUTDOWN);
 	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
 				       COMM_MSG_TYPE_BOOTSTRAP);
 	comm_channel_deinit(&drv_ctx->comm_channel_h);
@@ -440,7 +615,6 @@ nvscic2c_pcie_epf_bind(struct pci_epf *epf)
 	size_t win_size = 0;
 	struct pci_epf_bar *epf_bar = NULL;
 	struct driver_ctx_t *drv_ctx = NULL;
-	struct epf_context_t *epf_ctx = NULL;
 	struct pci_client_params params = {0};
 	struct callback_ops cb_ops = {0};
 
@@ -499,6 +673,28 @@ nvscic2c_pcie_epf_bind(struct pci_epf *epf)
 		goto err_register_msg;
 	}
 
+	/* register for shutdown message from @DRV_MODE_EPC (PCIe RP).*/
+	memset(&cb_ops, 0x0, sizeof(cb_ops));
+	cb_ops.callback = shutdown_msg_cb;
+	cb_ops.ctx = (void *)epf;
+	ret = comm_channel_register_msg_cb(drv_ctx->comm_channel_h,
+					   COMM_MSG_TYPE_SHUTDOWN, &cb_ops);
+	if (ret) {
+		pr_err("Failed to register for shutdown message from RP\n");
+		goto err_register_msg;
+	}
+
+	/* register for link message from @DRV_MODE_EPC (PCIe RP).*/
+	memset(&cb_ops, 0x0, sizeof(cb_ops));
+	cb_ops.callback = link_msg_cb;
+	cb_ops.ctx = (void *)epf;
+	ret = comm_channel_register_msg_cb(drv_ctx->comm_channel_h,
+					   COMM_MSG_TYPE_LINK, &cb_ops);
+	if (ret) {
+		pr_err("Failed to register for link message from RP\n");
+		goto err_register_msg;
+	}
+
 	/* BAR:0 settings. - done here to save time in CORE_INIT.*/
 	epf_bar = &epf->bar[BAR_0];
 	epf_bar->phys_addr = drv_ctx->self_mem.dma_handle;
@@ -509,13 +705,12 @@ nvscic2c_pcie_epf_bind(struct pci_epf *epf)
 			  PCI_BASE_ADDRESS_MEM_PREFETCH;
 
 	/* register for hw init notifier.*/
-	epf_ctx = drv_ctx->epf_ctx;
-	if (!epf_ctx->notifier_registered) {
+	if (!drv_ctx->epf_ctx->notifier_registered) {
 		epf->nb.notifier_call = nvscic2c_pcie_epf_notifier;
 		pci_epc_register_notifier(epf->epc, &epf->nb);
 		epf->block_nb.notifier_call = nvscic2c_pcie_epf_block_notifier;
 		pci_epc_register_block_notifier(epf->epc, &epf->block_nb);
-		epf_ctx->notifier_registered = true;
+		drv_ctx->epf_ctx->notifier_registered = true;
 	}
 
 	return ret;
@@ -540,13 +735,12 @@ static int
 nvscic2c_pcie_epf_remove(struct pci_epf *epf)
 {
 	struct driver_ctx_t *drv_ctx = epf_get_drvdata(epf);
-	struct epf_context_t *epf_ctx = NULL;
 
 	if (!drv_ctx)
 		return 0;
 
-	epf_ctx = drv_ctx->epf_ctx;
-	cancel_work_sync(&epf_ctx->initialization_work);
+	cancel_work_sync(&drv_ctx->epf_ctx->deinitialization_work);
+	cancel_work_sync(&drv_ctx->epf_ctx->initialization_work);
 	epf->header = NULL;
 	kfree(drv_ctx->epf_ctx);
 
@@ -612,7 +806,7 @@ nvscic2c_pcie_epf_probe(struct pci_epf *epf)
 		ret = -ENOMEM;
 		goto err_alloc_epf_ctx;
 	}
-	drv_ctx->epf_ctx = (void *)epf_ctx;
+	drv_ctx->epf_ctx = epf_ctx;
 	epf_ctx->header.vendorid = PCI_VENDOR_ID_NVIDIA;
 	epf_ctx->header.deviceid = pci_dev_id;
 	epf_ctx->header.baseclass_code = PCI_BASE_CLASS_COMMUNICATION;
@@ -623,10 +817,12 @@ nvscic2c_pcie_epf_probe(struct pci_epf *epf)
 	epf_ctx->drv_ctx = drv_ctx;
 	epf_ctx->epf = epf;
 	INIT_WORK(&epf_ctx->initialization_work, init_work);
+	INIT_WORK(&epf_ctx->deinitialization_work, deinit_work);
 
-	/* to synchronize deinit and unbind.*/
-	atomic_set(&epf_ctx->initialized, 0);
-	init_waitqueue_head(&epf_ctx->initialized_waitq);
+	/* to synchronize deinit, unbind.*/
+	atomic_set(&epf_ctx->core_initialized, 0);
+	atomic_set(&drv_ctx->epf_ctx->epf_initialized, 0);
+	init_waitqueue_head(&epf_ctx->core_initialized_waitq);
 
 	return ret;
 
