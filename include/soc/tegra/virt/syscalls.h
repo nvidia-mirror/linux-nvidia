@@ -363,7 +363,7 @@ static inline int hyp_read_freq_request(uint64_t *value)
 		:
 		: "x2", "x3", _X4_X17);
 
-	if (r0 == 1 &&  value != 0)
+	if (r0 == 1 &&  value != NULL)
 		*value = r1;
 
 	return (int16_t)r0;
