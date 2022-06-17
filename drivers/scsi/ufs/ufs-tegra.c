@@ -117,7 +117,7 @@ static const struct file_operations ufs_tegra_debugfs_ops = {
 	.release        = single_release,
 };
 
-void ufs_tegra_init_debugfs(struct ufs_hba *hba)
+static void ufs_tegra_init_debugfs(struct ufs_hba *hba)
 {
 	struct dentry *device_root;
 	struct ufs_tegra_host *ufs_tegra = hba->priv;
@@ -1066,7 +1066,7 @@ void ufs_tegra_mphy_tx_advgran(struct ufs_tegra_host *ufs_tegra)
 }
 
 
-void ufs_tegra_mphy_rx_advgran(struct ufs_tegra_host *ufs_tegra)
+static void ufs_tegra_mphy_rx_advgran(struct ufs_tegra_host *ufs_tegra)
 {
 	u32 val = 0, reg_vendor_2;
 
@@ -1103,26 +1103,26 @@ void ufs_tegra_mphy_rx_advgran(struct ufs_tegra_host *ufs_tegra)
 	}
 }
 
-void ufs_tegra_ufs_aux_ref_clk_enable(struct ufs_tegra_host *ufs_tegra)
+static void ufs_tegra_ufs_aux_ref_clk_enable(struct ufs_tegra_host *ufs_tegra)
 {
 	ufs_aux_update(ufs_tegra->ufs_aux_base, UFSHC_DEV_CLK_EN,
 						UFSHC_AUX_UFSHC_DEV_CTRL_0);
 }
 
-void ufs_tegra_ufs_aux_ref_clk_disable(struct ufs_tegra_host *ufs_tegra)
+static void ufs_tegra_ufs_aux_ref_clk_disable(struct ufs_tegra_host *ufs_tegra)
 {
 	ufs_aux_clear_bits(ufs_tegra->ufs_aux_base, UFSHC_DEV_CLK_EN,
 						UFSHC_AUX_UFSHC_DEV_CTRL_0);
 }
 
-void ufs_tegra_aux_reset_enable(struct ufs_tegra_host *ufs_tegra)
+static void ufs_tegra_aux_reset_enable(struct ufs_tegra_host *ufs_tegra)
 {
 	ufs_aux_clear_bits(ufs_tegra->ufs_aux_base,
 					UFSHC_DEV_RESET,
 					UFSHC_AUX_UFSHC_DEV_CTRL_0);
 }
 
-void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
+static void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
 {
 
 	/*

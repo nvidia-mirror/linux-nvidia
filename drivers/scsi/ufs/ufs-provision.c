@@ -55,7 +55,7 @@
 #define INIT_PWR_MODE_OFFSET 5
 #define HIGH_PRIORITY_LUN_OFFSET 6
 
-void populate_desc_header(struct ufs_tegra_host *ufs_tegra)
+static void populate_desc_header(struct ufs_tegra_host *ufs_tegra)
 {
 	u8 *lun_desc_buf;
 
@@ -72,7 +72,7 @@ void populate_desc_header(struct ufs_tegra_host *ufs_tegra)
 		dev_err(NULL, "lun_desc_buf is null\n");
 }
 
-int validate_refclk_value(struct ufs_hba *hba, u32 refclk_value)
+static int validate_refclk_value(struct ufs_hba *hba, u32 refclk_value)
 {
 	if (refclk_value > 3) {
 		dev_err(hba->dev, "%s: Bad bRefClkFreq value\n"
@@ -88,7 +88,7 @@ int validate_refclk_value(struct ufs_hba *hba, u32 refclk_value)
 	return 0;
 }
 
-int validate_bootlun_en_id_value(struct ufs_hba *hba, u32 bootlun_en_id)
+static int validate_bootlun_en_id_value(struct ufs_hba *hba, u32 bootlun_en_id)
 {
 	if (bootlun_en_id > 3) {
 		dev_err(hba->dev, "%s: Bad BootLUN ID\n"
@@ -103,7 +103,7 @@ int validate_bootlun_en_id_value(struct ufs_hba *hba, u32 bootlun_en_id)
 	return 0;
 }
 
-int validate_desc_header(struct ufs_hba *hba, u8 *lun_desc_buf)
+static int validate_desc_header(struct ufs_hba *hba, u8 *lun_desc_buf)
 {
 	int i, err = 0;
 	u8 desc_param;
