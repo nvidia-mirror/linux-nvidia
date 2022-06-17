@@ -190,7 +190,7 @@ static struct syscore_ops arm_smmu_syscore_ops = {
 };
 
 static int arm_smmu_suspend_init(void __iomem **smmu_base, u32 *smmu_base_pa,
-				int num_smmus, unsigned long smmu_size,
+				u32 num_smmus, unsigned long smmu_size,
 				unsigned long smmu_pgshift, u32 scratch_reg_pa)
 {
 	int ret = 0, i;
