@@ -21,9 +21,9 @@
 #include <linux/tegra_l1ss_kernel_interface.h>
 #include "tegra_l1ss.h"
 
-DEFINE_MUTEX(l1ss_client_lock);
-LIST_HEAD(l1ss_client_list_head);
-atomic_t received_ivc_ready;
+static DEFINE_MUTEX(l1ss_client_lock);
+static LIST_HEAD(l1ss_client_list_head);
+static atomic_t received_ivc_ready;
 
 static const struct of_device_id sce_match[] = {
 	{ .compatible = "nvidia,tegra194-safety-ivc", },

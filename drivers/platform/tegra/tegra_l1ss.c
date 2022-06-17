@@ -42,8 +42,8 @@
 
 #define MAX_DEV 1
 
-struct l1ss_data *ldata;
-struct class *l1ss_class;
+static struct l1ss_data *ldata;
+static struct class *l1ss_class;
 static unsigned int dev_major;
 static cmd_resp_look_up_ex cmd_resp_lookup_table[CMDRESPL1_N_CLASSES]
 						[CMDRESPL1_MAX_CMD_IN_CLASS] = {
@@ -551,7 +551,9 @@ static long l1ss_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			pr_err("Failed to allocate memory");
 			return -1;
 		}
-		if (copy_from_user(req, (nv_guard_request_t *)arg,
+		if (copy_from_user((void *)req,
+				   (const void __user *)
+					(nv_guard_request_t *)arg,
 				   sizeof(nv_guard_request_t))) {
 			pr_err("Failed copy_from_user");
 			kfree(req);
