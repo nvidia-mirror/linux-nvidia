@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2021 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2020-2022 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -78,7 +78,7 @@ struct smmu_debugfs_info {
 	struct dentry	*cb_root;
 	struct dentry	*masters_root;
 	struct list_head masters_list;
-	int		num_context_banks;
+	u32		num_context_banks;
 	unsigned long	pgshift;
 	int		max_cbs;
 	u16		streamid_mask;
