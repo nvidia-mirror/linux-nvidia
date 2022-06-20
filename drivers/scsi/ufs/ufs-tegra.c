@@ -946,31 +946,6 @@ static void ufs_tegra_pwr_change_clk_boost(struct ufs_tegra_host *ufs_tegra)
 	udelay(20);
 }
 
-void ufs_tegra_disable_mphy_slcg(struct ufs_tegra_host *ufs_tegra)
-{
-	u32 val = 0, reg_cg_over, reg_vendor_0;
-
-	if (ufs_tegra->chip_id == TEGRA234) {
-		reg_cg_over = MPHY_TX_APB_TX_CG_OVR0_0_T234;
-		reg_vendor_0 = MPHY_TX_APB_TX_VENDOR0_0_T234;
-	} else {
-		reg_cg_over = MPHY_TX_APB_TX_CG_OVR0_0;
-		reg_vendor_0 = MPHY_TX_APB_TX_VENDOR0_0;
-	}
-
-	val = (MPHY_TX_CLK_EN_SYMB | MPHY_TX_CLK_EN_SLOW |
-			MPHY_TX_CLK_EN_FIXED | MPHY_TX_CLK_EN_3X);
-	mphy_writel(ufs_tegra->mphy_l0_base, val, reg_cg_over);
-	mphy_writel(ufs_tegra->mphy_l0_base, MPHY_GO_BIT, reg_vendor_0);
-
-	if (ufs_tegra->x2config) {
-		mphy_writel(ufs_tegra->mphy_l1_base, val, reg_cg_over);
-		mphy_writel(ufs_tegra->mphy_l1_base, MPHY_GO_BIT, reg_vendor_0);
-	}
-
-}
-
-
 static void ufs_tegra_mphy_rx_sync_capability(struct ufs_tegra_host *ufs_tegra)
 {
 	u32 val_88_8b = 0;
@@ -1041,30 +1016,6 @@ static void ufs_tegra_mphy_rx_sync_capability(struct ufs_tegra_host *ufs_tegra)
 				MPHY_GO_BIT, vendor2_reg);
 	}
 }
-
-void ufs_tegra_mphy_tx_advgran(struct ufs_tegra_host *ufs_tegra)
-{
-	u32 val = 0, reg_vendor_0;
-
-	if (ufs_tegra->chip_id == TEGRA234)
-		reg_vendor_0 = MPHY_TX_APB_TX_VENDOR0_0_T234;
-	else
-		reg_vendor_0 = MPHY_TX_APB_TX_VENDOR0_0;
-
-	val = (TX_ADVANCED_GRANULARITY | TX_ADVANCED_GRANULARITY_SETTINGS);
-	mphy_update(ufs_tegra->mphy_l0_base, val,
-					MPHY_TX_APB_TX_ATTRIBUTE_34_37_0);
-	mphy_writel(ufs_tegra->mphy_l0_base, MPHY_GO_BIT,
-						reg_vendor_0);
-
-	if (ufs_tegra->x2config) {
-		mphy_update(ufs_tegra->mphy_l1_base, val,
-					MPHY_TX_APB_TX_ATTRIBUTE_34_37_0);
-		mphy_writel(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
-						reg_vendor_0);
-	}
-}
-
 
 static void ufs_tegra_mphy_rx_advgran(struct ufs_tegra_host *ufs_tegra)
 {
