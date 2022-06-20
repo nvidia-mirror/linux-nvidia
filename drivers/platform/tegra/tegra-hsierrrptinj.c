@@ -192,9 +192,6 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 			error_report.error_attribute = val;
 			count++;
 			break;
-		default: /* Unknown */
-			pr_debug("tegra-hsierrrptinj: Invalid input\n");
-			break;
 		}
 
 	}
