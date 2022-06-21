@@ -54,12 +54,21 @@
 /* Flag to enable/disable loading of ADSP firmware */
 #define ENABLE_ADSP 1
 
+/* Expected to map with SNDRV_CTL_ELEM_TYPE_INTEGER value*/
+#define TEGRA_SNDRV_CTL_ELEM_TYPE_INTEGER 2
+
 #define NETLINK_ADSP_EVENT 31
 #define NETLINK_ADSP_EVENT_GROUP 1
 
 struct adsp_event_nlmsg {
 	uint32_t err;
 	uint32_t data[NVFX_MAX_CALL_PARAMS_WSIZE];
+};
+
+struct tegra_soc_bytes {
+	int base;
+	int num_regs;
+	snd_ctl_elem_type_t mask;
 };
 
 #define ADSP_RESPONSE_TIMEOUT	1000 /* in ms */
@@ -4423,7 +4432,7 @@ static void adsp_fe_name_override(struct device *dev, int count)
 static int tegra210_adsp_param_info(struct snd_kcontrol *kcontrol,
 		       struct snd_ctl_elem_info *uinfo)
 {
-	struct soc_bytes *params = (void *)kcontrol->private_value;
+	struct tegra_soc_bytes *params = (void *)kcontrol->private_value;
 
 	if (params->mask == SNDRV_CTL_ELEM_TYPE_INTEGER) {
 		params->num_regs = 128;
@@ -4439,7 +4448,7 @@ static int tegra210_adsp_param_info(struct snd_kcontrol *kcontrol,
 static int tegra210_adsp_get_param(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct soc_bytes *params = (void *)kcontrol->private_value;
+	struct tegra_soc_bytes *params = (void *)kcontrol->private_value;
 
 	if (params->mask == SNDRV_CTL_ELEM_TYPE_INTEGER)
 		memset(ucontrol->value.integer.value, 0,
@@ -4459,7 +4468,7 @@ static int tegra210_adsp_get_param(struct snd_kcontrol *kcontrol,
 static int tegra210_adsp_set_param(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct soc_bytes *params = (void *)kcontrol->private_value;
+	struct tegra_soc_bytes *params = (void *)kcontrol->private_value;
 	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
 	struct tegra210_adsp *adsp = snd_soc_component_get_drvdata(cmpnt);
 	struct tegra210_adsp_app *app = &adsp->apps[params->base];
@@ -4559,7 +4568,7 @@ static int tegra210_adsp_set_param(struct snd_kcontrol *kcontrol,
 static int tegra210_adsp_tlv_callback(struct snd_kcontrol *kcontrol,
 	int op_flag, unsigned int size, unsigned int __user *tlv)
 {
-	struct soc_bytes *params = (void *)kcontrol->private_value;
+	struct tegra_soc_bytes *params = (void *)kcontrol->private_value;
 	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
 	struct tegra210_adsp *adsp = snd_soc_component_get_drvdata(cmpnt);
 	unsigned int count = size < params->num_regs ? size : params->num_regs;
@@ -4750,7 +4759,7 @@ static int tegra210_adsp_apm_put(struct snd_kcontrol *kcontrol,
 	.get = tegra210_adsp_get_param,		\
 	.put = tegra210_adsp_set_param,		\
 	.private_value =		\
-		((unsigned long)&(struct soc_bytes)		\
+		((unsigned long)&(struct tegra_soc_bytes)		\
 		{.base = xbase, .num_regs = 512,		\
 		.mask = SNDRV_CTL_ELEM_TYPE_BYTES}) }
 
@@ -4762,7 +4771,7 @@ static int tegra210_adsp_apm_put(struct snd_kcontrol *kcontrol,
 	.tlv.c = tegra210_adsp_tlv_callback,	\
 	.info = snd_soc_bytes_info_ext,	\
 	.private_value =		\
-		((unsigned long)&(struct soc_bytes)		\
+		((unsigned long)&(struct tegra_soc_bytes)		\
 		{.base = xbase, .num_regs = xcount,		\
 		.mask = SNDRV_CTL_ELEM_TYPE_BYTES}) }
 
@@ -5043,7 +5052,7 @@ static int tegra210_adsp_audio_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node, *subnp;
 	const struct of_device_id *match;
-	struct soc_bytes *controls;
+	struct tegra_soc_bytes *controls;
 	struct tegra210_adsp *adsp;
 	int32_t j, ret = 0;
 	uint32_t i, wt_idx, mux_idx, compr_ops = 1;
@@ -5051,6 +5060,7 @@ static int tegra210_adsp_audio_probe(struct platform_device *pdev)
 	uint32_t adma_ch_start = TEGRA210_ADSP_ADMA_CHANNEL_START_HV;
 	uint32_t adma_ch_cnt = TEGRA210_ADSP_ADMA_CHANNEL_COUNT;
 	char plugin_info[20], apm_info[20];
+	u32 param_mask;
 	struct netlink_kernel_cfg cfg = {
 		.input = tegra210_adsp_nl_recv_msg,
 	};
@@ -5204,7 +5214,7 @@ static int tegra210_adsp_audio_probe(struct platform_device *pdev)
 				}
 			}
 			if (of_property_read_u32(subnp, "param-type",
-				&adsp_app_desc[i].param_type)) {
+				&param_mask)) {
 				dev_info(&pdev->dev,
 					"Default param-type to BYTE for %s\n",
 					adsp_app_desc[i].name);
@@ -5212,6 +5222,14 @@ static int tegra210_adsp_audio_probe(struct platform_device *pdev)
 					SNDRV_CTL_ELEM_TYPE_BYTES;
 			} else {
 				/* override the param-type from DT if any */
+				if (param_mask ==
+					TEGRA_SNDRV_CTL_ELEM_TYPE_INTEGER) {
+					adsp_app_desc[i].param_type =
+						SNDRV_CTL_ELEM_TYPE_INTEGER;
+				} else {
+					adsp_app_desc[i].param_type =
+						SNDRV_CTL_ELEM_TYPE_BYTES;
+				}
 				controls =
 					(void *)tegra210_adsp_controls[i+1].private_value;
 				controls->mask = adsp_app_desc[i].param_type;
