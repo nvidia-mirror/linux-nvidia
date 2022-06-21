@@ -33,6 +33,9 @@
 #include <linux/of_device.h>
 #include <linux/debugfs.h>
 #include <linux/pm.h>
+#include <linux/device.h>
+#include <linux/kdev_t.h>
+#include <linux/mailbox_client.h>
 #include "linux/tegra-hsierrrptinj.h"
 
 
@@ -47,6 +50,23 @@
 
 /* Max instance of any registred IP */
 #define MAX_INSTANCE 11U
+
+/* Timeout in millisec */
+#define TIMEOUT		1000
+
+/* Error code for reporting errors to FSI */
+#define HSM_ERROR 0x55
+
+/* EC Index for reporting errors to FSI */
+#define EC_INDEX 0xFFFFFFFF
+
+/* Error report frame for reprting errors to FSI */
+struct hsm_error_report_frame {
+	unsigned int type;
+	unsigned int error_code;
+	unsigned int reporter_id;
+	unsigned int ec_index;
+};
 
 /**
  * Note: Any update to IP instances array should be reflected in the macro MAX_INSTANCE.
@@ -75,6 +95,14 @@ const char *hsierrrptinj_debugfs_name = "hsierrrpt";
 
 /* This array stores callbacks registered by IP Drivers */
 static hsierrrpt_inj ip_driver_cb[NUM_IPS][MAX_INSTANCE] = {{NULL}};
+
+/* Data type for mailbox client and channel details */
+struct hsierrrptinj_hsp_sm {
+	struct mbox_client client;
+	struct mbox_chan *chan;
+};
+
+static struct hsierrrptinj_hsp_sm hsierrrptinj_tx;
 
 
 /* Register Error callbacks from IP Drivers */
@@ -114,10 +142,21 @@ EXPORT_SYMBOL(hsierrrpt_reg_cb);
 int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
 {
 	int ret = -EINVAL;
+	struct hsm_error_report_frame error_report = {0};
 
-	ret = epl_report_error(err_rpt_frame);
+	if (IS_ERR(hsierrrptinj_tx.chan)) {
+		pr_err("tegra-hsierrrptinj: Mailbox channel or client not initiated\n");
+		return -ENODEV;
+	}
 
-	return ret;
+	error_report.type = HSM_ERROR;
+	error_report.error_code = err_rpt_frame.error_code;
+	error_report.reporter_id = err_rpt_frame.reporter_id;
+	error_report.ec_index = EC_INDEX;
+
+	ret = mbox_send_message(hsierrrptinj_tx.chan, (void *)&error_report);
+
+	return ret < 0 ? ret : 0;
 }
 
 /* Parse user entered data via debugfs interface and trigger IP Driver callback */
@@ -150,7 +189,7 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 
 	pr_debug("tegra-hsierrrptinj: Input Buffer: %s\n", cur);
 
-	/** Extract data and trigger*/
+	/* Extract data and trigger */
 	while (count < NUM_INPUTS) {
 
 		token = strsep(&cur, delim);
@@ -167,7 +206,7 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 
 		switch (count) {
 
-		case 0: /* IP ID **/
+		case 0: /* IP ID */
 			pr_debug("tegra-hsierrrptinj: IP ID: 0x%04lx\n", val);
 			ip_id = val;
 			count++;
@@ -238,8 +277,21 @@ done:
 	if (ret != 0) {
 		pr_err("tegra-hsierrrptinj: Failed to report HSI error to FSI\n");
 		pr_err("tegra-hsierrrptinj: Error code: %d", ret);
+		/* Error code has been logged.
+		 * Change error code in case of timeout error
+		 * to prevent re-triggering of .write fops.
+		 */
+		if (ret == -ETIME) {
+			/* Explicitly change error code to -EFAULT */
+			ret = -EFAULT;
+		}
 	} else {
 		pr_err("tegra-hsierrrptinj: Successfully reported HSI error to FSI\n");
+		/* On success, return the error report length.
+		 * This represents the number of bytes successfully written.
+		 * Returning 0, would re-trigger .write fops
+		 */
+		ret = ERR_RPT_LEN;
 	}
 
 	pr_err("tegra-hsierrrptinj: IP ID: 0x%04x\n", ip_id);
@@ -275,16 +327,53 @@ static const struct of_device_id hsierrrptinj_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, hsierrrptinj_dt_match);
 
+static void tegra_hsp_tx_empty_notify(struct mbox_client *cl, void *data, int empty_value)
+{
+	pr_debug("tegra-hsierrrptinj: TX empty callback came\n");
+}
+
+static int tegra_hsp_mb_init(struct device *dev)
+{
+	int err;
+
+	hsierrrptinj_tx.client.dev = dev;
+	hsierrrptinj_tx.client.tx_block = true;
+	hsierrrptinj_tx.client.tx_tout = TIMEOUT;
+	hsierrrptinj_tx.client.tx_done = tegra_hsp_tx_empty_notify;
+
+	hsierrrptinj_tx.chan = mbox_request_channel_byname(&hsierrrptinj_tx.client,
+							    "hsierrrptinj-tx");
+	if (IS_ERR(hsierrrptinj_tx.chan)) {
+		err = PTR_ERR(hsierrrptinj_tx.chan);
+		pr_err("tegra-hsierrrptinj: Failed to get tx mailbox: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
 static int hsierrrptinj_probe(struct platform_device *pdev)
 {
+	int ret = -EFAULT;
 	struct dentry *dent = 0;
+	struct device *dev = &pdev->dev;
+
+	/* Initiate TX Mailbox */
+	ret = tegra_hsp_mb_init(dev);
+	if (ret != 0) {
+		pr_err("tegra-hsierrrptinj: Failed initiating tx mailbox\n");
+		goto abort;
+	}
+	pr_err("tegra-hsierrrptinj: Successfully initiated TX Mailbox\n");
+
 	/* Create a directory 'tegra_hsierrrptinj' under 'sys/kernel/debug'
 	 * to hold the set of debug files
 	 */
 	pr_debug("tegra-hsierrrptinj: Create debugfs directory\n");
 	hsierrrptinj_debugfs_root = debugfs_create_dir("tegra_hsierrrptinj", NULL);
-	if (!hsierrrptinj_debugfs_root) {
+	if (IS_ERR_OR_NULL(hsierrrptinj_debugfs_root)) {
 		pr_err("tegra-hsierrrptinj: Failed to create debug directory\n");
+		ret = -EFAULT;
 		goto abort;
 	}
 
@@ -294,16 +383,17 @@ static int hsierrrptinj_probe(struct platform_device *pdev)
 				   hsierrrptinj_debugfs_root, NULL, &hsierrrptinj_fops);
 	if (IS_ERR_OR_NULL(dent)) {
 		pr_err("tegra-hsierrrptinj: Failed to create debugfs node\n");
+		ret = -EFAULT;
 		goto abort;
 	}
+	pr_err("tegra-hsierrrptinj: Debug node created successfully\n");
 
 	pr_debug("tegra-hsierrrptinj: probe success");
 	return 0;
 
 abort:
-	pr_err("tegra-hsierrrptinj: Failed to create debug node or directory.\n");
-
-	return -EFAULT;
+	pr_err("tegra-hsierrrptinj: Failed to create debug node/directory or setup mailbox.\n");
+	return ret;
 }
 
 static int hsierrrptinj_remove(struct platform_device *pdev)
