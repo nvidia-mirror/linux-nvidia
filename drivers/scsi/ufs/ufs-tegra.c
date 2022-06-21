@@ -1848,6 +1848,9 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	hba->rpm_lvl = UFS_PM_LVL_1;
 	hba->caps |= UFSHCD_CAP_INTR_AGGR;
 
+	if (ufs_tegra->chip_id == TEGRA234)
+		hba->caps |= 1 << 7;
+
 	if (ufs_tegra->chip_id != TEGRA234) {
 		ufs_tegra->ufs_pinctrl = devm_pinctrl_get(dev);
 		if (IS_ERR_OR_NULL(ufs_tegra->ufs_pinctrl)) {

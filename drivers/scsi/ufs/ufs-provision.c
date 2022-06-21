@@ -46,6 +46,7 @@
 #define LOGICAL_BLK_SIZE_OFFSET 9
 #define PROV_TYPE_OFFSET 10
 #define CONTEXT_CAP_OFFSET 11
+#define WB_ALLOC_UNITS_OFFSET 22
 
 /* CONFIGURATION DESCRIPTOR HEADER FIELDS OFFSETS */
 #define LENGTH_OFFSET 0
@@ -54,6 +55,9 @@
 #define DESCR_ACCESS_EN_OFFFSET 4
 #define INIT_PWR_MODE_OFFSET 5
 #define HIGH_PRIORITY_LUN_OFFSET 6
+#define WB_USER_SPACE_OFFSET 16
+#define WB_CONFIGURE_OFFSET 17
+#define WB_SHARED_BUFFER_OFFSET 18
 
 static void populate_desc_header(struct ufs_tegra_host *ufs_tegra)
 {
@@ -68,6 +72,8 @@ static void populate_desc_header(struct ufs_tegra_host *ufs_tegra)
 			ufs_tegra->descr_access_en;
 		lun_desc_buf[INIT_PWR_MODE_OFFSET] = ACTIVE_MODE;
 		lun_desc_buf[HIGH_PRIORITY_LUN_OFFSET] = EQUAL_PRIORITY;
+		lun_desc_buf[WB_USER_SPACE_OFFSET] = ufs_tegra->enable_shared_wb;
+		lun_desc_buf[WB_CONFIGURE_OFFSET] = ufs_tegra->enable_shared_wb;
 	} else
 		dev_err(NULL, "lun_desc_buf is null\n");
 }
@@ -558,6 +564,8 @@ static int create_desc_debugfs_nodes(struct dentry *parent_lun_root,
 				lun_desc_off + PROV_TYPE_OFFSET);
 	debugfs_create_x16("wContextCapabilities", 0644,
 		parent_lun_root, (u16 *)(lun_desc_off + CONTEXT_CAP_OFFSET));
+	debugfs_create_x32("dWBAllocUnits", 0644, parent_lun_root,
+			(u32 *)(lun_desc_off + WB_ALLOC_UNITS_OFFSET));
 
 	return 0;
 }
@@ -600,6 +608,10 @@ void debugfs_provision_init(struct ufs_hba *hba, struct dentry *device_root)
 			lun_root, &(ufs_tegra->boot_enable));
 	debugfs_create_x32("descr_access_en", 0644,
 			lun_root, &(ufs_tegra->descr_access_en));
+	debugfs_create_x32("shared_wb_alloc_units", 0644,
+			lun_root, (u32 *)(ufs_tegra->lun_desc_buf + WB_SHARED_BUFFER_OFFSET));
+	debugfs_create_x8("enable_shared_wb", 0644,
+			lun_root, &(ufs_tegra->enable_shared_wb));
 	debugfs_create_file("program_lun", 0644,
 			lun_root, hba, &program_lun_debugfs_ops);
 
