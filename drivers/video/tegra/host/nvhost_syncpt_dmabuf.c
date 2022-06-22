@@ -3,6 +3,7 @@
  * Copyright (c) 2022, NVIDIA Corporation.  All rights reserved.
  */
 
+#include <linux/slab.h>
 #include <linux/nvhost.h>
 #include <linux/nvhost_t194.h>
 #include <linux/dma-buf.h>
