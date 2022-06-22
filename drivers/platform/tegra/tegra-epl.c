@@ -107,7 +107,7 @@ static ssize_t device_file_ioctl(
 	uint32_t lData[MAX_LEN];
 	int ret;
 
-	if (copy_from_user(lData, (uint8_t *)arg,
+	if (copy_from_user(lData, (void __user *)arg,
 				 MAX_LEN * sizeof(uint32_t)))
 		return -EACCES;
 
