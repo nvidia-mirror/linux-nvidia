@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA Corporation.  All rights reserved.
  *
  * NVIDIA Corporation and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -522,7 +522,7 @@ struct CAPTURE_CSI_STREAM_TPG_START_RATE_REQ_MSG {
 	/** TPG frame rate in Hz */
 	uint32_t frame_rate;
 	/** Reserved */
-	uint32_t __pad32;
+	uint32_t pad32__;
 } CAPTURE_IVC_ALIGN;
 
 /**
@@ -561,7 +561,7 @@ struct CAPTURE_CSI_STREAM_TPG_APPLY_GAIN_REQ_MSG {
 	/** Gain ratio */
 	uint32_t gain_ratio;
 	/** Reserved */
-	uint32_t __pad32;
+	uint32_t pad32__;
 } CAPTURE_IVC_ALIGN;
 
 /**
@@ -571,7 +571,7 @@ struct CAPTURE_CSI_STREAM_TPG_APPLY_GAIN_RESP_MSG {
 	/** TPG apply gain request status. See @ref CapErrorCodes "Return values". */
 	uint32_t result;
 	/** Reserved */
-	uint32_t __pad32;
+	uint32_t pad32__;
 } CAPTURE_IVC_ALIGN;
 
 /**

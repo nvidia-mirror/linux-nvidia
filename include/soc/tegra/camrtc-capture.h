@@ -379,7 +379,7 @@ struct csi_stream_config {
 	/** CSI Virtual Channel */
 	uint32_t virtual_channel;
 	/** Reserved */
-	uint32_t __pad;
+	uint32_t pad__;
 };
 
 /**
@@ -410,7 +410,7 @@ struct capture_channel_config {
 	uint32_t vi_unit_id;
 
 	/** Reserved */
-	uint32_t __pad;
+	uint32_t pad__;
 
 	/**
 	 * A bitmask indicating which VI channels to consider for allocation. LSB is VI channel 0.
