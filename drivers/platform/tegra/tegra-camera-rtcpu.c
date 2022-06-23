@@ -1382,7 +1382,14 @@ static int tegra_camrtc_halt(struct device *dev)
 
 static int tegra_camrtc_resume(struct device *dev)
 {
-	return tegra_camrtc_poweron(dev, false);
+	int err;
+
+	err = tegra_camrtc_poweron(dev, false);
+
+	if (err == 0)
+		err = tegra_camrtc_boot(dev);
+
+	return err;
 }
 
 static void tegra_cam_rtcpu_shutdown(struct platform_device *pdev)
