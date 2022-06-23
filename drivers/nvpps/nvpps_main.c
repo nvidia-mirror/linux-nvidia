@@ -51,7 +51,7 @@ static dev_t		s_nvpps_devt;
 static DEFINE_MUTEX(s_nvpps_lock);
 static DEFINE_IDR(s_nvpps_idr);
 
-static char *interface_name;
+static char *interface_name = "eth0";
 
 
 /* platform device instance data */
@@ -179,6 +179,10 @@ static inline u64 __arch_counter_get_cntvct(void)
  * Get PTP time
  * Clients may call this API whenever PTP time is needed.
  * If PTP time source is not registered, returns -EINVAL
+ *
+ * This API is available irrespective of nvpps dt availablity
+ * When nvpps dt node is not present, interface name will
+ * default to "eth0".
  */
 int nvpps_get_ptp_ts(void *ts)
 {

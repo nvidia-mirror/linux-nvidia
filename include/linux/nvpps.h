@@ -19,6 +19,10 @@
  * Get PTP time
  * Clients may call the API every and anytime PTP time is needed.
  * If PTP time source is not registered, returns -EINVAL
+ *
+ * This API is available irrespective of nvpps dt availablity
+ * When nvpps dt node is not present, interface name will
+ * default to "eth0".
  */
 int nvpps_get_ptp_ts(void *ts);
 
