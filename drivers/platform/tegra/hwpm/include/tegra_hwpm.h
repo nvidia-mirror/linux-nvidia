@@ -361,8 +361,8 @@ struct tegra_soc_hwpm_chip {
 	u32 resource_enum, u8 *status);
 
 	int (*init_prod_values)(struct tegra_soc_hwpm *hwpm);
-	int (*disable_slcg)(struct tegra_soc_hwpm *hwpm);
-	int (*enable_slcg)(struct tegra_soc_hwpm *hwpm);
+	int (*disable_cg)(struct tegra_soc_hwpm *hwpm);
+	int (*enable_cg)(struct tegra_soc_hwpm *hwpm);
 
 	int (*reserve_rtr)(struct tegra_soc_hwpm *hwpm);
 	int (*release_rtr)(struct tegra_soc_hwpm *hwpm);

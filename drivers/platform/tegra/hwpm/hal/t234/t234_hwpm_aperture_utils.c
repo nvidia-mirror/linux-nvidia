@@ -198,10 +198,17 @@ int t234_hwpm_init_prod_values(struct tegra_soc_hwpm *hwpm)
 		return err;
 	}
 
+	/* CG enable is expected PROD value */
+	err = hwpm->active_chip->enable_cg(hwpm);
+	if (err < 0) {
+		tegra_hwpm_err(hwpm, "Unable to enable SLCG");
+		return err;
+	}
+
 	return 0;
 }
 
-int t234_hwpm_disable_slcg(struct tegra_soc_hwpm *hwpm)
+int t234_hwpm_disable_cg(struct tegra_soc_hwpm *hwpm)
 {
 	int err = 0;
 	u32 field_mask = 0U;
@@ -257,7 +264,7 @@ int t234_hwpm_disable_slcg(struct tegra_soc_hwpm *hwpm)
 	return 0;
 }
 
-int t234_hwpm_enable_slcg(struct tegra_soc_hwpm *hwpm)
+int t234_hwpm_enable_cg(struct tegra_soc_hwpm *hwpm)
 {
 	int err = 0;
 	u32 reg_val = 0U;

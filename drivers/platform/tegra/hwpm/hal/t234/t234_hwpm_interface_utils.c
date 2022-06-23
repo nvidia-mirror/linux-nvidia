@@ -38,8 +38,8 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 	.get_resource_info = t234_hwpm_get_resource_info,
 
 	.init_prod_values = t234_hwpm_init_prod_values,
-	.disable_slcg = t234_hwpm_disable_slcg,
-	.enable_slcg = t234_hwpm_enable_slcg,
+	.disable_cg = t234_hwpm_disable_cg,
+	.enable_cg = t234_hwpm_enable_cg,
 
 	.reserve_rtr = tegra_hwpm_reserve_rtr,
 	.release_rtr = tegra_hwpm_release_rtr,
@@ -118,13 +118,13 @@ static bool t234_hwpm_validate_hals(struct tegra_soc_hwpm *hwpm)
 		return false;
 	}
 
-	if (hwpm->active_chip->disable_slcg == NULL) {
-		tegra_hwpm_err(hwpm, "disable_slcg uninitialized");
+	if (hwpm->active_chip->disable_cg == NULL) {
+		tegra_hwpm_err(hwpm, "disable_cg uninitialized");
 		return false;
 	}
 
-	if (hwpm->active_chip->enable_slcg == NULL) {
-		tegra_hwpm_err(hwpm, "enable_slcg uninitialized");
+	if (hwpm->active_chip->enable_cg == NULL) {
+		tegra_hwpm_err(hwpm, "enable_cg uninitialized");
 		return false;
 	}
 

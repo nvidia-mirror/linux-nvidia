@@ -86,8 +86,8 @@ int t234_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
 	u32 resource_enum, u8 *status);
 
 int t234_hwpm_init_prod_values(struct tegra_soc_hwpm *hwpm);
-int t234_hwpm_disable_slcg(struct tegra_soc_hwpm *hwpm);
-int t234_hwpm_enable_slcg(struct tegra_soc_hwpm *hwpm);
+int t234_hwpm_disable_cg(struct tegra_soc_hwpm *hwpm);
+int t234_hwpm_enable_cg(struct tegra_soc_hwpm *hwpm);
 
 int t234_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_perfmon_enable(struct tegra_soc_hwpm *hwpm,

@@ -183,17 +183,17 @@ int tegra_hwpm_setup_hw(struct tegra_soc_hwpm *hwpm)
 		goto fail;
 	}
 
-	/* Disable SLCG */
-	ret = hwpm->active_chip->disable_slcg(hwpm);
-	if (ret < 0) {
-		tegra_hwpm_err(hwpm, "Unable to disable SLCG");
-		goto fail;
-	}
-
 	/* Program PROD values */
 	ret = hwpm->active_chip->init_prod_values(hwpm);
 	if (ret < 0) {
 		tegra_hwpm_err(hwpm, "Unable to set PROD values");
+		goto fail;
+	}
+
+	/* Disable SLCG */
+	ret = hwpm->active_chip->disable_cg(hwpm);
+	if (ret < 0) {
+		tegra_hwpm_err(hwpm, "Unable to disable SLCG");
 		goto fail;
 	}
 
@@ -215,8 +215,8 @@ int tegra_hwpm_release_hw(struct tegra_soc_hwpm *hwpm)
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	/* Enable SLCG */
-	ret = hwpm->active_chip->enable_slcg(hwpm);
+	/* Enable CG */
+	ret = hwpm->active_chip->enable_cg(hwpm);
 	if (ret < 0) {
 		tegra_hwpm_err(hwpm, "Unable to enable SLCG");
 		goto fail;
