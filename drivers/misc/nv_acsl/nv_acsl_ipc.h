@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (C) 2021 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2021-2022 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -18,7 +18,7 @@
 
 #include <linux/tegra_nvadsp.h>
 
-#define MAX_COMP 120   /** Max Components */
+#define MAX_COMP 160   /** Max Components */
 
 #define ACSL_TIMEOUT 5000 /* 5000 ms */
 #define ADSP_CORES 4      /* Numbers of ADSP Cores */
