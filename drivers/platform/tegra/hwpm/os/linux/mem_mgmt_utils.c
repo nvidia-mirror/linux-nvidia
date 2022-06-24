@@ -27,6 +27,7 @@
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_timers.h>
 #include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_static_analysis.h>
 
@@ -243,10 +244,10 @@ int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm)
 
 	/* Stream MEM_BYTES to clear pipeline */
 	if (hwpm->mem_mgmt->mem_bytes_kernel) {
-		s32 timeout_msecs = 1000;
-		u32 sleep_msecs = 100;
 		u32 *mem_bytes_kernel_u32 =
 			(u32 *)(hwpm->mem_mgmt->mem_bytes_kernel);
+		u32 sleep_msecs = 100;
+		struct tegra_hwpm_timeout timeout;
 
 		do {
 			ret = hwpm->active_chip->stream_mem_bytes(hwpm);
@@ -255,13 +256,12 @@ int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm)
 					"Trigger mem_bytes streaming failed");
 				goto fail;
 			}
-			msleep(sleep_msecs);
-			timeout_msecs -= sleep_msecs;
+			tegra_hwpm_msleep(sleep_msecs);
 		} while ((*mem_bytes_kernel_u32 ==
 			TEGRA_SOC_HWPM_MEM_BYTES_INVALID) &&
-			(timeout_msecs > 0));
+			(tegra_hwpm_timeout_expired(hwpm, &timeout) == 0));
 
-		if (timeout_msecs <= 0) {
+		if (*mem_bytes_kernel_u32 == TEGRA_SOC_HWPM_MEM_BYTES_INVALID) {
 			tegra_hwpm_err(hwpm,
 				"Timeout expired for MEM_BYTES streaming");
 			return -ETIMEDOUT;

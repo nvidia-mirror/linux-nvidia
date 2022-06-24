@@ -16,6 +16,7 @@ obj-y += os/linux/ip_utils.o
 obj-y += os/linux/ioctl.o
 obj-y += os/linux/kmem.o
 obj-y += os/linux/log.o
+obj-y += os/linux/timers.o
 obj-y += os/linux/mem_mgmt_utils.o
 obj-y += os/linux/regops_utils.o
 
