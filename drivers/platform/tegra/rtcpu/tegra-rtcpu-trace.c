@@ -326,7 +326,9 @@ static inline void rtcpu_trace_exceptions(struct tegra_rtcpu_trace *tracer)
 				tracer->exception_entries);
 
 	while (old_next != new_next) {
-		void *emem = tracer->exceptions_base +
+		void *emem;
+		old_next = array_index_nospec(old_next, tracer->exception_entries);
+		emem = tracer->exceptions_base +
 			CAMRTC_TRACE_EXCEPTION_SIZE * old_next;
 		memcpy(&exc.mem, emem, CAMRTC_TRACE_EXCEPTION_SIZE);
 		rtcpu_trace_exception(tracer, &exc.exc);
@@ -1124,6 +1126,7 @@ static inline void rtcpu_trace_events(struct tegra_rtcpu_trace *tracer)
 
 	/* pull events */
 	while (old_next != new_next) {
+		old_next = array_index_nospec(old_next, tracer->event_entries);
 		event = &tracer->events[old_next];
 		last_event = event;
 		rtcpu_trace_event(tracer, event);
