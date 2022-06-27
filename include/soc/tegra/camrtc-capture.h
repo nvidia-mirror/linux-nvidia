@@ -935,6 +935,10 @@ struct capture_status {
  * Programming NOTIFY v0.0.0" for details.
  */
 #define CAPTURE_STATUS_CHANSEL_NOMATCH		MK_U32(15)
+/** Capture status for invalid VI capture settings.
+ * Value of @ref err_data "err_data" is undefined.
+ */
+#define CAPTURE_STATUS_INVALID_CAP_SETTINGS	MK_U32(16)
 /** @} */
 
 	/** Start of Frame (SOF) timestamp (ns) */
