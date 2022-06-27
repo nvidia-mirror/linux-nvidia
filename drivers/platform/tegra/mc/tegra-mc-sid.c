@@ -1,7 +1,7 @@
 /*
  * MC StreamID configuration
  *
- * Copyright (c) 2015-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,7 +20,6 @@
 
 #include <linux/err.h>
 #include <linux/module.h>
-#include <linux/debugfs.h>
 #include <linux/version.h>
 #if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
 #include <soc/tegra/chip-id.h>
@@ -53,7 +52,6 @@ struct tegra_mc_sid {
 	void __iomem *base;
 	void __iomem *sid_base;
 	const struct tegra_mc_sid_soc_data *soc_data;
-	struct dentry *debugfs_root;
 };
 
 static struct tegra_mc_sid *mc_sid;
@@ -151,76 +149,6 @@ void platform_override_streamid(int sid)
 	}
 }
 
-#if defined(CONFIG_DEBUG_FS)
-
-enum { ORD, SEC, MAX_REGS_TYPE};
-
-static const char * const mc_regs_type[] = { "ord", "sec", };
-
-static int mc_reg32_debugfs_set(void *data, u64 val)
-{
-	writel(val, data);
-	return 0;
-}
-
-static int mc_reg32_debugfs_get(void *data, u64 *val)
-{
-	*val = readl(data);
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(mc_reg32_debugfs_fops,
-			mc_reg32_debugfs_get,
-			mc_reg32_debugfs_set, "%08llx\n");
-
-static void tegra_mc_sid_create_debugfs(void)
-{
-	int i, j;
-
-	mc_sid->debugfs_root = debugfs_create_dir("tegra_mc_sid", NULL);
-	if (!mc_sid->debugfs_root)
-		return;
-
-	for (i = 0; i < MAX_REGS_TYPE; i++) {
-		void __iomem *base;
-		struct dentry *dent;
-
-		if (i == SEC)
-			base = mc_sid->sid_base + sizeof(u32);
-		else
-			base = mc_sid->sid_base;
-
-		dent = debugfs_create_dir(mc_regs_type[i],
-						mc_sid->debugfs_root);
-		if (!dent)
-			continue;
-
-		for (j = 0; j < mc_sid->soc_data->nsid_override_reg; j++) {
-			void *addr;
-
-			addr = base +
-				mc_sid->soc_data->sid_override_reg[j].offs;
-			debugfs_create_file(
-				mc_sid->soc_data->sid_override_reg[j].name,
-				S_IRUGO | S_IWUSR, dent, addr,
-				&mc_reg32_debugfs_fops);
-		}
-	}
-}
-
-static void tegra_mc_sid_remove_debugfs(void)
-{
-	debugfs_remove_recursive(mc_sid->debugfs_root);
-}
-#else
-static inline void tegra_mc_sid_create_debugfs(void)
-{
-}
-static void tegra_mc_sid_remove_debugfs(void)
-{
-}
-#endif	/* CONFIG_DEBUG_FS */
-
 int tegra_mc_sid_probe(struct platform_device *pdev,
 			const struct tegra_mc_sid_soc_data *soc_data)
 {
@@ -241,8 +169,6 @@ int tegra_mc_sid_probe(struct platform_device *pdev,
 
 	mc_sid->sid_base = addr;
 
-	tegra_mc_sid_create_debugfs();
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tegra_mc_sid_probe);
@@ -251,7 +177,6 @@ int tegra_mc_sid_remove(struct platform_device *pdev)
 {
 	struct tegra_mc_sid_override *entry, *next;
 
-	tegra_mc_sid_remove_debugfs();
 	list_for_each_entry_safe(entry, next, &sid_override_list, list) {
 		list_del(&entry->list);
 		kfree(entry);
