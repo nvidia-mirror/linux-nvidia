@@ -30,6 +30,7 @@
 #include <linux/sizes.h>
 #include <linux/io.h>
 #include <linux/version.h>
+#include <linux/limits.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 #include <linux/sched/clock.h>
@@ -205,6 +206,10 @@ static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
 		dma_mark_declared_memory_unoccupied(dev, base, len,
 						    DMA_ATTR_ALLOC_EXACT_SIZE);
 #else
+		if (len > INT_MAX) {
+			pr_err("len exceeded\n");
+			return;
+		}
 		nvmap_dma_release_from_dev_coherent(dev, len, (void *)(uintptr_t)base);
 #endif
 	} else
