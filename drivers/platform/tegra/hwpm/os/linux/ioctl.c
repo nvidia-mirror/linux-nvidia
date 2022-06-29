@@ -29,6 +29,7 @@
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
+#include <os/linux/mem_mgmt_utils.h>
 
 #define LA_CLK_RATE 625000000UL
 
@@ -189,7 +190,7 @@ static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 		query_allowlist->allowlist_size = hwpm->full_alist_size;
 	} else {
 		/* Concatenate allowlists and return */
-		ret = tegra_hwpm_update_allowlist(hwpm, query_allowlist);
+		ret = tegra_hwpm_map_update_allowlist(hwpm, query_allowlist);
 		if (ret != 0) {
 			tegra_hwpm_err(hwpm, "Failed to update full alist");
 			return ret;

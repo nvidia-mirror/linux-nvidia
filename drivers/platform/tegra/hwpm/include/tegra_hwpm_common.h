@@ -64,8 +64,7 @@ int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, bool disable);
 
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm);
-int tegra_hwpm_update_allowlist(struct tegra_soc_hwpm *hwpm,
-	void *ioctl_struct);
+int tegra_hwpm_combine_alist(struct tegra_soc_hwpm *hwpm, u64 *alist);
 int tegra_hwpm_exec_regops(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_exec_reg_ops *exec_reg_ops);
 
@@ -79,11 +78,5 @@ int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info);
 int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_resource_info *rsrc_info);
-
-int tegra_hwpm_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream);
-int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm);
-int tegra_hwpm_update_mem_bytes(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_update_get_put *update_get_put);
 
 #endif /* TEGRA_HWPM_COMMON_H */

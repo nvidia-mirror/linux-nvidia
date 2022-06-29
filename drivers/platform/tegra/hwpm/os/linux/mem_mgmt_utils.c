@@ -24,8 +24,10 @@
 
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm.h>
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
+#include <os/linux/mem_mgmt_utils.h>
 
 static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
@@ -49,6 +51,16 @@ static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_err(hwpm, "Unable to map stream attachment");
 		return PTR_ERR(hwpm->stream_sgt);
 	}
+
+	alloc_pma_stream->stream_buf_pma_va =
+					sg_dma_address(hwpm->stream_sgt->sgl);
+	if (alloc_pma_stream->stream_buf_pma_va == 0) {
+		tegra_hwpm_err(hwpm, "Invalid stream buffer SMMU IOVA");
+		return -ENXIO;
+	}
+	tegra_hwpm_dbg(hwpm, hwpm_dbg_alloc_pma_stream,
+		"stream_buf_pma_va = 0x%llx",
+		alloc_pma_stream->stream_buf_pma_va);
 
 	return 0;
 }
@@ -150,17 +162,6 @@ int tegra_hwpm_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_err(hwpm, "Failed to map stream buffer");
 		goto fail;
 	}
-
-	alloc_pma_stream->stream_buf_pma_va =
-					sg_dma_address(hwpm->stream_sgt->sgl);
-	if (alloc_pma_stream->stream_buf_pma_va == 0) {
-		tegra_hwpm_err(hwpm, "Invalid stream buffer SMMU IOVA");
-		ret = -ENXIO;
-		goto fail;
-	}
-	tegra_hwpm_dbg(hwpm, hwpm_dbg_alloc_pma_stream,
-		"stream_buf_pma_va = 0x%llx",
-		alloc_pma_stream->stream_buf_pma_va);
 
 	/* Memory map mem bytes buffer */
 	ret = tegra_hwpm_dma_map_mem_bytes_buffer(hwpm, alloc_pma_stream);
@@ -298,4 +299,91 @@ int tegra_hwpm_update_mem_bytes(struct tegra_soc_hwpm *hwpm,
 	}
 
 	return 0;
+}
+
+int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
+	void *ioctl_struct)
+{
+	int err = 0;
+	u64 pinned_pages = 0;
+	u64 page_idx = 0;
+	u64 alist_buf_size = 0;
+	u64 num_pages = 0;
+	u64 *full_alist_u64 = NULL;
+	void *full_alist = NULL;
+	struct page **pages = NULL;
+	struct tegra_soc_hwpm_query_allowlist *query_allowlist =
+			(struct tegra_soc_hwpm_query_allowlist *)ioctl_struct;
+	unsigned long user_va = (unsigned long)(query_allowlist->allowlist);
+	unsigned long offset = user_va & ~PAGE_MASK;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+	if (hwpm->full_alist_size == 0ULL) {
+		tegra_hwpm_err(hwpm, "Invalid allowlist size");
+		return -EINVAL;
+	}
+
+	alist_buf_size = tegra_hwpm_safe_mult_u64(hwpm->full_alist_size,
+		hwpm->active_chip->get_alist_buf_size(hwpm));
+
+	tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_allowlist,
+		"alist_buf_size 0x%llx", alist_buf_size);
+
+	/* Memory map user buffer into kernel address space */
+	alist_buf_size = tegra_hwpm_safe_add_u64(offset, alist_buf_size);
+
+	/* Round-up and Divide */
+	alist_buf_size = tegra_hwpm_safe_sub_u64(
+		tegra_hwpm_safe_add_u64(alist_buf_size, PAGE_SIZE), 1ULL);
+	num_pages = alist_buf_size / PAGE_SIZE;
+
+	pages = tegra_hwpm_kcalloc(hwpm, num_pages, sizeof(*pages));
+	if (!pages) {
+		tegra_hwpm_err(hwpm,
+			"Couldn't allocate memory for pages array");
+		err = -ENOMEM;
+		goto alist_unmap;
+	}
+
+	pinned_pages = get_user_pages(user_va & PAGE_MASK, num_pages, 0,
+				pages, NULL);
+	if (pinned_pages != num_pages) {
+		tegra_hwpm_err(hwpm, "Requested %llu pages / Got %ld pages",
+				num_pages, pinned_pages);
+		err = -ENOMEM;
+		goto alist_unmap;
+	}
+
+	full_alist = vmap(pages, num_pages, VM_MAP, PAGE_KERNEL);
+	if (!full_alist) {
+		tegra_hwpm_err(hwpm, "Couldn't map allowlist buffer into"
+				   " kernel address space");
+		err = -ENOMEM;
+		goto alist_unmap;
+	}
+	full_alist_u64 = (u64 *)(full_alist + offset);
+
+	err = tegra_hwpm_combine_alist(hwpm, full_alist_u64);
+	if (err != 0) {
+		goto alist_unmap;
+	}
+
+	query_allowlist->allowlist_size = hwpm->full_alist_size;
+	return 0;
+
+alist_unmap:
+	if (full_alist)
+		vunmap(full_alist);
+	if (pinned_pages > 0) {
+		for (page_idx = 0ULL; page_idx < pinned_pages; page_idx++) {
+			set_page_dirty(pages[page_idx]);
+			put_page(pages[page_idx]);
+		}
+	}
+	if (pages) {
+		tegra_hwpm_kfree(hwpm, pages);
+	}
+
+	return err;
 }
