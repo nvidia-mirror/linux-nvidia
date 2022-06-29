@@ -16,6 +16,7 @@
 
 #include <tegra_hwpm_static_analysis.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
@@ -49,8 +50,8 @@ static int tegra_hwpm_perfmon_reserve(struct tegra_soc_hwpm *hwpm,
 		u64 address_range = tegra_hwpm_safe_add_u64(
 			tegra_hwpm_safe_sub_u64(res->end, res->start), 1ULL);
 		u64 num_regs = address_range / sizeof(u32);
-		perfmon->fake_registers = (u32 *)kzalloc(sizeof(u32) * num_regs,
-						GFP_KERNEL);
+		perfmon->fake_registers =
+			tegra_hwpm_kcalloc(hwpm, num_regs, sizeof(u32));
 		if (perfmon->fake_registers == NULL) {
 			tegra_hwpm_err(hwpm, "Perfmon (0x%llx - 0x%llx) "
 				"Couldn't allocate memory for fake regs",
@@ -77,7 +78,7 @@ static int tegra_hwpm_perfmux_reserve(struct tegra_soc_hwpm *hwpm,
 		u64 num_regs = address_range / sizeof(u32);
 
 		perfmux->fake_registers =
-			kcalloc(num_regs, sizeof(u32), GFP_KERNEL);
+			tegra_hwpm_kcalloc(hwpm, num_regs, sizeof(u32));
 		if (perfmux->fake_registers == NULL) {
 			tegra_hwpm_err(hwpm, "Aperture(0x%llx - 0x%llx):"
 				" Couldn't allocate memory for fake registers",
@@ -141,7 +142,7 @@ static int tegra_hwpm_perfmon_release(struct tegra_soc_hwpm *hwpm,
 	perfmon->end_pa = 0ULL;
 
 	if (perfmon->fake_registers) {
-		kfree(perfmon->fake_registers);
+		tegra_hwpm_kfree(hwpm, perfmon->fake_registers);
 		perfmon->fake_registers = NULL;
 	}
 	return 0;
@@ -157,7 +158,7 @@ static int tegra_hwpm_perfmux_release(struct tegra_soc_hwpm *hwpm,
 	 * This is only required for fake registers
 	 */
 	if (perfmux->fake_registers) {
-		kfree(perfmux->fake_registers);
+		tegra_hwpm_kfree(hwpm, perfmux->fake_registers);
 		perfmux->fake_registers = NULL;
 	}
 
@@ -235,7 +236,7 @@ static void tegra_hwpm_free_dynamic_inst_array(struct tegra_soc_hwpm *hwpm,
 			continue;
 		}
 
-		kfree(inst_a_info->inst_arr);
+		tegra_hwpm_kfree(hwpm, inst_a_info->inst_arr);
 	}
 }
 
@@ -556,7 +557,7 @@ static int tegra_hwpm_func_all_elements_of_type(struct tegra_soc_hwpm *hwpm,
 
 	if (iia_func == TEGRA_HWPM_RELEASE_IP_STRUCTURES) {
 		if (e_info->element_arr != NULL) {
-			kfree(e_info->element_arr);
+			tegra_hwpm_kfree(hwpm, e_info->element_arr);
 		}
 	}
 

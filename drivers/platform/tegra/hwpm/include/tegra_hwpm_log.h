@@ -58,6 +58,8 @@ enum tegra_soc_hwpm_log_type {
 #define hwpm_dbg_update_get_put		BIT(15)
 /* Driver release specific verbose prints */
 #define hwpm_dbg_driver_release		BIT(16)
+/* Kmem debug prints */
+#define hwpm_dbg_kmem			BIT(17)
 
 
 #define tegra_hwpm_err(hwpm, fmt, arg...)				\

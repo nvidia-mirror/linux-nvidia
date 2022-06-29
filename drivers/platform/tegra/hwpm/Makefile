@@ -13,6 +13,7 @@ obj-y += os/linux/driver.o
 obj-y += os/linux/io.o
 obj-y += os/linux/ip_utils.o
 obj-y += os/linux/ioctl.o
+obj-y += os/linux/kmem.o
 obj-y += os/linux/log.o
 
 obj-y += common/allowlist.o

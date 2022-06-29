@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm.h>
@@ -439,9 +440,8 @@ int t234_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
 	struct hwpm_ip **t234_active_ip_info;
 
 	/* Allocate array of pointers to hold active IP structures */
-	t234_chip_info.chip_ips =
-		kzalloc(sizeof(struct hwpm_ip *) * T234_HWPM_IP_MAX,
-						GFP_KERNEL);
+	t234_chip_info.chip_ips = tegra_hwpm_kcalloc(
+		hwpm, T234_HWPM_IP_MAX, sizeof(struct hwpm_ip *));
 
 	/* Add active chip structure link to hwpm super-structure */
 	hwpm->active_chip = &t234_chip_info;

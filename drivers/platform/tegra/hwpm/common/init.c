@@ -25,6 +25,7 @@
 #include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
@@ -132,11 +133,11 @@ void tegra_hwpm_release_sw_components(struct tegra_soc_hwpm *hwpm)
 	while (node != NULL) {
 		tmp_node = node;
 		node = tmp_node->next;
-		kfree(tmp_node);
+		tegra_hwpm_kfree(hwpm, tmp_node);
 	}
 
-	kfree(hwpm->active_chip->chip_ips);
-	kfree(hwpm);
+	tegra_hwpm_kfree(hwpm, hwpm->active_chip->chip_ips);
+	tegra_hwpm_kfree(hwpm, hwpm);
 	tegra_soc_hwpm_pdev = NULL;
 }
 

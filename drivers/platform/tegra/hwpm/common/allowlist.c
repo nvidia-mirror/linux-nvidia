@@ -25,6 +25,7 @@
 
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_log.h>
+#include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
 
@@ -111,7 +112,7 @@ int tegra_hwpm_update_allowlist(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_safe_add_u64(alist_buf_size, PAGE_SIZE), 1ULL);
 	num_pages = alist_buf_size / PAGE_SIZE;
 
-	pages = (struct page **)kzalloc(sizeof(*pages) * num_pages, GFP_KERNEL);
+	pages = tegra_hwpm_kcalloc(hwpm, num_pages, sizeof(*pages));
 	if (!pages) {
 		tegra_hwpm_err(hwpm,
 			"Couldn't allocate memory for pages array");
@@ -155,7 +156,7 @@ alist_unmap:
 		}
 	}
 	if (pages) {
-		kfree(pages);
+		tegra_hwpm_kfree(hwpm, pages);
 	}
 
 	return err;
