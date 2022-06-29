@@ -368,8 +368,8 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	/* Drive PWRDNB pin high to power up the serializer */
 	gpiod_set_value_cansleep(priv->gpiod_pwrdn, 1);
 
-	/* Wait ~2ms for powerup to complete */
-	usleep_range(2000, 2200);
+	/* Wait ~4ms for powerup to complete */
+	usleep_range(4000, 4200);
 
 	/*
 	 * Write RESET_LINK = 1 (for both Phy A, 0x29, and Phy B, 0x33)
@@ -427,6 +427,17 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 
 	queue_delayed_work(priv->wq, &priv->delay_work,
 			   msecs_to_jiffies(500));
+
+
+	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
+	if (ret < 0) {
+		dev_err(dev, "%s: INTR9 register read failed\n", __func__);
+		return -EFAULT;
+	}
+	/* enable INTR8.LOSS_OF_LOCK_OEN */
+	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR8,
+			       MAX_GMSL_DP_SER_INTR8_MASK,
+			       MAX_GMSL_DP_SER_INTR8_VAL);
 
 	return ret;
 }
@@ -615,16 +626,6 @@ static int max_gmsl_dp_ser_probe(struct i2c_client *client)
 		return -EFAULT;
 	}
 
-	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
-	if (ret < 0) {
-		dev_err(dev, "%s: INTR9 register read failed\n", __func__);
-		return -EFAULT;
-	}
-	/* enable INTR8.LOSS_OF_LOCK_OEN */
-	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR8,
-			       MAX_GMSL_DP_SER_INTR8_MASK,
-			       MAX_GMSL_DP_SER_INTR8_VAL);
-
 	priv->ser_errb = of_get_named_gpio(ser, "ser-errb", 0);
 
 	ret = devm_gpio_request_one(&client->dev, priv->ser_errb,
@@ -661,6 +662,41 @@ static int max_gmsl_dp_ser_remove(struct i2c_client *client)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int max_gmsl_dp_ser_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct max_gmsl_dp_ser_priv *priv = i2c_get_clientdata(client);
+
+	/* Drive PWRDNB pin low to power down the serializer */
+	gpiod_set_value_cansleep(priv->gpiod_pwrdn, 0);
+	return 0;
+}
+
+static int max_gmsl_dp_ser_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct max_gmsl_dp_ser_priv *priv = i2c_get_clientdata(client);
+	int ret = 0;
+
+	/*
+	  Drive PWRDNB pin high to power up the serializer
+	  and initialize all registes
+	 */
+	ret = max_gmsl_dp_ser_init(&client->dev);
+	if (ret < 0) {
+		dev_err(&priv->client->dev, "%s: dp serializer init failed\n", __func__);
+	}
+	return ret;
+}
+
+const struct dev_pm_ops max_gmsl_dp_ser_pm_ops = {
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(
+		max_gmsl_dp_ser_suspend, max_gmsl_dp_ser_resume)
+};
+
+#endif
+
 static const struct of_device_id max_gmsl_dp_ser_dt_ids[] = {
 	{ .compatible = "maxim,max_gmsl_dp_ser" },
 	{},
@@ -671,6 +707,9 @@ static struct i2c_driver max_gmsl_dp_ser_i2c_driver = {
 	.driver	= {
 		.name		= "max_gmsl_dp_ser",
 		.of_match_table	= of_match_ptr(max_gmsl_dp_ser_dt_ids),
+#ifdef CONFIG_PM
+		.pm	= &max_gmsl_dp_ser_pm_ops,
+#endif
 	},
 	.probe_new	= max_gmsl_dp_ser_probe,
 	.remove		= max_gmsl_dp_ser_remove,
