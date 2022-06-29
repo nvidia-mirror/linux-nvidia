@@ -14,6 +14,7 @@
 #include <linux/device.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/limits.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 #include "arm/arm-smmu/arm-smmu.h"
@@ -206,6 +207,10 @@ static int smmu_reg32_debugfs_set(void *data, u64 val)
 
 	if (smmu_dfs == NULL) {
 		pr_err("SMMU debugfs setup not complete\n");
+		return -EINVAL;
+	}
+	if (val > U32_MAX) {
+		pr_err("input is out of limit (32-bit)\n");
 		return -EINVAL;
 	}
 	writel(val, (smmu_dfs->bases[smmu_dfs->debug_smmu_id] +
