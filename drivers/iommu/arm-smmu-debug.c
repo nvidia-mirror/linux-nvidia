@@ -150,13 +150,13 @@ static int smmu_context_filter_show(struct seq_file *s, void *unused)
 {
 	struct smmu_debugfs_info *smmu_dfs = s->private;
 	unsigned long *bitmap = smmu_dfs->context_filter;
-	int idx = 0;
+	unsigned long idx = 0;
 
 	while (1) {
 		idx = find_next_bit(bitmap, smmu_dfs->max_cbs, idx);
 		if (idx >= smmu_dfs->num_context_banks)
 			break;
-		seq_printf(s, "%d,", idx);
+		seq_printf(s, "%lu,", idx);
 		idx++;
 	}
 	seq_putc(s, '\n');
