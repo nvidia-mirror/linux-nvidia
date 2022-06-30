@@ -9,6 +9,7 @@ ccflags-y += -I$(srctree.nvidia)/drivers/platform/tegra/hwpm/include
 ccflags-y += -I$(srctree.nvidia)/include
 
 obj-$(CONFIG_DEBUG_FS) += os/linux/debugfs.o
+obj-y += os/linux/aperture_utils.o
 obj-y += os/linux/driver.o
 obj-y += os/linux/io_utils.o
 obj-y += os/linux/ip_utils.o
