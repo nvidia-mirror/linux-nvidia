@@ -153,6 +153,9 @@ static int smmu_context_filter_show(struct seq_file *s, void *unused)
 	unsigned long *bitmap = smmu_dfs->context_filter;
 	unsigned long idx = 0;
 
+	if (smmu_dfs->max_cbs < 0)
+		return -EINVAL;
+
 	while (1) {
 		idx = find_next_bit(bitmap, smmu_dfs->max_cbs, idx);
 		if (idx >= smmu_dfs->num_context_banks)
