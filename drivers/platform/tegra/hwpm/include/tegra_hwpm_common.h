@@ -65,8 +65,6 @@ int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_combine_alist(struct tegra_soc_hwpm *hwpm, u64 *alist);
-int tegra_hwpm_exec_regops(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_exec_reg_ops *exec_reg_ops);
 
 int tegra_hwpm_setup_hw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm);

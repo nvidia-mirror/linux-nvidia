@@ -30,6 +30,7 @@
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
 #include <os/linux/mem_mgmt_utils.h>
+#include <os/linux/regops_utils.h>
 
 #define LA_CLK_RATE 625000000UL
 

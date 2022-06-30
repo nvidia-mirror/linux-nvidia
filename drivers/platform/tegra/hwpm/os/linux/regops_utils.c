@@ -11,8 +11,6 @@
  * more details.
  */
 
-#include <soc/tegra/fuse.h>
-
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
 #include <tegra_hwpm.h>
@@ -20,6 +18,7 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
+#include <os/linux/regops_utils.h>
 
 static int tegra_hwpm_exec_reg_ops(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_reg_op *reg_op)
