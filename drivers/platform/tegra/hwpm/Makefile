@@ -10,7 +10,7 @@ ccflags-y += -I$(srctree.nvidia)/include
 
 obj-$(CONFIG_DEBUG_FS) += os/linux/debugfs.o
 obj-y += os/linux/driver.o
-obj-y += os/linux/io.o
+obj-y += os/linux/io_utils.o
 obj-y += os/linux/ip_utils.o
 obj-y += os/linux/ioctl.o
 obj-y += os/linux/kmem.o

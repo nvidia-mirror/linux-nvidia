@@ -23,7 +23,7 @@
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_static_analysis.h>
 
-int tegra_hwpm_read_sticky_bits(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_read_sticky_bits_impl(struct tegra_soc_hwpm *hwpm,
 	u64 reg_base, u64 reg_offset, u32 *val)
 {
 	void __iomem *ptr = NULL;
@@ -217,7 +217,7 @@ static int hwpm_writel(struct tegra_soc_hwpm *hwpm,
  * Read a HWPM domain register. It is assumed that valid aperture
  * is passed to the function.
  */
-int tegra_hwpm_readl(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 addr, u32 *val)
 {
 	tegra_hwpm_fn(hwpm, " ");
@@ -244,7 +244,7 @@ int tegra_hwpm_readl(struct tegra_soc_hwpm *hwpm,
  * Write to a HWPM domain register. It is assumed that valid aperture
  * is passed to the function.
  */
-int tegra_hwpm_writel(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_writel_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 addr, u32 val)
 {
 	tegra_hwpm_fn(hwpm, " ");
@@ -271,7 +271,7 @@ int tegra_hwpm_writel(struct tegra_soc_hwpm *hwpm,
  * Read a register from the EXEC_REG_OPS IOCTL. It is assumed that the allowlist
  * check has been done before calling this function.
  */
-int tegra_hwpm_regops_readl(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_regops_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
 	u64 addr, u32 *val)
 {
@@ -300,7 +300,7 @@ int tegra_hwpm_regops_readl(struct tegra_soc_hwpm *hwpm,
  * Write a register from the EXEC_REG_OPS IOCTL. It is assumed that the
  * allowlist check has been done before calling this function.
  */
-int tegra_hwpm_regops_writel(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
 	u64 addr, u32 val)
 {

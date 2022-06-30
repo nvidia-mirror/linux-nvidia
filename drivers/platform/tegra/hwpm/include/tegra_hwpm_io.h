@@ -49,22 +49,55 @@ static inline u32 get_field(u32 input_data, u32 mask)
 	return (input_data & mask);
 }
 
+#ifdef __KERNEL__
+#include <os/linux/io_utils.h>
+#else
+int tegra_hwpm_read_sticky_bits_impl(struct tegra_soc_hwpm *hwpm,
+	u64 reg_base, u64 reg_offset, u32 *val)
+{
+	return -EINVAL;
+}
 
-struct tegra_soc_hwpm;
-struct hwpm_ip_inst;
-struct hwpm_ip_aperture;
+int tegra_hwpm_readl_impl(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 addr, u32 *val)
+{
+	return -EINVAL;
+}
 
-int tegra_hwpm_read_sticky_bits(struct tegra_soc_hwpm *hwpm,
-	u64 reg_base, u64 reg_offset, u32 *val);
-int tegra_hwpm_readl(struct tegra_soc_hwpm *hwpm,
-	struct hwpm_ip_aperture *aperture, u64 addr, u32 *val);
-int tegra_hwpm_writel(struct tegra_soc_hwpm *hwpm,
-	struct hwpm_ip_aperture *aperture, u64 addr, u32 val);
-int tegra_hwpm_regops_readl(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_writel_impl(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 addr, u32 val)
+{
+	return -EINVAL;
+}
+
+int tegra_hwpm_regops_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
-	u64 addr, u32 *val);
-int tegra_hwpm_regops_writel(struct tegra_soc_hwpm *hwpm,
+	u64 addr, u32 *val)
+{
+	return -EINVAL;
+}
+
+int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
-	u64 addr, u32 val);
+	u64 addr, u32 val)
+{
+	return -EINVAL;
+}
+#endif
+
+#define tegra_hwpm_read_sticky_bits(hwpm, reg_base, reg_offset, val) \
+	tegra_hwpm_read_sticky_bits_impl(hwpm, reg_base, reg_offset, val)
+
+#define tegra_hwpm_readl(hwpm, aperture, addr, val)	\
+	tegra_hwpm_readl_impl(hwpm, aperture, addr, val)
+
+#define tegra_hwpm_writel(hwpm, aperture, addr, val)	\
+	tegra_hwpm_writel_impl(hwpm, aperture, addr, val)
+
+#define tegra_hwpm_regops_readl(hwpm, ip_inst, aperture, addr, val)	\
+	tegra_hwpm_regops_readl_impl(hwpm, ip_inst, aperture, addr, val)
+
+#define tegra_hwpm_regops_writel(hwpm, ip_inst, aperture, addr, val)	\
+	tegra_hwpm_regops_writel_impl(hwpm, ip_inst, aperture, addr, val)
 
 #endif /* TEGRA_HWPM_IO_H */
