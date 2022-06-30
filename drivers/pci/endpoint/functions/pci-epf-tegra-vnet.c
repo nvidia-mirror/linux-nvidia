@@ -1634,6 +1634,7 @@ static void tvnet_ep_pci_epf_unbind(struct pci_epf *epf)
 	cancel_work_sync(&tvnet->data_irqsp->reprime_work);
 	pci_epc_stop(epc);
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 15, 0))
+	pci_epc_unregister_notifier(epc, &epf->nb);
 	lpci_epc_clear_bar(epc, epf->func_no, epf_bar);
 #else
 	lpci_epc_clear_bar(epc, BAR_0);

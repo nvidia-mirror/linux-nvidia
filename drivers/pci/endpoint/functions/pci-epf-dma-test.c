@@ -1582,6 +1582,10 @@ static void pcie_dma_epf_unbind(struct pci_epf *epf)
 	void *cookie = epfnv->edma.cookie;
 	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *) epfnv->bar0_virt;
 
+	pci_epc_unregister_notifier(epc, &epf->nb);
+#ifdef PCI_EPF_CORE_DEINIT
+	pci_epc_unregister_block_notifier(epc, &epf->block_nb);
+#endif
 	epfnv->edma.cookie = NULL;
 	epf_bar0->rp_phy_addr = 0;
 	tegra_pcie_edma_deinit(cookie);
