@@ -184,7 +184,6 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	goto success;
 
 init_sw_components_fail:
-clock_reset_fail:
 	if (tegra_platform_is_silicon()) {
 		if (hwpm->la_clk)
 			devm_clk_put(hwpm->dev, hwpm->la_clk);
@@ -195,6 +194,8 @@ clock_reset_fail:
 		if (hwpm->hwpm_rst)
 			reset_control_assert(hwpm->hwpm_rst);
 	}
+clock_reset_fail:
+	device_destroy(&hwpm->class, hwpm->dev_t);
 device_create:
 	cdev_del(&hwpm->cdev);
 cdev_add:
