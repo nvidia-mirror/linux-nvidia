@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Interrupt Management
  *
- * Copyright (c) 2010-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -631,11 +631,21 @@ void nvhost_intr_deinit(struct nvhost_intr *intr)
 int nvhost_intr_start(struct nvhost_intr *intr, u32 hz)
 {
 	int err = 0;
+	unsigned int id;
+	struct nvhost_intr_syncpt *syncpt;
+	u32 nb_pts = nvhost_syncpt_nb_hw_pts(&intr_to_dev(intr)->syncpt);
 
 	mutex_lock(&intr->mutex);
 
 	intr_op().resume(intr);
 	intr_op().set_host_clocks_per_usec(intr, (hz + 1000000 - 1)/1000000);
+
+	/* Enabling the Syncpt Threshold interrupts for pending waiters if any*/
+	for (id = 0, syncpt = intr->syncpt;
+			id < nb_pts; ++id, ++syncpt) {
+		if (!list_empty(&syncpt->wait_head))
+			reset_threshold_interrupt(intr, &syncpt->wait_head, id);
+	}
 
 	mutex_unlock(&intr->mutex);
 	return err;
@@ -646,6 +656,7 @@ int nvhost_intr_stop(struct nvhost_intr *intr)
 	unsigned int id;
 	struct nvhost_intr_syncpt *syncpt;
 	u32 nb_pts = nvhost_syncpt_nb_hw_pts(&intr_to_dev(intr)->syncpt);
+	int err = 0;
 
 	mutex_lock(&intr->mutex);
 
@@ -667,7 +678,8 @@ int nvhost_intr_stop(struct nvhost_intr *intr)
 		if (!list_empty(&syncpt->wait_head)) {  /* output diagnostics */
 			intr_op().enable_syncpt_intr(intr, id);
 			mutex_unlock(&intr->mutex);
-			return -EBUSY;
+			pr_warn("%s: syncpt waiter list is not empty\n", __func__);
+			err = -EBUSY;
 		}
 	}
 
@@ -675,7 +687,7 @@ int nvhost_intr_stop(struct nvhost_intr *intr)
 
 	mutex_unlock(&intr->mutex);
 
-	return 0;
+	return err;
 }
 
 void nvhost_intr_enable_host_irq(struct nvhost_intr *intr, int irq,
