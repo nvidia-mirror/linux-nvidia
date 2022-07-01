@@ -89,7 +89,7 @@ struct cvnas_device {
 
 	struct device dma_dev;
 
-	int nslices;
+	u32 nslices;
 	int slice_size;
 	phys_addr_t cvsram_base;
 	size_t cvsram_size;
