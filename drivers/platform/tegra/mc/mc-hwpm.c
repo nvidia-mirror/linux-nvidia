@@ -116,7 +116,7 @@ static int tegra_mc_hwpm_reg_op(void *ip_dev,
  * device 0 = global channel.
  * device n = specific channel device-1, e.g device = 1 ==> channel 0.
  */
-static void __iomem *tegra_mc_hwpm_map_regs(struct platform_device *pdev, int device)
+static void __iomem *tegra_mc_hwpm_map_regs(struct platform_device *pdev, u32 device)
 {
 	struct resource res;
 	const void *prop;
