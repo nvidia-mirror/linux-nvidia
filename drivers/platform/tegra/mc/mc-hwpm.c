@@ -123,7 +123,7 @@ static void __iomem *tegra_mc_hwpm_map_regs(struct platform_device *pdev, int de
 	void __iomem *regs;
 	void __iomem *regs_start = NULL;
 	u32 reg_ranges;
-	int i, start;
+	u32 i, start;
 
 	prop = of_get_property(pdev->dev.of_node, "reg-ranges", NULL);
 	if (!prop) {
