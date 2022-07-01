@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2021, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2016-2022, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -549,20 +549,20 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 
 	if (!dev->ops.get_avg_cnt) {
 		dev_err(mon_dev, "get_avg_cnt operation is not registered\n");
-		return IRQ_NONE;
+		goto fail;
 	}
 	dev->avg_count = dev->ops.get_avg_cnt(offs(dev->reg_offs));
 	actmon_dev_avg_wmark_set(dev);
 
 	if (!dev->ops.get_dev_intr_enb) {
 		dev_err(mon_dev, "get_dev_intr_enb operation is not registered\n");
-		return IRQ_NONE;
+		goto fail;
 	}
 	int_val = dev->ops.get_dev_intr_enb(offs(dev->reg_offs));
 
 	if (!dev->ops.get_intr_st) {
 		dev_err(mon_dev, "get_intr_st operation is not registered\n");
-		return IRQ_NONE;
+		goto fail;
 	}
 	val = dev->ops.get_intr_st(offs(dev->reg_offs));
 
@@ -571,7 +571,7 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 			dev->ops.get_raw_cnt(offs(dev->reg_offs)));
 		if (!dev->ops.enb_dev_wm) {
 			dev_err(mon_dev, "enb_dev_wm operation is not registered\n");
-			return IRQ_NONE;
+			goto fail;
 		}
 		dev->ops.enb_dev_wm(&int_val);
 
@@ -582,7 +582,7 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 			if (!dev->ops.disb_dev_up_wm) {
 				dev_err(mon_dev,
 					"disb_dev_up_wm operation is not registered\n");
-				return IRQ_NONE;
+				goto fail;
 			}
 			dev->ops.disb_dev_up_wm(&int_val);
 		}
@@ -591,7 +591,7 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 			dev->ops.get_raw_cnt(offs(dev->reg_offs)));
 		if (!dev->ops.enb_dev_wm) {
 			dev_err(mon_dev, "enb_dev_wm operation is not registered\n");
-			return IRQ_NONE;
+			goto fail;
 		}
 		dev->ops.enb_dev_wm(&int_val);
 
@@ -601,7 +601,7 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 		if (dev->boost_freq == 0) {
 			if (!dev->ops.disb_dev_dn_wm) {
 				dev_err(mon_dev, "disb_dev_dn_wm operation is not registered\n");
-				return IRQ_NONE;
+				goto fail;
 			}
 			dev->ops.disb_dev_dn_wm(&int_val);
 		}
@@ -609,14 +609,14 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 
 	if (!dev->ops.enb_dev_intr) {
 		dev_err(mon_dev, "enb_dev_intr operation is not registered\n");
-		return IRQ_NONE;
+		goto fail;
 	}
 	dev->ops.enb_dev_intr(int_val, offs(dev->reg_offs));
 
 	/* clr all */
 	if (!dev->ops.set_intr_st) {
 		dev_err(mon_dev, "set_intr_st operation is not registered\n");
-		return IRQ_NONE;
+		goto fail;
 	}
 	dev->ops.set_intr_st(0xffffffff, offs(dev->reg_offs));
 
@@ -624,6 +624,10 @@ static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 	spin_unlock_irqrestore(&dev->lock, flags);
 
 	return IRQ_WAKE_THREAD;
+
+fail:
+	spin_unlock_irqrestore(&dev->lock, flags);
+	return IRQ_NONE;
 }
 
 static irqreturn_t actmon_dev_fn(int irq, void *dev_id)
