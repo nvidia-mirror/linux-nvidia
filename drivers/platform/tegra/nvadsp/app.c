@@ -548,7 +548,8 @@ static void fill_app_instance_data(nvadsp_app_info_t *app,
 
 static nvadsp_app_info_t *create_app_instance(nvadsp_app_handle_t handle,
 	nvadsp_app_args_t *app_args, struct run_app_instance_data *data,
-	app_complete_status_notifier notifier, uint32_t stack_size)
+	app_complete_status_notifier notifier, uint32_t stack_size,
+	uint32_t core_id)
 {
 	struct nvadsp_app_service *ser = (void *)handle;
 	struct device *dev = &priv.pdev->dev;
@@ -581,6 +582,8 @@ static nvadsp_app_info_t *create_app_instance(nvadsp_app_handle_t handle,
 
 	/* assign the stack that is needed by the app */
 	data->stack_size  = stack_size;
+	/* assign the core that is needed by the app */
+	data->core_id  = core_id;
 
 	/* set the state to INITIALIZED. No need to do it in a spin lock */
 	state = (int *)&app->state;
@@ -652,7 +655,8 @@ nvadsp_app_info_t __must_check *nvadsp_app_init(nvadsp_app_handle_t handle,
 	msgq_send = &msg_pool->app_loader_send_message.msgq;
 	data = &message->data;
 
-	app = create_app_instance(handle, args, &data->app_init, NULL, 0);
+	/* Pinning app to core 0 by default */
+	app = create_app_instance(handle, args, &data->app_init, NULL, 0, 0);
 	if (IS_ERR_OR_NULL(app)) {
 		pr_err("Failed to create APP instance\n");
 		kfree(message);
@@ -758,7 +762,8 @@ EXPORT_SYMBOL(nvadsp_app_start);
 
 nvadsp_app_info_t *nvadsp_run_app(nvadsp_os_handle_t os_handle,
 	const char *appfile, nvadsp_app_args_t *app_args,
-	app_complete_status_notifier notifier, uint32_t stack_sz, bool block)
+	app_complete_status_notifier notifier, uint32_t stack_sz,
+	uint32_t core_id, bool block)
 {
 	union app_loader_message message = {};
 	nvadsp_app_handle_t service_handle;
@@ -791,7 +796,7 @@ nvadsp_app_info_t *nvadsp_run_app(nvadsp_os_handle_t os_handle,
 	}
 
 	info = create_app_instance(service_handle, app_args,
-		&data->app_init, notifier, stack_sz);
+		&data->app_init, notifier, stack_sz, core_id);
 	if (IS_ERR_OR_NULL(info)) {
 		dev_err(dev, "unable to create instance for app %s\n", appfile);
 		goto end;

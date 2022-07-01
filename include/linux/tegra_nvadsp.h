@@ -1,7 +1,7 @@
 /*
  * A Header file for managing ADSP/APE
  *
- * Copyright (c) 2014-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -307,7 +307,8 @@ int nvadsp_app_deinit(nvadsp_app_info_t *);
 void *nvadsp_alloc_coherent(size_t, dma_addr_t *, gfp_t);
 void nvadsp_free_coherent(size_t, void *, dma_addr_t);
 nvadsp_app_info_t __must_check *nvadsp_run_app(nvadsp_os_handle_t, const char *,
-	nvadsp_app_args_t *, app_complete_status_notifier, uint32_t, bool);
+	nvadsp_app_args_t *, app_complete_status_notifier,
+	uint32_t, uint32_t, bool);
 void nvadsp_exit_app(nvadsp_app_info_t *app, bool terminate);
 
 static inline void

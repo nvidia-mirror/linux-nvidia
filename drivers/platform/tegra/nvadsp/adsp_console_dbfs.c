@@ -224,13 +224,15 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 			ret = -EACCES;
 			break;
 		}
+
+		dev_info(dev, "Core ID: %d\n", app_args.core_id);
 		app_args.app_name[NVADSP_NAME_SZ_MAX] = '\0';
 
 #ifdef USE_RUN_APP_API
 		app_args.ctx2 = (uint64_t)nvadsp_run_app(NULL,
 			app_args.app_name,
 			(nvadsp_app_args_t *)&app_args.args[0],
-			NULL, 0, true);
+			NULL, 0, app_args.core_id, true);
 		if (!app_args.ctx2) {
 			dev_info(dev, "adsp_consol: unable to run %s\n",
 				app_args.app_name);

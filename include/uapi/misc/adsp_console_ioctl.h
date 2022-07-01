@@ -33,6 +33,7 @@
 #define NV_ADSP_CONSOLE_MAGIC 'q'
 
 struct adsp_consol_run_app_arg_t {
+	uint32_t core_id;
 	char app_name[NVADSP_NAME_SZ];
 	char app_path[NVADSP_NAME_SZ];
 	uint32_t args[ARGV_SIZE_IN_WORDS + 1];
