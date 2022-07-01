@@ -240,11 +240,6 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 		return -EINVAL;
 	}
 
-	if (instance_id >= ip_instances[ip_id]) {
-		pr_err("tegra-hsierrrptinj: Invalid instance for IP Driver 0x%04x\n", ip_id);
-		return -EINVAL;
-	}
-
 	/* Get current timestamp */
 	asm volatile("mrs %0, cntvct_el0" : "=r" (error_report.timestamp));
 
@@ -256,6 +251,11 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lb
 		ret = hsierrrpt_report_to_fsi(error_report);
 		pr_debug("tegra-hsierrrptinj: Reported error to FSI\n");
 		goto done;
+	}
+
+	if (instance_id >= ip_instances[ip_id]) {
+		pr_err("tegra-hsierrrptinj: Invalid instance for IP Driver 0x%04x\n", ip_id);
+		return -EINVAL;
 	}
 
 	/* Trigger IP driver registered callback. If no callback has been registered,
