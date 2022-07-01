@@ -25,7 +25,7 @@
 /* Total channels = Broadcast channel + MC_MAX_CHANNELS */
 #define TOTAL_CHANNELS (1 + MC_MAX_CHANNELS)
 static void __iomem *memctlr_regs[TOTAL_CHANNELS];
-static int dram_channels;
+static u32 dram_channels;
 /**
  * Read from the MC.
  *
