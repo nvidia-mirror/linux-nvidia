@@ -25,6 +25,7 @@
 #include <linux/sysfs.h>
 #include <uapi/linux/tegra_l3_cache.h>
 #include <linux/version.h>
+#include <linux/limits.h>
 #if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
 #include <soc/tegra/chip-id.h>
 #else
@@ -387,6 +388,11 @@ static ssize_t gpu_cpu_ways_store(struct device *device,
 	ret = t19x_set_l3_cache_ways(new_gpu_cpu_ways, gpu_only_ways);
 	if (!ret)
 		pdata->ioctl_data.igpu_cpu_ways = new_gpu_cpu_ways;
+
+	if (count > LONG_MAX) {
+		pr_err("count exceeded\n");
+		return -EINVAL;
+	}
 
 	return count;
 }
