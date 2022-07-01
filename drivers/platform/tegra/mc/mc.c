@@ -233,7 +233,7 @@ int tegra_mc_flush(int id)
 }
 EXPORT_SYMBOL(tegra_mc_flush);
 
-int tegra_mc_flush_done(int id)
+int tegra_mc_flush_done(u32 id)
 {
 	u32 rst_ctrl;
 	u32 rst_ctrl_reg, rst_stat_reg;
