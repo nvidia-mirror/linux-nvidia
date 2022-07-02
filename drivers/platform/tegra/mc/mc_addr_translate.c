@@ -192,7 +192,7 @@ static u64 mc_translate_update_ch(u64 addr, u32 ch)
 	u32 cur_chan;
 	u32 chanbits = 2;
 	u32 chanpos = 10;
-	u32 chanoffset;
+	u64 chanoffset;
 
 	for (cur_chan = 0; (cur_chan < (1 << chanbits)); ++cur_chan) {
 
