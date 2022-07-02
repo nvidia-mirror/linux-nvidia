@@ -76,11 +76,6 @@
 #define TEGRA_VIRTUAL_SE_CMD_AES_GCM_CMD_DECRYPT	0x28
 #define TEGRA_VIRTUAL_SE_CMD_AES_CMAC_SIGN			0x32
 #define TEGRA_VIRTUAL_SE_CMD_AES_CMAC_VERIFY		0x33
-#define TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_IV	0x34
-#define TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_CMAC_SIGN	0x35
-#define TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_CMAC_VERIFY	0x36
-#define TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_VERIFY	0x37
-#define TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GCM_DEC	0x38
 
 #define TEGRA_VIRTUAL_SE_CMD_AES_GMAC_CMD_INIT			(0x29U)
 #define TEGRA_VIRTUAL_SE_CMD_AES_GMAC_CMD_SIGN			(0x30U)
@@ -2147,7 +2142,7 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 	unsigned int total_len;
 	int err = 0;
 	int num_lists = 0;
-	u64 time_left;
+	int time_left;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	unsigned int num_mapped_sgs = 0;
@@ -2249,7 +2244,10 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 
 	priv_data_ptr = (struct tegra_vse_tag *)ivc_req_msg->ivc_hdr.tag;
 	priv_data_ptr->priv_data = (unsigned int *)priv;
-	priv->cmd = VIRTUAL_SE_PROCESS;
+	if (is_last == true)
+		priv->cmd = VIRTUAL_CMAC_PROCESS;
+	else
+		priv->cmd = VIRTUAL_SE_PROCESS;
 
 	priv->se_dev = se_dev;
 	init_completion(&priv->alg_complete);
@@ -2276,44 +2274,7 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 		err = -ETIMEDOUT;
 	}
 
-	if (priv->rx_status != 0) {
-		err = status_to_errno(priv->rx_status);
-		dev_err(se_dev->dev, "%s: SE server returned error %u\n",
-				__func__, priv->rx_status);
-		goto unmap_exit;
-	}
-
 	if (is_last) {
-
-		if (cmac_req_data->request_type == CMAC_SIGN)
-			ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_CMAC_SIGN;
-		else
-			ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_CMAC_VERIFY;
-		priv->cmd = VIRTUAL_CMAC_PROCESS;
-		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			err = -ENODEV;
-			goto unmap_exit;
-		}
-
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
-		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			goto unmap_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "cmac_op timeout\n");
-			err = -ETIMEDOUT;
-		}
-
 		if (cmac_req_data->request_type == CMAC_SIGN) {
 			if (priv->rx_status == 0) {
 				memcpy(req->result,
@@ -2326,13 +2287,13 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 			else
 				cmac_req_data->result = 1;
 		}
+	}
 
-		if ((priv->rx_status != 0) &&
-				(priv->rx_status != TEGRA_VIRTUAL_SE_ERR_MAC_INVALID)) {
-			err = status_to_errno(priv->rx_status);
-			dev_err(se_dev->dev, "%s: SE server returned error %u\n",
-					__func__, priv->rx_status);
-		}
+	if ((priv->rx_status != 0) &&
+			(priv->rx_status != TEGRA_VIRTUAL_SE_ERR_MAC_INVALID)) {
+		err = status_to_errno(priv->rx_status);
+		dev_err(se_dev->dev, "%s: SE server returned error %u\n",
+				__func__, priv->rx_status);
 	}
 
 unmap_exit:
@@ -2942,7 +2903,7 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	int err = 0;
-	u64 time_left;
+	int time_left;
 	uint32_t cryptlen = 0;
 
 	void *aad_buf = NULL;
@@ -3080,10 +3041,8 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 					"\n %s IV generation failed %d\n", __func__, err);
 				goto free_exit;
 			}
-			priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
-		} else {
-			priv->cmd = VIRTUAL_SE_PROCESS;
 		}
+		priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
 		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_GCM_CMD_ENCRYPT;
 	} else {
 		priv->cmd = VIRTUAL_SE_PROCESS;
@@ -3160,39 +3119,6 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 		sg_pcopy_from_buffer(req->dst, sg_nents(req->dst),
 			tag_buf, aes_ctx->authsize,
 			req->assoclen + cryptlen);
-	} else {
-		priv->cmd = VIRTUAL_SE_PROCESS;
-		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GCM_DEC;
-		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			err = -ENODEV;
-			goto free_exit;
-		}
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
-		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			goto free_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-			err = -ETIMEDOUT;
-			goto free_exit;
-		}
-
-		if (priv->rx_status != 0) {
-			dev_err(se_dev->dev, "%s: SE Server returned error %u\n", __func__,
-					priv->rx_status);
-			err = status_to_errno(priv->rx_status);
-			goto free_exit;
-		}
 	}
 
 	sg_pcopy_from_buffer(req->dst, sg_nents(req->dst),
@@ -3409,7 +3335,7 @@ static int tegra_hv_vse_aes_gmac_sv_init(struct ahash_request *req)
 	ivc_hdr->engine = VIRTUAL_SE_AES0;
 	priv_data_ptr = (struct tegra_vse_tag *)ivc_hdr->tag;
 	priv_data_ptr->priv_data = (unsigned int *)priv;
-	priv->cmd = VIRTUAL_SE_PROCESS;
+	priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
 	priv->se_dev = se_dev;
 
 	ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_GMAC_CMD_INIT;
@@ -3417,41 +3343,6 @@ static int tegra_hv_vse_aes_gmac_sv_init(struct ahash_request *req)
 	ivc_tx->aes.op_gcm.key_length = gmac_ctx->keylen;
 
 	vse_thread_start = true;
-	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		dev_err(se_dev->dev, "%s: engine is in suspended state", __func__);
-		err = -ENODEV;
-		goto free_exit;
-	}
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-			sizeof(struct tegra_virtual_se_ivc_msg_t));
-	if (err) {
-		dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-		mutex_unlock(&se_dev->server_lock);
-		goto free_exit;
-	}
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0UL) {
-		dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-		err = -ETIMEDOUT;
-		goto free_exit;
-	}
-
-	if (priv->rx_status != 0) {
-		dev_err(se_dev->dev, "%s: SE server returned error %u\n", __func__,
-									priv->rx_status);
-		err = status_to_errno(priv->rx_status);
-		goto free_exit;
-	}
-
-	ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_IV;
-	priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
 	init_completion(&priv->alg_complete);
 	mutex_lock(&se_dev->server_lock);
 	/* Return error if engine is in suspended state */
@@ -3595,7 +3486,7 @@ static int tegra_hv_vse_aes_gmac_sv_op(struct ahash_request *req, bool is_last)
 
 	priv_data_ptr = (struct tegra_vse_tag *)ivc_hdr->tag;
 	priv_data_ptr->priv_data = (unsigned int *)priv;
-	priv->cmd = VIRTUAL_SE_PROCESS;
+	priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
 	priv->se_dev = se_dev;
 
 	if (gmac_req_data->request_type == GMAC_SIGN)
@@ -3657,52 +3548,21 @@ static int tegra_hv_vse_aes_gmac_sv_op(struct ahash_request *req, bool is_last)
 
 	if (priv->rx_status != 0) {
 		dev_err(se_dev->dev, "%s: SE server returned error %u\n", __func__,
-				priv->rx_status);
-		err = status_to_errno(priv->rx_status);
-		goto free_exit;
-	} else {
-		if (is_last && gmac_req_data->request_type == GMAC_SIGN) {
-			/* copy tag to req for last GMAC_SIGN requests */
-			memcpy(req->result, tag_buf, gmac_ctx->authsize);
-		}
-	}
-
-	if (is_last && gmac_req_data->request_type == GMAC_VERIFY) {
-		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_VERIFY;
-		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			dev_err(se_dev->dev, "%s: engine is in suspended state\n", __func__);
-			err = -ENODEV;
-			goto free_exit;
-		}
-
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
-		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-			goto free_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0UL) {
-			dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-			err = -ETIMEDOUT;
-			goto free_exit;
-		}
-
-		if (priv->rx_status != 0) {
-			if (priv->rx_status == 11U)
-				gmac_req_data->result = 1;
-			else
-				err = status_to_errno(priv->rx_status);
+									priv->rx_status);
+		if (is_last && (gmac_req_data->request_type == GMAC_VERIFY)
+				&& (priv->rx_status == 11U)) {
+			gmac_req_data->result = 1;
 		} else {
-			gmac_req_data->result = 0;
+			err = status_to_errno(priv->rx_status);
+		}
+	} else {
+		if (is_last) {
+			if (gmac_req_data->request_type == GMAC_VERIFY) {
+				gmac_req_data->result = 0;
+			} else {
+				/* copy tag to req for last GMAC_SIGN requests */
+				memcpy(req->result, tag_buf, gmac_ctx->authsize);
+			}
 		}
 	}
 
