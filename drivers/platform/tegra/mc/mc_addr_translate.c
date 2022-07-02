@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -146,7 +146,7 @@ static u32 mc_reverse_masked_bank(u64 linear, int masked_bank, int bankpos,
 		pre_bank <<= 1;
 
 		bank_bit = (mc_cfg.bank_mask[i] & linear);
-		bank_bit &= ~((1ll << (bankpos+bankbits)) - 1);
+		bank_bit &= ~((1ull << (bankpos+bankbits)) - 1);
 		while (bank_bit) {
 			pre_bank ^= bank_bit & 1;
 			bank_bit >>= 1;
