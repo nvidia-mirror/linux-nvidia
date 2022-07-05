@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -83,7 +83,7 @@ struct emc_params {
 };
 
 static struct emc_params emc_param;
-static int ch_num;
+static u32 ch_num;
 
 static enum dram_types dram_type;
 
