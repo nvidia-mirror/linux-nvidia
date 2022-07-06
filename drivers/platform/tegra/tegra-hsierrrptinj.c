@@ -60,7 +60,7 @@
 /* EC Index for reporting errors to FSI */
 #define EC_INDEX 0xFFFFFFFF
 
-/* Error report frame for reprting errors to FSI */
+/* Error report frame for reporting errors to FSI */
 struct hsm_error_report_frame {
 	unsigned int type;
 	unsigned int error_code;
@@ -85,13 +85,13 @@ struct hsm_error_report_frame {
  * SDMMC - 2
  * DLA   - 2
  */
-unsigned int ip_instances[NUM_IPS] = {1, 1, 10, 4, 11, 1, 2, 1, 2, 2};
+static unsigned int ip_instances[NUM_IPS] = {1, 1, 10, 4, 11, 1, 2, 1, 2, 2};
 
 /* This directory entry will point to `/sys/kernel/debug/tegra_hsierrrptinj`. */
 static struct dentry *hsierrrptinj_debugfs_root;
 
 /* This file will point to `/sys/kernel/debug/tegra_hsierrrptinj/hsierrrpt`. */
-const char *hsierrrptinj_debugfs_name = "hsierrrpt";
+static const char *hsierrrptinj_debugfs_name = "hsierrrpt";
 
 /* This array stores callbacks registered by IP Drivers */
 static hsierrrpt_inj ip_driver_cb[NUM_IPS][MAX_INSTANCE] = {{NULL}};
@@ -139,9 +139,11 @@ int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt
 EXPORT_SYMBOL(hsierrrpt_reg_cb);
 
 /* Report errors to FSI */
-int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
+static int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
 {
 	int ret = -EINVAL;
+
+	/* Bypass path for reporting errors mapped to Category-1 (local EC) IPs */
 	struct hsm_error_report_frame error_report = {0};
 
 	if (IS_ERR(hsierrrptinj_tx.chan)) {
@@ -160,7 +162,7 @@ int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
 }
 
 /* Parse user entered data via debugfs interface and trigger IP Driver callback */
-static ssize_t hsierrrptinj_inject(struct file *file, const char *buf, size_t lbuf, loff_t *ppos)
+static ssize_t hsierrrptinj_inject(struct file *file, const char __user *buf, size_t lbuf, loff_t *ppos)
 {
 	struct epl_error_report_frame error_report = {0};
 	int count = 0, ret = -EINVAL;
@@ -355,7 +357,7 @@ static int tegra_hsp_mb_init(struct device *dev)
 static int hsierrrptinj_probe(struct platform_device *pdev)
 {
 	int ret = -EFAULT;
-	struct dentry *dent = 0;
+	struct dentry *dent = NULL;
 	struct device *dev = &pdev->dev;
 
 	/* Initiate TX Mailbox */
