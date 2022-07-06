@@ -333,7 +333,7 @@ static struct mc_client mc_clients[] = {
 	client("pcie5b", "csr_pcie5br", INVALID),
 	client("pcie5b", "csr_pcie5br1", INVALID),
 };
-static int mc_client_last = ARRAY_SIZE(mc_clients) - 1;
+static u32 mc_client_last = ARRAY_SIZE(mc_clients) - 1;
 /*** Done. ***/
 
 static u32 mc_channel = MC_BROADCAST_CHANNEL;
