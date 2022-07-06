@@ -1016,6 +1016,11 @@ static void trace_rtcpu_log(struct tegra_rtcpu_trace *tracer,
 
 	len = event->header.len - CAMRTC_TRACE_EVENT_HEADER_SIZE;
 
+	if (len > CAMRTC_TRACE_EVENT_PAYLOAD_SIZE) {
+		pr_err("%s: invalid trace event len (%zu)\n", __func__, len);
+		len = CAMRTC_TRACE_EVENT_PAYLOAD_SIZE;
+	}
+
 	if (len == CAMRTC_TRACE_EVENT_PAYLOAD_SIZE)
 		/* Ignore NULs at the end of buffer */
 		len = strnlen(event->data.data8, len);
