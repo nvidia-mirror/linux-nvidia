@@ -175,7 +175,7 @@ struct mcerr_ops {
  */
 #define MMA_HISTORY_SAMPLES 20
 struct arb_emem_intr_info {
-	int arb_intr_mma;
+	u32 arb_intr_mma;
 	u64 time;
 	spinlock_t lock;
 };
