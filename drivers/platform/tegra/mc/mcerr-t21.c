@@ -377,7 +377,7 @@ static void mcerr_default_print(const struct mc_error *err,
 static void arb_intr(void)
 {
 	u64 time;
-	u32 time_diff_ms;
+	u64 time_diff_ms;
 	unsigned long flags;
 
 	spin_lock_irqsave(&arb_intr_info.lock, flags);
