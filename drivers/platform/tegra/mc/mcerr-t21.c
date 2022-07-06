@@ -172,7 +172,7 @@ static struct mc_client mc_clients[] = {
 	client("gpu", "csr_gpusrd2", GPU),
 	client("gpu", "csw_gpuswr2", GPU),
 };
-static int mc_client_last = ARRAY_SIZE(mc_clients) - 1;
+static u32 mc_client_last = ARRAY_SIZE(mc_clients) - 1;
 /*** Done. ***/
 
 static const char *t210_intr_info[] = {
