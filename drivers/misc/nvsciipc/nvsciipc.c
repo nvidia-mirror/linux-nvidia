@@ -384,7 +384,7 @@ static const struct file_operations nvsciipc_fops = {
 	.open           = nvsciipc_dev_open,
 	.release        = nvsciipc_dev_release,
 	.unlocked_ioctl = nvsciipc_dev_ioctl,
-	.llseek         = noop_llseek,
+	.llseek         = no_llseek,
 };
 
 static int nvsciipc_probe(struct platform_device *pdev)
@@ -514,10 +514,6 @@ static struct platform_driver nvsciipc_driver = {
 static int __init nvsciipc_module_init(void)
 {
 	int ret;
-
-	if (!(of_machine_is_compatible("nvidia,tegra194") ||
-	      of_machine_is_compatible("nvidia,tegra234")))
-		return -ENODEV;
 
 	ret = platform_driver_register(&nvsciipc_driver);
 	if (ret)
