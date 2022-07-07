@@ -24,9 +24,10 @@
 #include <soc/tegra/fuse.h>
 
 #include <tegra_hwpm_log.h>
-#include <os/linux/debugfs.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
+#include <os/linux/debugfs.h>
+#include <os/linux/ip_utils.h>
 
 static const struct of_device_id tegra_soc_hwpm_of_match[] = {
 	{
@@ -242,6 +243,7 @@ static int tegra_hwpm_remove(struct platform_device *pdev)
 	class_unregister(&hwpm->class);
 
 	tegra_hwpm_debugfs_deinit(hwpm);
+	tegra_hwpm_release_ip_register_node(hwpm);
 	tegra_hwpm_release_sw_components(hwpm);
 
 	return 0;

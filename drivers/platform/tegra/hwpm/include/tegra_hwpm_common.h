@@ -14,18 +14,15 @@
 #ifndef TEGRA_HWPM_COMMON_H
 #define TEGRA_HWPM_COMMON_H
 
+#include <tegra_hwpm_types.h>
+
 enum tegra_hwpm_funcs;
 enum hwpm_aperture_type;
 enum tegra_hwpm_element_type;
 struct tegra_hwpm_func_args;
+struct tegra_hwpm_ip_ops;
 struct tegra_soc_hwpm;
-struct tegra_soc_hwpm_exec_reg_ops;
-struct tegra_soc_hwpm_ip_floorsweep_info;
-struct tegra_soc_hwpm_resource_info;
-struct tegra_soc_hwpm_alloc_pma_stream;
-struct tegra_soc_hwpm_update_get_put;
 struct hwpm_ip;
-struct tegra_soc_hwpm_ip_ops;
 struct hwpm_ip_inst;
 struct hwpm_ip_aperture;
 
@@ -57,7 +54,7 @@ int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon);
 
 int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops,
+	struct tegra_hwpm_ip_ops *ip_ops,
 	u64 base_address, u32 ip_idx, bool available);
 int tegra_hwpm_finalize_chip_info(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
@@ -71,10 +68,5 @@ int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_release_hw(struct tegra_soc_hwpm *hwpm);
 void tegra_hwpm_release_sw_setup(struct tegra_soc_hwpm *hwpm);
-
-int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info);
-int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_resource_info *rsrc_info);
 
 #endif /* TEGRA_HWPM_COMMON_H */

@@ -19,7 +19,6 @@
 #include <tegra_hwpm.h>
 #include <os/linux/debugfs.h>
 
-/* FIXME: This is a placeholder for now. We can add debugfs nodes as needed. */
 void tegra_hwpm_debugfs_init(struct tegra_soc_hwpm *hwpm)
 {
 	if (!hwpm) {

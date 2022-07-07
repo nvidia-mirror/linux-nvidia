@@ -11,24 +11,11 @@
  * more details.
  */
 
-#include <soc/tegra/fuse.h>
-#include <linux/mm.h>
-#include <linux/vmalloc.h>
-#include <linux/kernel.h>
-#include <linux/uaccess.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/of_address.h>
-#include <linux/dma-buf.h>
-
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
-
 
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
 {

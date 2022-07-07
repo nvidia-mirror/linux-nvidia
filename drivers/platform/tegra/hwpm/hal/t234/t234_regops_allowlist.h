@@ -19,7 +19,6 @@
 #ifndef T234_HWPM_REGOPS_ALLOWLIST_H
 #define T234_HWPM_REGOPS_ALLOWLIST_H
 
-#include <linux/types.h>
 #include <tegra_hwpm.h>
 
 extern struct allowlist t234_perfmon_alist[67];

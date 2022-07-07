@@ -28,7 +28,8 @@
  * Extract given ip_ops and update corresponding IP structure.
  */
 int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops, bool available)
+	u32 resource_enum, u64 base_address,
+	struct tegra_hwpm_ip_ops *ip_ops, bool available)
 {
 	int ret = 0;
 	u32 ip_idx = 0U;
@@ -36,16 +37,13 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 	tegra_hwpm_fn(hwpm, " ");
 
 	tegra_hwpm_dbg(hwpm, hwpm_dbg_ip_register,
-			"Extract IP ops for resource enum %d info",
-			hwpm_ip_ops->resource_enum);
+		"Extract IP ops for resource enum %d info", resource_enum);
 
 	/* Convert tegra_soc_hwpm_resource to internal enum */
-	if (!(t234_hwpm_is_resource_active(hwpm,
-			hwpm_ip_ops->resource_enum, &ip_idx))) {
+	if (!(t234_hwpm_is_resource_active(hwpm, resource_enum, &ip_idx))) {
 		tegra_hwpm_dbg(hwpm, hwpm_dbg_ip_register,
 			"SOC hwpm resource %d (base 0x%llx) is unconfigured",
-			hwpm_ip_ops->resource_enum,
-			hwpm_ip_ops->ip_base_address);
+			resource_enum, base_address);
 		goto fail;
 	}
 
@@ -89,13 +87,13 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 #if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 	case T234_HWPM_IP_MSS_GPU_HUB:
 #endif
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, hwpm_ip_ops,
-			hwpm_ip_ops->ip_base_address, ip_idx, available);
+		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, ip_ops,
+			base_address, ip_idx, available);
 		if (ret != 0) {
 			tegra_hwpm_err(hwpm,
 				"Failed to %s fs/ops for IP %d (base 0x%llx)",
 				available == true ? "set" : "reset",
-				ip_idx, hwpm_ip_ops->ip_base_address);
+				ip_idx, base_address);
 			goto fail;
 		}
 		break;
@@ -113,8 +111,8 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 		/* Check base address in T234_HWPM_IP_MSS_CHANNEL */
 #if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		ip_idx = T234_HWPM_IP_MSS_CHANNEL;
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, hwpm_ip_ops,
-			hwpm_ip_ops->ip_base_address, ip_idx, available);
+		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, ip_ops,
+			base_address, ip_idx, available);
 		if (ret != 0) {
 			/*
 			 * Return value of ENODEV will indicate that the base
@@ -126,7 +124,7 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 			if (ret != -ENODEV) {
 				tegra_hwpm_err(hwpm,
 					"IP %d base 0x%llx:Failed to %s fs/ops",
-					ip_idx, hwpm_ip_ops->ip_base_address,
+					ip_idx, base_address,
 					available == true ? "set" : "reset");
 				goto fail;
 			}
@@ -136,8 +134,8 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 #if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 		/* Check base address in T234_HWPM_IP_MSS_ISO_NISO_HUBS */
 		ip_idx = T234_HWPM_IP_MSS_ISO_NISO_HUBS;
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, hwpm_ip_ops,
-			hwpm_ip_ops->ip_base_address, ip_idx, available);
+		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, ip_ops,
+			base_address, ip_idx, available);
 		if (ret != 0) {
 			/*
 			 * Return value of ENODEV will indicate that the base
@@ -149,7 +147,7 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 			if (ret != -ENODEV) {
 				tegra_hwpm_err(hwpm,
 					"IP %d base 0x%llx:Failed to %s fs/ops",
-					ip_idx, hwpm_ip_ops->ip_base_address,
+					ip_idx, base_address,
 					available == true ? "set" : "reset");
 				goto fail;
 			}
@@ -159,8 +157,8 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 #if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 		/* Check base address in T234_HWPM_IP_MSS_MCF */
 		ip_idx = T234_HWPM_IP_MSS_MCF;
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, hwpm_ip_ops,
-			hwpm_ip_ops->ip_base_address, ip_idx, available);
+		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, ip_ops,
+			base_address, ip_idx, available);
 		if (ret != 0) {
 			/*
 			 * Return value of ENODEV will indicate that the base
@@ -172,7 +170,7 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 			if (ret != -ENODEV) {
 				tegra_hwpm_err(hwpm,
 					"IP %d base 0x%llx:Failed to %s fs/ops",
-					ip_idx, hwpm_ip_ops->ip_base_address,
+					ip_idx, base_address,
 					available == true ? "set" : "reset");
 				goto fail;
 			}

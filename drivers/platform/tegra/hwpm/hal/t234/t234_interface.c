@@ -11,14 +11,10 @@
  * more details.
  */
 
-#include <linux/slab.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
+#include <tegra_hwpm_common.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
-#include <tegra_hwpm_common.h>
 #include <tegra_hwpm.h>
-#include <tegra_hwpm_static_analysis.h>
 #include <hal/t234/t234_init.h>
 #include <hal/t234/t234_internal.h>
 

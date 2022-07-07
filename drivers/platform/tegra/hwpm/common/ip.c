@@ -11,66 +11,12 @@
  * more details.
  */
 
-#include <linux/slab.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_io.h>
+#include <tegra_hwpm_ip.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
-
-int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info)
-{
-	int ret = 0;
-	u32 i = 0U;
-
-	tegra_hwpm_fn(hwpm, " ");
-
-	for (i = 0U; i < fs_info->num_queries; i++) {
-		ret = hwpm->active_chip->get_fs_info(
-			hwpm, (u32)fs_info->ip_fsinfo[i].ip,
-			&fs_info->ip_fsinfo[i].ip_inst_mask,
-			&fs_info->ip_fsinfo[i].status);
-		if (ret < 0) {
-			/* Print error for debug purpose. */
-			tegra_hwpm_err(hwpm, "Failed to get fs_info");
-		}
-
-		tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_floorsweep_info,
-			"Query %d: ip %d: ip_status: %d inst_mask 0x%llx",
-			i, fs_info->ip_fsinfo[i].ip,
-			fs_info->ip_fsinfo[i].status,
-			fs_info->ip_fsinfo[i].ip_inst_mask);
-	}
-	return ret;
-}
-
-int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_resource_info *rsrc_info)
-{
-	int ret = 0;
-	u32 i = 0U;
-
-	tegra_hwpm_fn(hwpm, " ");
-
-	for (i = 0U; i < rsrc_info->num_queries; i++) {
-		ret = hwpm->active_chip->get_resource_info(
-			hwpm, (u32)rsrc_info->resource_info[i].resource,
-			&rsrc_info->resource_info[i].status);
-		if (ret < 0) {
-			/* Print error for debug purpose. */
-			tegra_hwpm_err(hwpm, "Failed to get rsrc_info");
-		}
-
-		tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_resource_info,
-			"Query %d: resource %d: status: %d",
-			i, rsrc_info->resource_info[i].resource,
-			rsrc_info->resource_info[i].status);
-	}
-	return ret;
-}
 
 int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, bool disable)
@@ -143,7 +89,7 @@ static int tegra_hwpm_update_ip_inst_fs_mask(struct tegra_soc_hwpm *hwpm,
 }
 
 static int tegra_hwpm_update_ip_ops_info(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops,
+	struct tegra_hwpm_ip_ops *ip_ops,
 	u32 ip_idx, u32 a_type, u32 inst_idx, bool available)
 {
 	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
@@ -152,18 +98,18 @@ static int tegra_hwpm_update_ip_ops_info(struct tegra_soc_hwpm *hwpm,
 		&chip_ip->inst_aperture_info[a_type];
 	struct hwpm_ip_inst *ip_inst = inst_a_info->inst_arr[inst_idx];
 	/* Update IP ops info for the instance */
-	struct tegra_hwpm_ip_ops *ip_ops = &ip_inst->ip_ops;
+	struct tegra_hwpm_ip_ops *ops = &ip_inst->ip_ops;
 
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (available) {
-		ip_ops->ip_dev = hwpm_ip_ops->ip_dev;
-		ip_ops->hwpm_ip_pm = hwpm_ip_ops->hwpm_ip_pm;
-		ip_ops->hwpm_ip_reg_op = hwpm_ip_ops->hwpm_ip_reg_op;
+		ops->ip_dev = ip_ops->ip_dev;
+		ops->hwpm_ip_pm = ip_ops->hwpm_ip_pm;
+		ops->hwpm_ip_reg_op = ip_ops->hwpm_ip_reg_op;
 	} else {
-		ip_ops->ip_dev = NULL;
-		ip_ops->hwpm_ip_pm = NULL;
-		ip_ops->hwpm_ip_reg_op = NULL;
+		ops->ip_dev = NULL;
+		ops->hwpm_ip_pm = NULL;
+		ops->hwpm_ip_reg_op = NULL;
 	}
 
 	return 0;
@@ -173,7 +119,7 @@ static int tegra_hwpm_update_ip_ops_info(struct tegra_soc_hwpm *hwpm,
  * Find IP hw instance mask and update IP floorsweep info and IP ops.
  */
 int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops,
+	struct tegra_hwpm_ip_ops *ip_ops,
 	u64 base_address, u32 ip_idx, bool available)
 {
 	int ret = 0;
@@ -215,9 +161,9 @@ int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_err(hwpm, "Invalid element type %d", element_type);
 	}
 
-	if (hwpm_ip_ops != NULL) {
+	if (ip_ops != NULL) {
 		/* Update IP ops */
-		ret = tegra_hwpm_update_ip_ops_info(hwpm, hwpm_ip_ops,
+		ret = tegra_hwpm_update_ip_ops_info(hwpm, ip_ops,
 			ip_idx, a_type, inst_idx, available);
 		if (ret != 0) {
 			tegra_hwpm_err(hwpm,
@@ -237,27 +183,6 @@ int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
 	}
 
 fail:
-	return ret;
-}
-
-static int tegra_hwpm_complete_ip_register(struct tegra_soc_hwpm *hwpm)
-{
-	int ret = 0;
-	struct hwpm_ip_register_list *node = ip_register_list_head;
-
-	tegra_hwpm_fn(hwpm, " ");
-
-	while (node != NULL) {
-		ret = hwpm->active_chip->extract_ip_ops(
-			hwpm, &node->ip_ops, true);
-		if (ret != 0) {
-			tegra_hwpm_err(hwpm,
-				"Resource enum %d extract IP ops failed",
-				node->ip_ops.resource_enum);
-			return ret;
-		}
-		node = node->next;
-	}
 	return ret;
 }
 

@@ -11,9 +11,6 @@
  * more details.
  */
 
-#include <soc/tegra/fuse.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>

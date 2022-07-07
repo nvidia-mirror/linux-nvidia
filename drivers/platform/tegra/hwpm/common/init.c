@@ -11,23 +11,10 @@
  * more details.
  */
 
-#include <linux/mm.h>
-#include <linux/vmalloc.h>
-#include <linux/kernel.h>
-#include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/module.h>
-#include <linux/io.h>
-#include <linux/slab.h>
-#include <linux/reset.h>
-#include <linux/clk.h>
-#include <linux/dma-buf.h>
-#include <soc/tegra/fuse.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
+#include <tegra_hwpm_ip.h>
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_common.h>
 
@@ -123,18 +110,9 @@ int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm)
 
 void tegra_hwpm_release_sw_components(struct tegra_soc_hwpm *hwpm)
 {
-	struct hwpm_ip_register_list *node = ip_register_list_head;
-	struct hwpm_ip_register_list *tmp_node = NULL;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	hwpm->active_chip->release_sw_setup(hwpm);
-
-	while (node != NULL) {
-		tmp_node = node;
-		node = tmp_node->next;
-		tegra_hwpm_kfree(hwpm, tmp_node);
-	}
 
 	tegra_hwpm_kfree(hwpm, hwpm->active_chip->chip_ips);
 	tegra_hwpm_kfree(hwpm, hwpm);

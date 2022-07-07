@@ -30,12 +30,6 @@
 
 #define TEGRA_SOC_HWPM_IP_INACTIVE	~(0U)
 
-struct hwpm_ip_register_list {
-	struct tegra_soc_hwpm_ip_ops ip_ops;
-	struct hwpm_ip_register_list *next;
-};
-extern struct hwpm_ip_register_list *ip_register_list_head;
-
 /*
  * This structure is copy of struct tegra_soc_hwpm_ip_ops uapi structure.
  * This is not a hard requirement as tegra_hwpm_validate_ip_ops conversion
@@ -352,7 +346,8 @@ struct tegra_soc_hwpm_chip {
 	u32 (*get_ip_max_idx)(struct tegra_soc_hwpm *hwpm);
 
 	int (*extract_ip_ops)(struct tegra_soc_hwpm *hwpm,
-	struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops, bool available);
+	u32 resource_enum, u64 base_address,
+	struct tegra_hwpm_ip_ops *ip_ops, bool available);
 	int (*force_enable_ips)(struct tegra_soc_hwpm *hwpm);
 	int (*validate_current_config)(struct tegra_soc_hwpm *hwpm);
 	int (*get_fs_info)(struct tegra_soc_hwpm *hwpm,

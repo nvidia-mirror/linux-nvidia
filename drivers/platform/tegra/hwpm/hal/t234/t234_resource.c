@@ -11,11 +11,6 @@
  * more details.
  */
 
-#include <linux/slab.h>
-#include <linux/bitops.h>
-#include <linux/of_address.h>
-#include <uapi/linux/tegra-soc-hwpm-uapi.h>
-
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
