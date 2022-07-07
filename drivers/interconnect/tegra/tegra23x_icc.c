@@ -195,7 +195,7 @@ static int tegra23x_icc_set(struct icc_node *src, struct icc_node *dst)
 	unsigned long cap_req = 0;
 	unsigned long cap_khz = tp->cap_rate / HZ_TO_KHZ_MULT;
 
-	if (!tegra_platform_is_silicon())
+	if (!tegra_platform_is_silicon() || !tp->mrqs_available)
 		return 0;
 
 	classify_bw_reqs(provider, &bwmgr_req, &max_floor_kbps, &init_bw_floor);

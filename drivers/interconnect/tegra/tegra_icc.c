@@ -123,6 +123,52 @@ static struct tegra_icc_node *tegra_icc_nodes[] = {
 	[TEGRA_ICC_NVPMODEL] = &nvpmodel,
 };
 
+static int query_mrq_query_abi(struct tegra_icc_provider *tp, uint32_t mrq_id)
+{
+	struct mrq_query_abi_request req = {
+		.mrq = mrq_id,
+	};
+	struct mrq_query_abi_response resp = {0};
+	int ret;
+
+	memset(&tp->msg, 0, sizeof(struct tegra_bpmp_message));
+	tp->msg.mrq = MRQ_QUERY_ABI;
+	tp->msg.tx.data = &req;
+	tp->msg.tx.size = sizeof(req);
+	tp->msg.rx.data = NULL;
+	tp->msg.rx.size = 0;
+
+	ret = tegra_bpmp_transfer(tp->bpmp_dev, &tp->msg);
+	if (ret == 0 && tp->msg.rx.ret < 0)
+		ret = tp->msg.rx.ret;
+	else if (resp.status != 0)
+		ret = resp.status;
+	tp->msg.tx.data = NULL;
+
+	return ret;
+}
+
+static void query_mrqs_available(struct platform_device *pdev,
+	struct tegra_icc_provider *tp)
+{
+	int ret = 0;
+	bool mrqs_available = true;
+
+	ret = query_mrq_query_abi(tp, MRQ_ISO_CLIENT);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "error querying MRQ_ISO_CLIENT\n");
+		mrqs_available = false;
+	}
+
+	ret = query_mrq_query_abi(tp, MRQ_BWMGR);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "error querying MRQ_BWMGR\n");
+		mrqs_available = false;
+	}
+
+	tp->mrqs_available = mrqs_available;
+}
+
 static int tegra_icc_probe(struct platform_device *pdev)
 {
 	const struct tegra_icc_ops *ops;
@@ -179,7 +225,6 @@ static int tegra_icc_probe(struct platform_device *pdev)
 		goto err_bpmp;
 	}
 	clk_prepare_enable(tp->dram_clk);
-
 	if (tegra_platform_is_silicon()) {
 		rate = clk_round_rate(tp->dram_clk, ULONG_MAX);
 		if (rate < 0) {
@@ -227,6 +272,8 @@ static int tegra_icc_probe(struct platform_device *pdev)
 	data->num_nodes = num_nodes;
 
 	platform_set_drvdata(pdev, tp);
+
+	query_mrqs_available(pdev, tp);
 
 	dev_dbg(&pdev->dev, "Registered TEGRA ICC\n");
 

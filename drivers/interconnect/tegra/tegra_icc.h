@@ -38,6 +38,7 @@ struct tegra_icc_provider {
 	struct tegra_bpmp_message msg;
 #endif
 	uint32_t last_disp_la_floor;
+	bool mrqs_available;
 };
 
 #define to_tegra_provider(_provider) \
