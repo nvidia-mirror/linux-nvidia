@@ -1093,7 +1093,6 @@ out:
 	BUG_ON(!atomic_read(&h->ref));
 	nvmap_handle_put(h);
 }
-EXPORT_SYMBOL(nvmap_free_handle);
 
 bool is_nvmap_id_ro(struct nvmap_client *client, int id)
 {

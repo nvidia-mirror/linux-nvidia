@@ -528,7 +528,6 @@ bool dmabuf_is_nvmap(struct dma_buf *dmabuf)
 {
 	return dmabuf->exp_name == dmabuf_name;
 }
-EXPORT_SYMBOL(dmabuf_is_nvmap);
 
 static struct dma_buf *__dma_buf_export(struct nvmap_handle_info *info,
 					size_t size, bool ro_buf)
