@@ -2,7 +2,7 @@
  * @file drivers/platform/tegra/rtcpu/capture-ivc-priv.h
  * @brief Capture IVC driver private header for T186/T194
  *
- * Copyright (c) 2017-2019 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2017-2022 NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -81,8 +81,6 @@ struct tegra_capture_ivc_msg_header {
 struct tegra_capture_ivc_resp {
 	/** IVC msg header. See @ref tegra_capture_ivc_msg_header */
 	struct tegra_capture_ivc_msg_header header;
-	/** IVC response */
-	void *resp;
 };
 
 /** Pointer holding the Control IVC channel context, created during probe call*/

@@ -31,14 +31,20 @@
 
 #include <asm/barrier.h>
 
+#include <trace/events/tegra_capture.h>
+
 #include "capture-ivc-priv.h"
 
-static int tegra_capture_ivc_tx(struct tegra_capture_ivc *civc,
+static int tegra_capture_ivc_tx_(struct tegra_capture_ivc *civc,
 				const void *req, size_t len)
 {
-	struct tegra_ivc_channel *chan = civc->chan;
+	struct tegra_ivc_channel *chan;
 	int ret;
 
+	if (civc == NULL)
+		return -ENODEV;
+
+	chan = civc->chan;
 	if (WARN_ON(!chan->is_ready))
 		return -EIO;
 
@@ -61,20 +67,44 @@ static int tegra_capture_ivc_tx(struct tegra_capture_ivc *civc,
 	return ret;
 }
 
+static int tegra_capture_ivc_tx(struct tegra_capture_ivc *civc,
+				const void *req, size_t len)
+{
+	int ret;
+	struct tegra_capture_ivc_msg_header hdr;
+	size_t hdrlen = sizeof(hdr);
+	char const *ch_name = "NULL";
+
+	if (civc && civc->chan)
+		ch_name = dev_name(&civc->chan->dev);
+
+	if (len < hdrlen) {
+		memset(&hdr, 0, hdrlen);
+		memcpy(&hdr, req, len);
+	} else {
+		memcpy(&hdr, req, hdrlen);
+	}
+
+	ret = tegra_capture_ivc_tx_(civc, req, len);
+
+	if (ret < 0)
+		trace_capture_ivc_send_error(ch_name, hdr.msg_id, hdr.channel_id, ret);
+	else
+		trace_capture_ivc_send(ch_name, hdr.msg_id, hdr.channel_id);
+
+	return ret;
+}
+
 int tegra_capture_ivc_control_submit(const void *control_desc, size_t len)
 {
-	if (WARN_ON(__scivc_control == NULL))
-		return -ENODEV;
-
+	WARN_ON(__scivc_control == NULL);
 	return tegra_capture_ivc_tx(__scivc_control, control_desc, len);
 }
 EXPORT_SYMBOL(tegra_capture_ivc_control_submit);
 
 int tegra_capture_ivc_capture_submit(const void *capture_desc, size_t len)
 {
-	if (WARN_ON(__scivc_capture == NULL))
-		return -ENODEV;
-
+	WARN_ON(__scivc_capture == NULL);
 	return tegra_capture_ivc_tx(__scivc_capture, capture_desc, len);
 }
 EXPORT_SYMBOL(tegra_capture_ivc_capture_submit);
@@ -323,7 +353,7 @@ EXPORT_SYMBOL(tegra_capture_ivc_unregister_capture_cb);
 static inline void tegra_capture_ivc_recv_msg(
 	struct tegra_capture_ivc *civc,
 	uint32_t id,
-	const struct tegra_capture_ivc_resp *msg)
+	const void *msg)
 {
 	struct device *dev = &civc->chan->dev;
 
@@ -339,17 +369,21 @@ static inline void tegra_capture_ivc_recv_msg(
 static inline void tegra_capture_ivc_recv(struct tegra_capture_ivc *civc)
 {
 	struct ivc *ivc = &civc->chan->ivc;
-	const struct tegra_capture_ivc_resp *msg;
-	uint32_t id;
+	struct device *dev = &civc->chan->dev;
 
 	while (tegra_ivc_can_read(ivc)) {
-		msg = tegra_ivc_read_get_next_frame(ivc);
-		id = msg->header.channel_id;
+		const void *msg = tegra_ivc_read_get_next_frame(ivc);
+		const struct tegra_capture_ivc_msg_header *hdr = msg;
+		uint32_t id = hdr->channel_id;
+
+		trace_capture_ivc_recv(dev_name(dev), hdr->msg_id, id);
 
 		/* Check if message is valid */
-		if (!WARN(id >= TOTAL_CHANNELS, "Invalid rtcpu response id %u", id)) {
+		if (id < TOTAL_CHANNELS) {
 			id = array_index_nospec(id, TOTAL_CHANNELS);
 			tegra_capture_ivc_recv_msg(civc, id, msg);
+		} else {
+			dev_WARN(dev, "Invalid rtcpu channel id %u", id);
 		}
 
 		tegra_ivc_read_advance(ivc);
@@ -383,6 +417,8 @@ static void tegra_capture_ivc_worker(struct work_struct *work)
 static void tegra_capture_ivc_notify(struct tegra_ivc_channel *chan)
 {
 	struct tegra_capture_ivc *civc = tegra_ivc_channel_get_drvdata(chan);
+
+	trace_capture_ivc_notify(dev_name(&chan->dev));
 
 	/* Only 1 thread can wait on write_q, rest wait for write_lock */
 	wake_up(&civc->write_q);

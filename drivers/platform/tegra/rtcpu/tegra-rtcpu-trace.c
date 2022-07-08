@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -46,6 +46,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/tegra_rtcpu.h>
+#include <trace/events/tegra_capture.h>
 #include <trace/events/freertos.h>
 
 #define NV(p) "nvidia," #p
@@ -970,6 +971,82 @@ static void rtcpu_trace_nvcsi_event(struct camrtc_event_struct *event)
 	}
 }
 
+struct capture_event_progress {
+	uint32_t channel_id;
+	uint32_t sequence;
+};
+
+struct capture_event_isp {
+	uint32_t channel_id;
+	uint32_t prog_sequence;
+	uint32_t cap_sequence;
+	uint8_t isp_settings_id;
+	uint8_t vi_channel_id;
+	uint8_t pad_[2];
+};
+
+struct capture_event {
+	union {
+		struct capture_event_progress progress;
+		struct capture_event_isp isp;
+	};
+};
+
+static void rtcpu_trace_capture_event(struct camrtc_event_struct *event)
+{
+	const struct capture_event *ev = (const void *)&event->data;
+
+	switch (event->header.id) {
+	case camrtc_trace_capture_event_sof:
+		trace_capture_event_sof(event->header.tstamp,
+				ev->progress.channel_id, ev->progress.sequence);
+		break;
+	case camrtc_trace_capture_event_eof:
+		trace_capture_event_eof(event->header.tstamp,
+				ev->progress.channel_id, ev->progress.sequence);
+		break;
+	case camrtc_trace_capture_event_error:
+		trace_capture_event_error(event->header.tstamp,
+				ev->progress.channel_id, ev->progress.sequence);
+		break;
+	case camrtc_trace_capture_event_reschedule:
+		trace_capture_event_reschedule(event->header.tstamp,
+				ev->progress.channel_id, ev->progress.sequence);
+		break;
+	case camrtc_trace_capture_event_reschedule_isp:
+		trace_capture_event_reschedule_isp(event->header.tstamp,
+			ev->isp.channel_id, ev->isp.cap_sequence, ev->isp.prog_sequence,
+			ev->isp.isp_settings_id, ev->isp.vi_channel_id);
+		break;
+	case camrtc_trace_capture_event_isp_done:
+		trace_capture_event_isp_done(event->header.tstamp,
+			ev->isp.channel_id, ev->isp.cap_sequence, ev->isp.prog_sequence,
+			ev->isp.isp_settings_id, ev->isp.vi_channel_id);
+		break;
+	case camrtc_trace_capture_event_isp_error:
+		trace_capture_event_isp_error(event->header.tstamp,
+			ev->isp.channel_id, ev->isp.cap_sequence, ev->isp.prog_sequence,
+			ev->isp.isp_settings_id, ev->isp.vi_channel_id);
+		break;
+	case camrtc_trace_capture_event_wdt:
+		trace_capture_event_wdt(event->header.tstamp);
+		break;
+	case camrtc_trace_capture_event_report_program:
+		trace_capture_event_report_program(event->header.tstamp,
+				ev->progress.channel_id, ev->progress.sequence);
+		break;
+
+	case camrtc_trace_capture_event_inject:
+	case camrtc_trace_capture_event_sensor:
+	case camrtc_trace_capture_event_suspend:
+	case camrtc_trace_capture_event_suspend_isp:
+	default:
+		trace_capture_event_unknown(event->header.tstamp,
+			event->header.id);
+		break;
+	}
+}
+
 static void rtcpu_trace_array_event(struct tegra_rtcpu_trace *tracer,
 	struct camrtc_event_struct *event)
 {
@@ -996,6 +1073,9 @@ static void rtcpu_trace_array_event(struct tegra_rtcpu_trace *tracer,
 		break;
 	case CAMRTC_EVENT_MODULE_NVCSI:
 		rtcpu_trace_nvcsi_event(event);
+		break;
+	case CAMRTC_EVENT_MODULE_CAPTURE:
+		rtcpu_trace_capture_event(event);
 		break;
 	default:
 		trace_rtcpu_unknown(event->header.tstamp,
