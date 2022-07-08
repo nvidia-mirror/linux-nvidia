@@ -1,7 +1,7 @@
 /*
  * Tegra 18x SoC-specific DRAM ECC Error handling code.
  *
- * Copyright (c) 2016-2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -177,7 +177,7 @@ static u64 mc_ecc_read_log(struct mc_ecc_err_log *log, u32 ch)
 	log->ecc_err_poison_sp0 = ((val >> ECC_ERR_POISON_SHIFT) &
 						ECC_ERR_POISON_MASK);
 	log->ecc_err_bit_sp0 = (((val >> ECC_DERR_SYNDROME_SHIFT) &
-					ECC_DERR_SYNDROME_MASK) & ~(0x200));
+					ECC_DERR_SYNDROME_MASK) & ~(0x200U));
 
 
 	val = __emc_readl(ch, EMC_ECC_ERR_SP1);
@@ -189,7 +189,7 @@ static u64 mc_ecc_read_log(struct mc_ecc_err_log *log, u32 ch)
 	log->ecc_err_poison_sp1 = ((val >> ECC_ERR_POISON_SHIFT) &
 						ECC_ERR_POISON_MASK);
 	log->ecc_err_bit_sp1 = (((val >> ECC_DERR_SYNDROME_SHIFT) &
-					ECC_DERR_SYNDROME_MASK) & ~(0x200));
+					ECC_DERR_SYNDROME_MASK) & ~(0x200U));
 
 	val = __emc_readl(ch, EMC_ECC_ERR_ADDR);
 	log->ecc_err_addr = val;
