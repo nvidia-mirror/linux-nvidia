@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2022, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -142,7 +142,7 @@
  * Read from the specified EMC channel: 0 -> EMC0, 1 -> EMC1, etc. If @idx
  * corresponds to a non-existent channel then 0 is returned.
  */
-static inline u32 __emc_readl(int idx, u32 reg)
+static inline u32 __emc_readl(u32 idx, u32 reg)
 {
 	static bool warned = false;
 	if (is_tegra_safety_build()) {
