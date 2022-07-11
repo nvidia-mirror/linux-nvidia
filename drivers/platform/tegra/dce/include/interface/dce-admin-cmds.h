@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2018-2023 NVIDIA CORPORATION.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,6 +25,7 @@
 #define DCE_ADMIN_CMDS_H
 
 #include <interface/dce-types.h>
+#include <interface/dce-admin-perf-stats.h>
 
 /*
  * Version of the ADMIN command interface.
@@ -34,7 +36,7 @@
  * To keep things simple, this value should be incremented by 1 each
  * time changes are made.
  */
-#define DCE_ADMIN_VERSION				2
+#define DCE_ADMIN_VERSION				3
 
 #define DCE_ADMIN_CMD_SIZE	sizeof(struct dce_admin_ipc_cmd)
 #define DCE_ADMIN_RESP_SIZE	sizeof(struct dce_admin_ipc_resp)
@@ -58,20 +60,22 @@
 #define DCE_ADMIN_CMD_GET_LOG_INFO	0x0BU   // get current log info
 #define DCE_ADMIN_CMD_LOCK_CHANGES	0x0CU   // lock creating new channels
 						// and changing memory areas
-#define DCE_ADMIN_CMD_CODE_COVERAGE_START 0x0DU // start collecting code
-						// coverage data
-#define DCE_ADMIN_CMD_CODE_COVERAGE_STOP 0x0EU  // stop collecting code
-						// coverage data
+#define DCE_ADMIN_CMD_CODE_COVERAGE_START	0x0DU   // start collecting code
+							// coverage data
+#define DCE_ADMIN_CMD_CODE_COVERAGE_STOP	0x0EU   // stop collecting code
+							// coverage data
 #define DCE_ADMIN_CMD_PERF_START	0x0FU   // start collecting perf data
 #define DCE_ADMIN_CMD_PERF_STOP		0x10U   // stop collecting perf data
-#define DCE_ADMIN_CMD_INT_TEST_START	0x11U // start internal tests
-#define DCE_ADMIN_CMD_INT_TEST_STOP	0x12U // stop internal tests and return status
-#define DCE_ADMIN_CMD_EXT_TEST		0x13U // run external test (blocking call)
+#define DCE_ADMIN_CMD_INT_TEST_START	0x11U   // start internal tests
+#define DCE_ADMIN_CMD_INT_TEST_STOP	0x12U   // stop internal tests and return status
+#define DCE_ADMIN_CMD_EXT_TEST		0x13U   // run external test (blocking call)
 #define DCE_ADMIN_CMD_DEBUG		0x14U   // debug command
-
 #define DCE_ADMIN_CMD_RM_BOOTSTRAP	0x15U   // tell RM to "bootstrap"
+#define DCE_ADMIN_CMD_PERF_RESULTS	0x16U   // copy out the perf results
+#define DCE_ADMIN_CMD_PERF_GET_EVENTS	0x17U   // get perf events
+#define DCE_ADMIN_CMD_PERF_CLEAR_EVENTS	0x18U   // clear perf events
 
-#define DCE_ADMIN_CMD_NEXT		0x16U   // must be last command ID + 1
+#define DCE_ADMIN_CMD_NEXT		0x19U   // must be last command ID + 1
 
 struct dce_admin_version_info {
 	uint32_t	version;
@@ -159,6 +163,7 @@ struct dce_admin_ipc_cmd {
 		struct dce_admin_ipc_info_args		ipc_info;
 		struct dce_admin_mem_args		mem_map;
 		struct dce_admin_ipc_create_args	ipc_create;
+		struct dce_admin_perf_args		perf;
 	} args;
 };
 
@@ -166,11 +171,12 @@ struct dce_admin_ipc_resp {
 	uint32_t			error;
 	union {
 		struct dce_admin_version_info		version;
-		struct dce_admin_echo				echo;
-		struct dce_admin_log_args			log;
-		struct dce_admin_ipc_info			ipc;
-		struct dce_admin_mem_args			mem_info;
+		struct dce_admin_echo			echo;
+		struct dce_admin_log_args		log;
+		struct dce_admin_ipc_info		ipc;
+		struct dce_admin_mem_args		mem_info;
 		struct dce_admin_fw_version_info	fw_version;
+		struct dce_admin_perf_stats_info	perf;
 	} args;
 };
 

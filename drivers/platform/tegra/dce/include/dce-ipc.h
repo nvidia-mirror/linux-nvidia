@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -34,7 +35,7 @@
 #define DCE_DISPRM_CMD_MAX_FSIZE	        4096U
 #define DCE_DISPRM_EVENT_NOTIFY_CMD_MAX_NFRAMES	4U
 #define DCE_DISPRM_EVENT_NOTIFY_CMD_MAX_FSIZE	4096U
-#define DCE_ADMIN_CMD_MAX_FSIZE		        1024U
+#define DCE_ADMIN_CMD_MAX_FSIZE		        2048U
 
 #define DCE_IPC_WAIT_TYPE_INVALID	0U
 #define DCE_IPC_WAIT_TYPE_RPC		1U

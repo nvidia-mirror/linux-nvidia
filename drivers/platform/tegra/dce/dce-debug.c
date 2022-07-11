@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -17,6 +18,7 @@
 #include <dce.h>
 #include <dce-log.h>
 #include <dce-util-common.h>
+#include <dce-debug-perf.h>
 #include <interface/dce-interface.h>
 #include <interface/dce-core-interface-errors.h>
 
@@ -612,6 +614,44 @@ static const struct file_operations boot_status_fops = {
 	.read	= dbg_dce_boot_status_fops_read,
 };
 
+static const struct file_operations perf_format_fops = {
+	.open		= dbg_dce_perf_format_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= dbg_dce_perf_format_fops_write,
+};
+
+static const struct file_operations perf_stats_stats_fops = {
+	.open		= dbg_dce_perf_stats_stats_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= dbg_dce_perf_stats_stats_fops_write,
+};
+
+static const struct file_operations perf_stats_help_fops = {
+	.open		= dbg_dce_perf_stats_help_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static const struct file_operations perf_events_events_fops = {
+	.open		= dbg_dce_perf_events_events_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= dbg_dce_perf_events_events_fops_write,
+};
+
+static const struct file_operations perf_events_help_fops = {
+	.open		= dbg_dce_perf_events_help_fops_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 void dce_remove_debug(struct tegra_dce *d)
 {
 	struct dce_device *d_dev = dce_device_from_dce(d);
@@ -699,6 +739,7 @@ void dce_init_debug(struct tegra_dce *d)
 	struct device *dev = dev_from_dce(d);
 	struct dce_device *d_dev = dce_device_from_dce(d);
 	struct dentry *debugfs_dir = NULL;
+	struct dentry *perf_debugfs_dir = NULL;
 
 	d_dev->debugfs = debugfs_create_dir("tegra_dce", NULL);
 	if (!d_dev->debugfs)
@@ -731,6 +772,43 @@ void dce_init_debug(struct tegra_dce *d)
 
 	retval = debugfs_create_file("boot_status", 0444,
 				     d_dev->debugfs, d, &boot_status_fops);
+	if (!retval)
+		goto err_handle;
+
+	perf_debugfs_dir = debugfs_create_dir("perf", d_dev->debugfs);
+	if (!perf_debugfs_dir)
+		goto err_handle;
+
+	retval = debugfs_create_file("format", 0644,
+				     perf_debugfs_dir, d, &perf_format_fops);
+	if (!retval)
+		goto err_handle;
+
+	debugfs_dir = debugfs_create_dir("stats", perf_debugfs_dir);
+	if (!debugfs_dir)
+		goto err_handle;
+
+	retval = debugfs_create_file("stats", 0644,
+				     debugfs_dir, d, &perf_stats_stats_fops);
+	if (!retval)
+		goto err_handle;
+
+	retval = debugfs_create_file("help", 0444,
+				     debugfs_dir, d, &perf_stats_help_fops);
+	if (!retval)
+		goto err_handle;
+
+	debugfs_dir = debugfs_create_dir("events", perf_debugfs_dir);
+	if (!debugfs_dir)
+		goto err_handle;
+
+	retval = debugfs_create_file("events", 0644,
+				     debugfs_dir, d, &perf_events_events_fops);
+	if (!retval)
+		goto err_handle;
+
+	retval = debugfs_create_file("help", 0444,
+				     debugfs_dir, d, &perf_events_help_fops);
 	if (!retval)
 		goto err_handle;
 

@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -425,6 +426,17 @@ int dce_admin_send_enter_sc7(struct tegra_dce *d,
 			     struct dce_ipc_message *msg);
 int dce_admin_handle_ipc_requested_event(struct tegra_dce *d, void *params);
 int dce_admin_handle_ipc_received_event(struct tegra_dce *d, void *params);
+int dce_admin_send_cmd_get_perf_stat(struct tegra_dce *d,
+				     struct dce_ipc_message *msg);
+int dce_admin_send_cmd_set_perf_stat(struct tegra_dce *d,
+				     struct dce_ipc_message *msg,
+				     bool start_perf);
+int dce_admin_send_cmd_stop_perf_stat(struct tegra_dce *d,
+				       struct dce_ipc_message *msg);
+int dce_admin_send_cmd_get_perf_events(struct tegra_dce *d,
+				       struct dce_ipc_message *msg);
+int dce_admin_send_cmd_clear_perf_events(struct tegra_dce *d,
+				       struct dce_ipc_message *msg);
 int dce_admin_ipc_wait(struct tegra_dce *d, u32 w_type);
 void dce_admin_ipc_handle_signal(struct tegra_dce *d, u32 ch_type);
 
