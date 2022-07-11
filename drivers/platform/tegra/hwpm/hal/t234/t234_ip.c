@@ -14,6 +14,7 @@
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm_log.h>
+#include <tegra_hwpm_soc.h>
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
 #include <hal/t234/t234_internal.h>
@@ -199,26 +200,27 @@ int t234_hwpm_validate_current_config(struct tegra_soc_hwpm *hwpm)
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	if (!tegra_platform_is_silicon()) {
+	if (!tegra_hwpm_is_platform_silicon()) {
 		return 0;
 	}
 
 	/* Read production mode fuse */
-	err = tegra_fuse_readl(TEGRA_FUSE_PRODUCTION_MODE, &production_mode);
+	err = tegra_hwpm_fuse_readl_prod_mode(hwpm, &production_mode);
 	if (err != 0) {
 		tegra_hwpm_err(hwpm, "prod mode fuse read failed");
 		return err;
 	}
 
 #define TEGRA_FUSE_SECURITY_MODE		0xA0U
-	err = tegra_fuse_readl(TEGRA_FUSE_SECURITY_MODE, &security_mode);
+	err = tegra_hwpm_fuse_readl(hwpm,
+		TEGRA_FUSE_SECURITY_MODE, &security_mode);
 	if (err != 0) {
 		tegra_hwpm_err(hwpm, "security mode fuse read failed");
 		return err;
 	}
 
 #define TEGRA_FUSE_FA_MODE			0x48U
-	err = tegra_fuse_readl(TEGRA_FUSE_FA_MODE, &fa_mode);
+	err = tegra_hwpm_fuse_readl(hwpm, TEGRA_FUSE_FA_MODE, &fa_mode);
 	if (err != 0) {
 		tegra_hwpm_err(hwpm, "fa mode fuse read failed");
 		return err;
@@ -295,7 +297,7 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 
 #if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 	/* MSS CHANNEL */
-	if (is_tegra_hypervisor_mode()) {
+	if (tegra_hwpm_is_hypervisor_mode()) {
 		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
 			addr_map_mc0_base_r(),
 			T234_HWPM_IP_MSS_CHANNEL, true);
@@ -319,7 +321,7 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 		}
 #endif
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		/* Static IP instances corresponding to silicon */
 		/* VI */
 /*

@@ -22,15 +22,15 @@
 #include <linux/string.h>
 #include <linux/of_address.h>
 #include <linux/dma-buf.h>
-#include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
-#include <tegra_hwpm_mem_mgmt.h>
-#include <tegra_hwpm_log.h>
+#include <tegra_hwpm.h>
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm_ip.h>
-#include <tegra_hwpm.h>
+#include <tegra_hwpm_log.h>
+#include <tegra_hwpm_soc.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_mem_mgmt.h>
 #include <os/linux/regops_utils.h>
 
 #define LA_CLK_RATE 625000000UL
@@ -391,7 +391,7 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 		return -EAGAIN;
 	}
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		ret = reset_control_assert(hwpm->hwpm_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "hwpm reset assert failed");
@@ -527,7 +527,7 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 		goto fail;
 	}
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		ret = reset_control_assert(hwpm->hwpm_rst);
 		if (ret < 0) {
 			tegra_hwpm_err(hwpm, "hwpm reset assert failed");

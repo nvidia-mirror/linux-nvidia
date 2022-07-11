@@ -20,11 +20,11 @@
 #include <linux/clk.h>
 #include <linux/dma-buf.h>
 #include <linux/debugfs.h>
-
 #include <soc/tegra/fuse.h>
 
-#include <tegra_hwpm_log.h>
 #include <tegra_hwpm.h>
+#include <tegra_hwpm_log.h>
+#include <tegra_hwpm_soc.h>
 #include <tegra_hwpm_common.h>
 #include <os/linux/debugfs.h>
 #include <os/linux/ip_utils.h>
@@ -62,6 +62,20 @@ static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
 	}
 
 	return allow_node;
+}
+
+static int tegra_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
+{
+	tegra_hwpm_fn(hwpm, " ");
+
+	hwpm->dbg_mask = TEGRA_HWPM_DEFAULT_DBG_MASK;
+
+	hwpm->device_info.chip = tegra_get_chip_id();
+	hwpm->device_info.chip_revision = tegra_get_major_rev();
+	hwpm->device_info.revision = tegra_chip_get_revision();
+	hwpm->device_info.platform = tegra_get_platform();
+
+	return 0;
 }
 
 static int tegra_hwpm_probe(struct platform_device *pdev)
@@ -132,7 +146,7 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 	(void) dma_set_mask_and_coherent(hwpm->dev, DMA_BIT_MASK(39));
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		hwpm->la_clk = devm_clk_get(hwpm->dev, "la");
 		if (IS_ERR(hwpm->la_clk)) {
 			tegra_hwpm_err(hwpm, "Missing la clock");
@@ -163,6 +177,12 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	}
 
 	tegra_hwpm_debugfs_init(hwpm);
+	ret = tegra_hwpm_init_chip_info(hwpm);
+	if (ret != 0) {
+		tegra_hwpm_err(hwpm, "Failed to initialize current chip info.");
+		goto init_chip_info_fail;
+	}
+
 	ret = tegra_hwpm_init_sw_components(hwpm);
 	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to init sw components");
@@ -173,7 +193,7 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	 * Currently VDK doesn't have a fmodel for SOC HWPM. Therefore, we
 	 * enable fake registers on VDK for minimal testing.
 	 */
-	if (tegra_platform_is_vdk())
+	if (tegra_hwpm_is_platform_simulation())
 		hwpm->fake_registers_enabled = true;
 	else
 		hwpm->fake_registers_enabled = false;
@@ -184,8 +204,9 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	tegra_hwpm_dbg(hwpm, hwpm_info, "Probe successful!");
 	goto success;
 
+init_chip_info_fail:
 init_sw_components_fail:
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		if (hwpm->la_clk)
 			devm_clk_put(hwpm->dev, hwpm->la_clk);
 		if (hwpm->la_parent_clk)
@@ -226,7 +247,7 @@ static int tegra_hwpm_remove(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_hwpm_is_platform_silicon()) {
 		if (hwpm->la_clk)
 			devm_clk_put(hwpm->dev, hwpm->la_clk);
 		if (hwpm->la_parent_clk)

@@ -19,6 +19,7 @@ obj-y += os/linux/log.o
 obj-y += os/linux/timers.o
 obj-y += os/linux/mem_mgmt_utils.o
 obj-y += os/linux/regops_utils.o
+obj-y += os/linux/soc_utils.o
 
 obj-y += common/allowlist.o
 obj-y += common/aperture.o

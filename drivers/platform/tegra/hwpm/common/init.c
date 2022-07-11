@@ -24,18 +24,11 @@
 #include <tegra_hwpm_next_init.h>
 #endif
 
-static int tegra_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
+static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm)
 {
 	int err = -EINVAL;
 
 	tegra_hwpm_fn(hwpm, " ");
-
-	hwpm->device_info.chip = tegra_get_chip_id();
-	hwpm->device_info.chip_revision = tegra_get_major_rev();
-	hwpm->device_info.revision = tegra_chip_get_revision();
-	hwpm->device_info.platform = tegra_get_platform();
-
-	hwpm->dbg_mask = TEGRA_HWPM_DEFAULT_DBG_MASK;
 
 	switch (hwpm->device_info.chip) {
 	case 0x23:
@@ -62,16 +55,8 @@ static int tegra_hwpm_init_chip_info(struct tegra_soc_hwpm *hwpm)
 
 	if (err != 0) {
 		tegra_hwpm_err(hwpm, "init_chip_info failed");
+		return err;
 	}
-
-	return err;
-}
-
-static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm)
-{
-	int err = 0;
-
-	tegra_hwpm_fn(hwpm, " ");
 
 	err = tegra_hwpm_func_all_ip(hwpm, NULL, TEGRA_HWPM_INIT_IP_STRUCTURES);
 	if (err != 0) {
@@ -87,12 +72,6 @@ int tegra_hwpm_init_sw_components(struct tegra_soc_hwpm *hwpm)
 	int err = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
-
-	err = tegra_hwpm_init_chip_info(hwpm);
-	if (err != 0) {
-		tegra_hwpm_err(hwpm, "Failed to initialize current chip info.");
-		return err;
-	}
 
 	err = tegra_hwpm_init_chip_ip_structures(hwpm);
 	if (err != 0) {
