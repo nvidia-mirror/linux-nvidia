@@ -52,7 +52,7 @@
 
 #define MAX_NUM_FRATES			10
 #define MAX_CTRL_DATA_LEN 		100
-#define MAX_CTRL_UI_STRING_LEN 		32
+#define MAX_CTRL_UI_STRING_LEN		33
 
 typedef enum _errno {
 	ERRCODE_SUCCESS = 0x00,

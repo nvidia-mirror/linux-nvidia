@@ -114,14 +114,15 @@ static int cam_power_put(struct cam *priv)
 
 static int cam_power_get(struct cam *priv)
 {
-	struct camera_common_power_rail *pw = &priv->power;
-	struct camera_common_pdata *pdata = priv->pdata;
 	const char *mclk_name;
 	const char *parentclk_name;
 	struct clk *parent;
 	int err = 0;
 
-	if (!priv || !priv->pdata)
+	struct camera_common_power_rail *pw = priv ? &priv->power : NULL;
+	struct camera_common_pdata *pdata = priv ? priv->pdata : NULL;
+
+	if (!pw || !pdata)
 		return -EINVAL;
 
 	mclk_name = priv->pdata->mclk_name ? priv->pdata->mclk_name : "cam_mclk1";
@@ -330,13 +331,15 @@ static int cam_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct cam *priv =
 	    container_of(ctrl->handler, struct cam, ctrl_handler);
-	struct i2c_client *client = priv->i2c_client;
+	struct i2c_client *client;
 	int err = 0;
-
 	uint8_t ctrl_type = 0;
 	int ctrl_val = 0;
-	if (!priv || !priv->pdata)
+
+	if (!priv)
 		return -EINVAL;
+
+	client = priv->i2c_client;
 
 	if (priv->power.state == SWITCH_OFF)
 		return 0;
@@ -359,14 +362,13 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct cam *priv =
 	    container_of(ctrl->handler, struct cam, ctrl_handler);
-	struct i2c_client *client = priv->i2c_client;
-	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
-	int err = 0, mode = 0;
+	int err = 0;
+	struct i2c_client *client;
 
-	mode = s_data->mode;
-
-	if (!priv || !priv->pdata)
+	if (!priv)
 		return -EINVAL;
+
+	client = priv->i2c_client;
 
 	if (priv->power.state == SWITCH_OFF)
 		return 0;
@@ -382,12 +384,13 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 static int cam_try_add_ctrls(struct cam *priv, int index,
 				ISP_CTRL_INFO * mcu_ctrl)
 {
-	struct i2c_client *client = priv->i2c_client;
+	struct i2c_client *client;
 	struct v4l2_ctrl_config custom_ctrl_config;
 
 	if (!priv || !priv->pdata)
 		return -EINVAL;
 
+	client = priv->i2c_client;
 	priv->ctrl_handler.error = 0;
 	/* Try Enumerating in standard controls */
 	priv->ctrls[index] =
@@ -476,14 +479,15 @@ custom:
 
 static int cam_ctrls_init(struct cam *priv, ISP_CTRL_INFO *mcu_cam_ctrls)
 {
-	struct i2c_client *client = priv->i2c_client;
 	int err = 0, i = 0;
-
+	struct i2c_client *client;
 	/* Array of Ctrls */
 
 	/* Custom Ctrl */
 	if (!priv || !priv->pdata)
 		return -EINVAL;
+
+	client = priv->i2c_client;
 
 	if (mcu_list_ctrls(client, mcu_cam_ctrls, priv) < 0) {
 		dev_err(&client->dev, "Failed to init ctrls\n");
@@ -1356,7 +1360,9 @@ static int mcu_get_ctrl_ui(struct i2c_client *client,
 		goto exit;
 	}
 
-	strncpy((char *)mcu_ui_info->ctrl_ui_data.ctrl_ui_info.ctrl_name, &mc_ret_data[2],MAX_CTRL_UI_STRING_LEN);
+	strncpy((char *)mcu_ui_info->ctrl_ui_data.ctrl_ui_info.ctrl_name, &mc_ret_data[2],
+		MAX_CTRL_UI_STRING_LEN-1);
+	mcu_ui_info->ctrl_ui_data.ctrl_ui_info.ctrl_name[MAX_CTRL_UI_STRING_LEN-1] = '\0';
 
 	mcu_ui_info->ctrl_ui_data.ctrl_ui_info.ctrl_ui_type = mc_ret_data[34];
 	mcu_ui_info->ctrl_ui_data.ctrl_ui_info.ctrl_ui_flags = mc_ret_data[35] << 8 |
@@ -2190,7 +2196,7 @@ int mcu_bload_parse_send_cmd(struct i2c_client *client,
 
 	if ((ihex_rec->rectype == REC_TYPE_ELA)
 	    && (ihex_rec->addr == 0x0000)
-	    && (ihex_rec->datasize = 0x02)) {
+	    && (ihex_rec->datasize == 0x02)) {
 		/*   Upper 32-bit configuration */
 		g_bload_flashaddr = (ihex_rec->recdata[0] <<
 				     24) | (ihex_rec->recdata[1]
