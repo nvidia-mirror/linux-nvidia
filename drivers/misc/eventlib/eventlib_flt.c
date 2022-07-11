@@ -297,6 +297,9 @@ static int flt_writer_init(struct eventlib_ctx *ctx)
 		return ret;
 
 	flt->w2r = subsys_w2r_area(ctx, FILTERING);
+	if (IS_ERR(flt->w2r))
+		return PTR_ERR(flt->w2r);
+
 	size = subsys_w2r_size(ctx, FILTERING);
 	if (size != sizeof(struct eventlib_flt_w2r))
 		return -ENOSPC;
@@ -315,6 +318,9 @@ static int flt_writer_init(struct eventlib_ctx *ctx)
 		return ret;
 
 	flt->r2w = subsys_r2w_area(ctx, FILTERING);
+	if (IS_ERR(flt->r2w))
+		return PTR_ERR(flt->r2w);
+
 	size = subsys_r2w_size(ctx, FILTERING);
 	if (size != flt_r2w_size(flt))
 		return -ENOSPC;
@@ -345,6 +351,9 @@ static int flt_reader_init(struct eventlib_ctx *ctx)
 		return -EPROTONOSUPPORT;
 
 	flt->w2r = subsys_w2r_area(ctx, FILTERING);
+	if (IS_ERR(flt->w2r))
+		return PTR_ERR(flt->w2r);
+
 	if (flt->w2r->compat != FLT_COMPAT_INFO)
 		return -EPROTONOSUPPORT;
 
@@ -363,6 +372,8 @@ static int flt_reader_init(struct eventlib_ctx *ctx)
 		return -EIO;
 
 	flt->r2w = subsys_r2w_area(ctx, FILTERING);
+	if (IS_ERR(flt->r2w))
+		return PTR_ERR(flt->r2w);
 
 	ret = flt_reader_alloc_slot(flt);
 	if (ret != 0)

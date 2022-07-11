@@ -26,6 +26,8 @@
 /* All pointers targeted to shared memory are annotated with 'shmptr' */
 #define shmptr /* empty, pure annotation */
 
+#include <linux/err.h>
+
 #include "eventlib.h"
 #include "utility.h"
 #include "eventlib_tbuf.h"
@@ -101,10 +103,10 @@ static inline void *subsys_shm_area(shmptr struct eventlib_shared *sh,
 	struct eventlib_shared *copy, int subsys)
 {
 	if (sh == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	if (subsys < 0 || subsys >= EVENTLIB_SUBSYS_MAX)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	return ((void *)((uintptr_t)sh + copy->subsys[subsys].offset));
 }

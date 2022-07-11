@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -58,6 +58,9 @@ static int tbuf_writer_init(struct eventlib_ctx *ctx)
 		return -EIO;
 
 	area = subsys_w2r_area(ctx, TRACEBUF);
+	if (IS_ERR(area))
+		return PTR_ERR(area);
+
 	size = subsys_w2r_size(ctx, TRACEBUF);
 	size /= ctx->num_buffers;
 	size = ALIGN_64_DOWN(size);
@@ -93,6 +96,9 @@ static int tbuf_reader_init(struct eventlib_ctx *ctx)
 		return -EIO;
 
 	area = subsys_w2r_area(ctx, TRACEBUF);
+	if (IS_ERR(area))
+		return PTR_ERR(area);
+
 	size = subsys_w2r_size(ctx, TRACEBUF);
 	size /= ctx->priv->w2r_copy.num_buffers;
 	size = ALIGN_64_DOWN(size);
