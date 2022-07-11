@@ -1465,6 +1465,9 @@ void halrf_rfk_handshake(void *dm_void, boolean is_before_k)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 
+	if (!dm->mp_mode)
+		return;
+
 	if (*dm->mp_mode)
 		return;
 
@@ -1501,6 +1504,9 @@ void halrf_rf_k_connect_trigger(void *dm_void, boolean is_recovery,
 	struct dm_struct *dm = (struct dm_struct *)dm_void;	
 	struct dm_dpk_info *dpk_info = &dm->dpk_info;
 	struct _hal_rf_ *rf = &dm->rf_table;
+
+	if (!dm->mp_mode)
+		return;
 
 	if (dm->mp_mode && rf->is_con_tx && rf->is_single_tone &&
 	    rf->is_carrier_suppresion) {
@@ -1629,6 +1635,9 @@ void halrf_segment_iqk_trigger(void *dm_void, boolean clear,
 	if (odm_check_power_status(dm) == false)
 		return;
 #endif
+
+	if (!dm->mp_mode)
+		return;
 
 	if (dm->mp_mode &&
 	    rf->is_con_tx &&
@@ -1805,6 +1814,9 @@ void halrf_iqk_trigger(void *dm_void, boolean is_recovery)
 		return;
 #endif
 
+	if (!dm->mp_mode)
+		return;
+
 	if (dm->mp_mode &&
 	    rf->is_con_tx &&
 	    rf->is_single_tone &&
@@ -1974,6 +1986,9 @@ void halrf_lck_trigger(void *dm_void)
 	if (odm_check_power_status(dm) == false)
 		return;
 #endif
+
+	if (!dm->mp_mode)
+		return;
 
 	if (dm->mp_mode &&
 	    rf->is_con_tx &&
@@ -2186,6 +2201,9 @@ void halrf_set_rfsupportability(void *dm_void)
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct _hal_rf_ *rf = &dm->rf_table;
 
+	if (!dm->mp_mode)
+		return;
+
 	if (rf->manual_rf_supportability &&
 	    *rf->manual_rf_supportability != 0xffffffff) {
 		rf->rf_supportability = *rf->manual_rf_supportability;
@@ -2282,6 +2300,9 @@ void halrf_dpk_trigger(void *dm_void)
 	if (odm_check_power_status(dm) == false)
 		return;
 #endif
+
+	if (!dm->mp_mode)
+		return;
 
 	if (dm->mp_mode &&
 	    rf->is_con_tx &&

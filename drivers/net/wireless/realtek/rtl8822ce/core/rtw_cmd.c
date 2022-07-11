@@ -1269,7 +1269,7 @@ u8 rtw_stop_ap_cmd(_adapter  *adapter, u8 flags)
 {
 #ifdef CONFIG_AP_MODE
 	struct cmd_obj *cmdobj;
-	struct drvextra_cmd_parm *parm;
+	struct drvextra_cmd_parm *parm = NULL;
 	struct cmd_priv *pcmdpriv = &adapter->cmdpriv;
 	struct submit_ctx sctx;
 	u8 res = _SUCCESS;
@@ -1293,6 +1293,7 @@ u8 rtw_stop_ap_cmd(_adapter  *adapter, u8 flags)
 		/* need enqueue, prepare cmd_obj and enqueue */
 		cmdobj = (struct cmd_obj *)rtw_zmalloc(sizeof(*cmdobj));
 		if (cmdobj == NULL) {
+			rtw_mfree((u8 *)parm, sizeof(*parm));
 			res = _FAIL;
 			goto exit;
 		}
@@ -1433,8 +1434,14 @@ u8 rtw_setstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 key_type, bool
 	else
 		GET_ENCRY_ALGO(psecuritypriv, sta, psetstakey_para->algorithm, _FALSE);
 
-	if ((psetstakey_para->algorithm == _GCMP_256_) || (psetstakey_para->algorithm == _CCMP_256_)) 
-		key_len = 32;
+#ifdef CONFIG_TDLS
+	/* TDLS_KEY doesn't support 256-bit key length yet */
+	if (key_type != TDLS_KEY)
+#endif
+	{
+		if ((psetstakey_para->algorithm == _GCMP_256_) || (psetstakey_para->algorithm == _CCMP_256_))
+			key_len = 32;
+	}
 
 	if (key_type == GROUP_KEY) {
 		_rtw_memcpy(&psetstakey_para->key, &psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey, key_len);

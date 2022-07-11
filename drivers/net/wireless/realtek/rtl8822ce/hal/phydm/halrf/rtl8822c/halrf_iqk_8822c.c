@@ -3596,10 +3596,10 @@ _iqk_rx_iqk_gain_search_fail_8822c(
 			fail = false;
 			iqk->isbnd = false;
 		}
-		
+
 		if (iqk->isbnd)
 			fail = false;
-		
+		if (idx < 5)
 		iqk->tmp1bcc = IQMUX[idx];
 
 		if (fail == false){
@@ -3608,10 +3608,10 @@ _iqk_rx_iqk_gain_search_fail_8822c(
 			RF_DBG(dm, DBG_RF_IQK, "[IQK]S%d 0x1be8 = %x\n",path, tmp);
 		}
 }
-	
+
 return fail;
 
-	
+
 }
 
 boolean
@@ -4514,7 +4514,7 @@ void _iqk_rximr_test_8822c(
 	boolean kfail;
 	u8 i, step, count, side;
 	u32 imr_result = 0, tone_index;
-	u32 temp = 0, temp1b38[2][15];
+	u32 temp = 0, temp1b38[2][15] = {0};
 	char *freq[15] = {"1.25MHz", "3.75MHz", "6.25MHz", "8.75MHz", "11.25MHz",
 			  "13.75MHz", "16.25MHz", "18.75MHz", "21.25MHz", "23.75MHz",
 			  "26.25MHz", "28.75MHz", "31.25MHz", "33.75MHz", "36.25MHz"};

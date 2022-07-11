@@ -5015,6 +5015,7 @@ ssize_t proc_set_pattern_info(struct file *file, const char __user *buffer,
 					  HW_VAR_WOWLAN, (u8 *)&poidparam);
 		} else {
 			index = pwrpriv->wowlan_pattern_idx;
+			tmp[MAX_WKFM_PATTERN_STR_LEN] = '\0';
 			ret = rtw_wowlan_parser_pattern_cmd(tmp,
 					    pwrpriv->patterns[index].content,
 					    &pwrpriv->patterns[index].len,
@@ -6353,7 +6354,7 @@ ssize_t proc_set_tx_auth(struct file *file, const char __user *buffer, size_t co
 	char tmp[16];
 	u8	mac_addr[NUM_STA][ETH_ALEN];
 	u8 bc_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	u32 tx_auth;
+	u32 tx_auth = 0;
 	u8 index;
 
 

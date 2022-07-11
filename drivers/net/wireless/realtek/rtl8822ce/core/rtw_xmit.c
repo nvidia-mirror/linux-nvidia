@@ -3140,7 +3140,7 @@ s32 rtw_mgmt_xmitframe_coalesce(_adapter *padapter, _pkt *pkt, struct xmit_frame
 			ClearPwrMgt(BIP_AAD);
 			ClearMData(BIP_AAD);
 			/* conscruct AAD, copy address 1 to address 3 */
-			_rtw_memcpy(BIP_AAD + 2, pwlanhdr->addr1, 18);
+			_rtw_memcpy(BIP_AAD + 2, GetAddr1Ptr((u8 *)pwlanhdr), 18);
 			/* copy management fram body */
 			_rtw_memcpy(BIP_AAD + BIP_AAD_SIZE, MGMT_body, frame_body_len);
 

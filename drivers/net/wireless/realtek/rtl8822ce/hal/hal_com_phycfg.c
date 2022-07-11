@@ -4942,13 +4942,18 @@ PHY_ConfigRFWithParaFile(
 	if (!(Adapter->registrypriv.load_phy_file & LOAD_RF_PARA_FILE))
 		return rtStatus;
 
-	/* eRFPath can only be RF_PATH_A or RF_PATH_B */
-	if (eRFPath == RF_PATH_A) {
+	switch (eRFPath) {
+	case RF_PATH_A:
 		pBuf = pHalData->rf_radio_a;
 		pBufLen = &pHalData->rf_radio_a_len;
-	} else {
+		break;
+	case RF_PATH_B:
 		pBuf = pHalData->rf_radio_b;
 		pBufLen = &pHalData->rf_radio_b_len;
+		break;
+	default:
+		RTW_INFO("Unknown RF path!! %d\r\n", eRFPath);
+		break;
 	}
 
 	_rtw_memset(pHalData->para_file_buf, 0, MAX_PARA_FILE_BUF_LEN);
@@ -4965,11 +4970,17 @@ PHY_ConfigRFWithParaFile(
 					_rtw_memcpy(pBuf, pHalData->para_file_buf, rlen);
 					*pBufLen = rlen;
 
-					/* eRFPath can only be RF_PATH_A or RF_PATH_B */
-					if (eRFPath == RF_PATH_A)
+					switch (eRFPath) {
+					case RF_PATH_A:
 						pHalData->rf_radio_a = pBuf;
-					else
+						break;
+					case RF_PATH_B:
 						pHalData->rf_radio_b = pBuf;
+						break;
+					default:
+						RTW_INFO("Unknown RF path!! %d\r\n", eRFPath);
+						break;
+					}
 				} else
 					RTW_INFO("%s(): eRFPath=%d  alloc fail !\n", __FUNCTION__, eRFPath);
 			}

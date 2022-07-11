@@ -913,7 +913,13 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf)
 	/* find the largest bw supported by both registry and hal */
 	bw = hal_largest_bw(padapter, REGSTY_BW_5G(pregistrypriv));
 
-	HighestRate = VHT_MCS_DATA_RATE[bw][pvhtpriv->sgi_80m][((pvhtpriv->vht_highest_rate - MGN_VHT1SS_MCS0) & 0x3f)];
+	if(bw < ARRAY_SIZE(VHT_MCS_DATA_RATE)){
+		HighestRate = VHT_MCS_DATA_RATE[bw][pvhtpriv->sgi_80m][((pvhtpriv->vht_highest_rate - MGN_VHT1SS_MCS0) & 0x3f)];
+	} else {
+		RTW_WARN("BW parameter value is out of range:%u\n", bw);
+		HighestRate = VHT_MCS_DATA_RATE[ARRAY_SIZE(VHT_MCS_DATA_RATE) - 1][pvhtpriv->sgi_80m][((pvhtpriv->vht_highest_rate - MGN_VHT1SS_MCS0) & 0x3f)];
+	}
+
 	HighestRate = (HighestRate + 1) >> 1;
 
 	SET_VHT_CAPABILITY_ELE_MCS_RX_HIGHEST_RATE(pcap, HighestRate); /* indicate we support highest rx rate is 600Mbps. */

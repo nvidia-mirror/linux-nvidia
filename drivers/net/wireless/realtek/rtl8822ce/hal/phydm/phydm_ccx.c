@@ -1114,7 +1114,7 @@ void phydm_nhm_dbg(void *dm_void, char input[][16], u32 *_used, char *output,
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct ccx_info *ccx = &dm->dm_ccx_info;
-	struct nhm_para_info nhm_para;
+	struct nhm_para_info nhm_para = {0};
 	char help[] = "-h";
 	u32 var1[10] = {0};
 	u32 used = *_used;
@@ -1215,6 +1215,7 @@ void phydm_nhm_dbg(void *dm_void, char input[][16], u32 *_used, char *output,
 			nhm_para.nhm_app = NHM_DBG;
 			nhm_para.nhm_lv = NHM_LV_4;
 			nhm_para.mntr_time = 262;
+			nhm_para.nhm_th0_manual = 0;
 		} else {
 			nhm_para.incld_txon = (enum nhm_option_txon_all)var1[1];
 			nhm_para.incld_cca = (enum nhm_option_cca_all)var1[2];

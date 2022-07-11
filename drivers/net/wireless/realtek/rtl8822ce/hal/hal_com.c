@@ -8106,6 +8106,7 @@ static void rtw_hal_append_tkip_mic(PADAPTER padapter,
 	u8	mic[8];
 	u8	priority[4] = {0x0};
 	u8	null_key[16] = {0x0};
+	_rtw_memset(&micdata, 0, sizeof(struct mic_data));
 
 	RTW_INFO("%s(): Add MIC, offset: %d\n", __func__, offset);
 

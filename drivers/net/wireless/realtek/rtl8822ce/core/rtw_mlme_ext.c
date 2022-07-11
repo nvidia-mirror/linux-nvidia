@@ -9301,7 +9301,7 @@ static u32 rtw_append_assoc_req_owe_ie(_adapter *adapter, u8 *pbuf)
 	if (sec == NULL)
 		goto exit;
 
-	if (sec->owe_ie && sec->owe_ie_len > 0) {
+	if (sec->owe_ie_len > 0) {
 		len = sec->owe_ie_len;
 		_rtw_memcpy(pbuf, sec->owe_ie, len);
 	}
@@ -17001,7 +17001,7 @@ u8 tdls_hdl(_adapter *padapter, unsigned char *pbuf)
 	struct tdls_txmgmt txmgmt;
 	u32 setchtime, resp_sleep = 0, wait_time;
 	u8 zaddr[ETH_ALEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-	u8 ret;
+	u8 ret = H2C_SUCCESS;
 	u8 doiqk;
 	u64 tx_ra_bitmap = 0;
 
@@ -17031,8 +17031,10 @@ u8 tdls_hdl(_adapter *padapter, unsigned char *pbuf)
 
 		/* leave ALL PS when TDLS is established */
 		if (_FAIL == rtw_pwr_wakeup(padapter)) {
-			RTW_ERR("%s(): rtw_pwr_wakeup fail !!!\n", __FUNCTION__);
-			return H2C_REJECTED;
+			RTW_INFO("%s(): rtw_pwr_wakeup fail !!!\n", __func__);
+			rtw_tdls_cmd(padapter, ptdls_sta->cmn.mac_addr, TDLS_TEARDOWN_STA);
+			ret = H2C_REJECTED;
+			break;
 		}
 
 		rtw_hal_rcr_set_chk_bssid(padapter, MLME_TDLS_LINKED);
@@ -17091,7 +17093,8 @@ u8 tdls_hdl(_adapter *padapter, unsigned char *pbuf)
 		issue_nulldata(padapter, NULL, 1, 3, 3);
 
 		RTW_INFO("[TDLS ] issue tdls channel switch response\n");
-		ret = issue_tdls_ch_switch_rsp(padapter, &txmgmt, _TRUE);
+		ret = (issue_tdls_ch_switch_rsp(padapter, &txmgmt, _TRUE) == _SUCCESS) ?
+			H2C_SUCCESS : H2C_REJECTED;
 
 		/* If we receive TDLS_CH_SW_REQ at off channel which it's target is AP's channel */
 		/* then we just switch to AP's channel*/
@@ -17100,7 +17103,7 @@ u8 tdls_hdl(_adapter *padapter, unsigned char *pbuf)
 			break;
 		}
 
-		if (ret == _SUCCESS)
+		if (ret == H2C_SUCCESS)
 			rtw_tdls_cmd(padapter, ptdls_sta->cmn.mac_addr, TDLS_CH_SW_TO_OFF_CHNL);
 		else
 			RTW_INFO("[TDLS] issue_tdls_ch_switch_rsp wait ack fail !!!!!!!!!!\n");
@@ -17230,7 +17233,7 @@ u8 tdls_hdl(_adapter *padapter, unsigned char *pbuf)
 
 	/* _exit_critical_bh(&(ptdlsinfo->hdl_lock), &irqL); */
 
-	return H2C_SUCCESS;
+	return ret;
 #else
 	return H2C_REJECTED;
 #endif /* CONFIG_TDLS */

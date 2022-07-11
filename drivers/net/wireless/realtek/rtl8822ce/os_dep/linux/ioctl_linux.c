@@ -7827,7 +7827,7 @@ static int rtw_wx_set_priv(struct net_device *dev,
 		rtw_vmfree(ext, len);
 		return -EFAULT;
 	}
-
+	ext[len - 1] = '\0';
 
 
 #ifdef CONFIG_DEBUG_RTW_WX_SET_PRIV
@@ -8066,6 +8066,7 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 		if (copy_from_user(input,
 				   wrqu->data.pointer, wrqu->data.length))
 			return -EFAULT;
+		input[wrqu->data.length - 1] = '\0';
 		/* leave PS first */
 		rtw_ps_deny(padapter, PS_DENY_IOCTL);
 		LeaveAllPowerSaveModeDirect(padapter);
@@ -9588,7 +9589,7 @@ static int rtw_mp_efuse_set(struct net_device *dev,
 			err = -EFAULT;
 		}
 	} else if (strcmp(tmp[0], "btfk2map") == 0) {
-
+#ifdef CONFIG_BT_EFUSE_MASK
 		if (padapter->registrypriv.bBTFileMaskEfuse != _TRUE && pmp_priv->bloadBTefusemap == _TRUE) {
 			RTW_INFO("%s: File BT eFuse mask file not to be loaded\n", __FUNCTION__);
 			sprintf(extra, "Not load BT eFuse mask file yet, Please advance to use [ efuse_bt_mask ], now remove the Adapter.!!!!\n");
@@ -9596,7 +9597,7 @@ static int rtw_mp_efuse_set(struct net_device *dev,
 			err = 0;
 			goto exit;
 		}
-
+#endif
 		rtw_write8(padapter, 0xa3, 0x05);
 		BTStatus = rtw_read8(padapter, 0xa0);
 		RTW_INFO("%s: btwmap before read 0xa0 BT Status =0x%x\n", __FUNCTION__, BTStatus);
@@ -9622,7 +9623,6 @@ static int rtw_mp_efuse_set(struct net_device *dev,
 		rtw_read8(padapter, EFUSE_CTRL);
 		BTEfuse_PowerSwitch(padapter, 1, _FALSE);
 #endif /* RTW_HALMAC */
-		_rtw_memcpy(pEfuseHal->BTEfuseModifiedMap, pEfuseHal->fakeBTEfuseModifiedMap, EFUSE_BT_MAX_MAP_LEN);
 
 		if (rtw_BT_efuse_map_write(padapter, 0x00, EFUSE_BT_MAX_MAP_LEN, pEfuseHal->fakeBTEfuseModifiedMap) == _FAIL) {
 			RTW_INFO("%s: rtw_BT_efuse_map_write error!\n", __FUNCTION__);
@@ -10455,8 +10455,6 @@ static int rtw_priv_get(struct net_device *dev,
 	struct dm_iqk_info	*p_iqk_info = &p_dm->IQK_info;
 	u32 i = 100;
 
-	if (padapter == NULL)
-		return -ENETDOWN;
 
 	if (padapter->bup == _FALSE) {
 		RTW_INFO(" %s fail =>(padapter->bup == _FALSE )\n", __FUNCTION__);

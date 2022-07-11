@@ -602,9 +602,9 @@ void _halrf_txgapk_write_tx_gain_8822c(
 	}
 
 	for (path_idx = RF_PATH_A; path_idx < MAX_PATH_NUM_8822C; path_idx++) {
-		for (i = 0; i < 10; i++) {
+		for (i = 0; i <= 10; i++) {
 			offset_tmp[i] = 0;
-			for (j = i; j < 10; j++) {
+			for (j = i; j <= 10; j++) {
 				if ((((txgapk->txgapk_rf3f_bp[band_idx][j][path_idx] & 0xf00) >> 8) >= 0xc) &&
 					(((txgapk->txgapk_rf3f_bp[band_idx][j][path_idx] & 0xf0) >> 4) >= 0xe))
 					continue;
