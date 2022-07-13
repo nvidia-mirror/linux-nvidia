@@ -247,7 +247,7 @@ struct allowlist t234_pva0_pm_alist[9] = {
 	{0x00008020, true},
 };
 
-struct allowlist t234_nvdla_alist[34] = {
+struct allowlist t234_nvdla_alist[37] = {
 	{0x00001088, false},
 	{0x000010a8, false},
 	{0x0001a000, false},
@@ -282,6 +282,9 @@ struct allowlist t234_nvdla_alist[34] = {
 	{0x0001a074, true},
 	{0x0001a078, true},
 	{0x0001a07c, true},
+	{0x00000008, true},
+	{0x00000a00, true},
+	{0x00000a20, true},
 };
 
 struct allowlist t234_mgbe_alist[2] = {
@@ -328,8 +331,40 @@ struct allowlist t234_mss_channel_alist[2] = {
 	{0x0000082c, true},
 };
 
-struct allowlist t234_mss_nvlink_alist[1] = {
+struct allowlist t234_mss_nvlink_alist[33] = {
 	{0x00000a30, true},
+	{0x00000a80, true},
+	{0x00000a84, true},
+	{0x00000a88, true},
+	{0x00000a8c, true},
+	{0x00000a90, true},
+	{0x00000a94, true},
+	{0x00000a98, true},
+	{0x00000a9c, true},
+	{0x00000aa0, true},
+	{0x00000aa4, true},
+	{0x00000aa8, true},
+	{0x00000aac, true},
+	{0x00000ab0, true},
+	{0x00000ab4, true},
+	{0x00000ab8, true},
+	{0x00000abc, true},
+	{0x00000ac0, true},
+	{0x00000ac4, true},
+	{0x00000ac8, true},
+	{0x00000acc, true},
+	{0x00000ad0, true},
+	{0x00000ad4, true},
+	{0x00000ad8, true},
+	{0x00000adc, true},
+	{0x00000ae0, true},
+	{0x00000ae4, true},
+	{0x00000ae8, true},
+	{0x00000aec, true},
+	{0x00000af0, true},
+	{0x00000af4, true},
+	{0x00000af8, true},
+	{0x00000afc, true},
 };
 
 struct allowlist t234_mc0to7_res_mss_iso_niso_hub_alist[2] = {
