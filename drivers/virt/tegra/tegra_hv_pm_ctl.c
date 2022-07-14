@@ -1051,7 +1051,8 @@ static int netlink_pm_notify(struct notifier_block *nb,
 			dev_dbg(data->dev, "all client notified successful\n");
 
 		/*Receive the message from userspace*/
-		wait_for_completion(&netlink_complete);
+		if (user_client_count)
+			wait_for_completion(&netlink_complete);
 		break;
 
 	case PM_POST_HIBERNATION:
@@ -1068,7 +1069,8 @@ static int netlink_pm_notify(struct notifier_block *nb,
 			dev_dbg(data->dev, "all client notified successful\n");
 
 		/*Receive the message from userspace*/
-		wait_for_completion(&netlink_complete);
+		if (user_client_count)
+			wait_for_completion(&netlink_complete);
 		break;
 
 	default:
