@@ -598,6 +598,11 @@ nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 		pr_err("(%s): Interrupted waiting for CORE_DEINIT to complete\n",
 		       drv_ctx->drv_name);
 
+	if (drv_ctx->epf_ctx->notifier_registered) {
+		pci_epc_unregister_notifier(epf->epc, &epf->nb);
+		pci_epc_unregister_block_notifier(epf->epc, &epf->block_nb);
+		drv_ctx->epf_ctx->notifier_registered = false;
+	}
 	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
 				       COMM_MSG_TYPE_SHUTDOWN);
 	comm_channel_unregister_msg_cb(drv_ctx->comm_channel_h,
