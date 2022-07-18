@@ -739,4 +739,8 @@ int smmu_driver_init(void);
 void smmu_driver_exit(void);
 #endif
 
+#if defined(MODS_HAS_TEGRA)
+int esc_mods_send_ipi(struct mods_client *client, struct MODS_SEND_IPI *p);
+#endif
+
 #endif	/* _MODS_INTERNAL_H_  */

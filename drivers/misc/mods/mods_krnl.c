@@ -2604,6 +2604,11 @@ static long mods_krnl_ioctl(struct file  *fp,
 		MODS_IOCTL(MODS_ESC_OIST_STATUS,
 			   esc_mods_oist_status, MODS_TEGRA_OIST_STATUS);
 		break;
+
+	case MODS_ESC_MODS_SEND_IPI:
+		MODS_IOCTL(MODS_ESC_MODS_SEND_IPI,
+			   esc_mods_send_ipi, MODS_SEND_IPI);
+		break;
 #endif
 
 	case MODS_ESC_ACQUIRE_ACCESS_TOKEN:

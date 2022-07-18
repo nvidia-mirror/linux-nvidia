@@ -18,6 +18,7 @@ mods-$(CONFIG_TEGRA_NVADSP)        += mods_adsp.o
 mods-$(CONFIG_COMMON_CLK)          += mods_clock.o
 mods-$(CONFIG_DEBUG_FS)            += mods_debugfs.o
 mods-$(CONFIG_DMA_ENGINE)          += mods_dma.o
+mods-$(CONFIG_ARCH_TEGRA)          += mods_ipi.o
 mods-$(CONFIG_NET)                 += mods_netdevice.o
 mods-$(CONFIG_ARCH_TEGRA)          += mods_oist.o
 mods-$(CONFIG_OPTEE)               += mods_optee.o
