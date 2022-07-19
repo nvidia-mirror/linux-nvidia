@@ -2438,16 +2438,16 @@ static int mods_post_alloc(struct mods_client     *client,
 				cl_error("kmap failed\n");
 				return -ENOMEM;
 			}
-#if defined(MODS_HAS_TEGRA) && !defined(CONFIG_CPA)
-			clear_contiguous_cache(client,
-					       (u64)(size_t)ptr,
-					       phys_addr + (i << PAGE_SHIFT),
-					       PAGE_SIZE);
-#else
+#ifdef CONFIG_X86
 			if (p_mem_info->cache_type == MODS_ALLOC_WRITECOMBINE)
 				err = MODS_SET_MEMORY_WC((unsigned long)ptr, 1);
 			else
 				err = MODS_SET_MEMORY_UC((unsigned long)ptr, 1);
+#else
+			clear_contiguous_cache(client,
+					       (u64)(size_t)ptr,
+					       phys_addr + (i << PAGE_SHIFT),
+					       PAGE_SIZE);
 #endif
 			kunmap(ptr);
 			if (unlikely(err)) {

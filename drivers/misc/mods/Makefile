@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 ccflags-y += -I$(srctree.nvidia)/include
+ccflags-y += -DMODS_HAS_TEGRA
 
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
 CONFIG_MODS := m

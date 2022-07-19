@@ -108,10 +108,6 @@
 #       define MODS_HAS_ACPI_FETCH 1
 #endif
 
-#if defined(CONFIG_ARCH_TEGRA)
-#       define MODS_HAS_TEGRA 1
-#endif
-
 #if defined(MODS_HAS_TEGRA) && KERNEL_VERSION(5, 1, 0) <= MODS_KERNEL_VERSION
 #       define MODS_ENABLE_BPMP_MRQ_API 1
 #endif
