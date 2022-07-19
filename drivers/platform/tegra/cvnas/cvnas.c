@@ -408,7 +408,7 @@ err_enable_clk:
 
 static int nvcvnas_power_off(struct cvnas_device *cvnas_dev)
 {
-	int val, i, j;
+	u32 val, i, j;
 	u32 fcm_pg_seq[] =
 		{0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF};
 
