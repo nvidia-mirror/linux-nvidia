@@ -115,7 +115,7 @@ int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt
 		return -EINVAL;
 	}
 
-	if (ip_id >= NUM_IPS) {
+	if (ip_id < 0 || ip_id >= NUM_IPS) {
 		pr_err("tegra-hsierrrptinj: Invalid IP ID 0x%04x\n", ip_id);
 		return -EINVAL;
 	}
