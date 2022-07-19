@@ -47,6 +47,21 @@ obj-y += hal/t234/ip/rtr/t234_rtr.o
 #
 
 #
+# One of the HWPM components is a perfmux. Perfmux registers belong to the
+# IP domain. There are 2 ways of accessing perfmux registers
+# - option 1: implement HWPM <-> IP interface. IP drivers register with HWPM
+#             driver and share required function pointers
+# - option 2: map perfmux register address in HWPM driver
+# Option 1 is a preferred solution. However, IP drivers have yet to
+# implement the interface. Such IPs can be force enabled from HWPM driver
+# perspective. However, forcing an IP will enable all instances of the IP.
+# Hence, IP force enable should only be done on full chip config.
+# Note as power management API is not available, unpowergating the IP via
+# command line is required.
+#
+##define CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE
+
+#
 # Define a Minimal IP config flag
 # Enable only MSS_Channel, NVDLA and PVA IPs
 # When CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE is set to y.
@@ -54,7 +69,7 @@ obj-y += hal/t234/ip/rtr/t234_rtr.o
 CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE=y
 
 ifeq ($(CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE),y)
-ccflags-y += -DCONFIG_HWPM_ALLOW_FORCE_ENABLE
+ccflags-y += -DCONFIG_T234_HWPM_ALLOW_FORCE_ENABLE
 endif
 
 ifeq ($(CONFIG_TEGRA_GRHOST_NVDLA),y)

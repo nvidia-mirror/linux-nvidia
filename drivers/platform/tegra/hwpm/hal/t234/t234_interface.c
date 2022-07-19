@@ -229,89 +229,89 @@ bool t234_hwpm_is_ip_active(struct tegra_soc_hwpm *hwpm,
 	u32 config_ip = TEGRA_SOC_HWPM_IP_INACTIVE;
 
 	switch (ip_enum) {
-	case TEGRA_SOC_HWPM_IP_VI:
+	case TEGRA_HWPM_IP_VI:
 #if defined(CONFIG_T234_HWPM_IP_VI)
 		config_ip = T234_HWPM_IP_VI;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_ISP:
+	case TEGRA_HWPM_IP_ISP:
 #if defined(CONFIG_T234_HWPM_IP_ISP)
 		config_ip = T234_HWPM_IP_ISP;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_VIC:
+	case TEGRA_HWPM_IP_VIC:
 #if defined(CONFIG_T234_HWPM_IP_VIC)
 		config_ip = T234_HWPM_IP_VIC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_OFA:
+	case TEGRA_HWPM_IP_OFA:
 #if defined(CONFIG_T234_HWPM_IP_OFA)
 		config_ip = T234_HWPM_IP_OFA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_PVA:
+	case TEGRA_HWPM_IP_PVA:
 #if defined(CONFIG_T234_HWPM_IP_PVA)
 		config_ip = T234_HWPM_IP_PVA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_NVDLA:
+	case TEGRA_HWPM_IP_NVDLA:
 #if defined(CONFIG_T234_HWPM_IP_NVDLA)
 		config_ip = T234_HWPM_IP_NVDLA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_MGBE:
+	case TEGRA_HWPM_IP_MGBE:
 #if defined(CONFIG_T234_HWPM_IP_MGBE)
 		config_ip = T234_HWPM_IP_MGBE;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_SCF:
+	case TEGRA_HWPM_IP_SCF:
 #if defined(CONFIG_T234_HWPM_IP_SCF)
 		config_ip = T234_HWPM_IP_SCF;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_NVDEC:
+	case TEGRA_HWPM_IP_NVDEC:
 #if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		config_ip = T234_HWPM_IP_NVDEC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_NVENC:
+	case TEGRA_HWPM_IP_NVENC:
 #if defined(CONFIG_T234_HWPM_IP_NVENC)
 		config_ip = T234_HWPM_IP_NVENC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_PCIE:
+	case TEGRA_HWPM_IP_PCIE:
 #if defined(CONFIG_T234_HWPM_IP_PCIE)
 		config_ip = T234_HWPM_IP_PCIE;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_DISPLAY:
+	case TEGRA_HWPM_IP_DISPLAY:
 #if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 		config_ip = T234_HWPM_IP_DISPLAY;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_MSS_CHANNEL:
+	case TEGRA_HWPM_IP_MSS_CHANNEL:
 #if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		config_ip = T234_HWPM_IP_MSS_CHANNEL;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_MSS_GPU_HUB:
+	case TEGRA_HWPM_IP_MSS_GPU_HUB:
 #if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 		config_ip = T234_HWPM_IP_MSS_GPU_HUB;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_MSS_ISO_NISO_HUBS:
+	case TEGRA_HWPM_IP_MSS_ISO_NISO_HUBS:
 #if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 		config_ip = T234_HWPM_IP_MSS_ISO_NISO_HUBS;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_IP_MSS_MCF:
+	case TEGRA_HWPM_IP_MSS_MCF:
 #if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 		config_ip = T234_HWPM_IP_MSS_MCF;
 #endif
 		break;
 	default:
 		tegra_hwpm_err(hwpm,
-			"Queried enum tegra_soc_hwpm_ip %d invalid", ip_enum);
+			"Queried enum tegra_hwpm_ip %d invalid", ip_enum);
 		break;
 	}
 
@@ -320,100 +320,100 @@ bool t234_hwpm_is_ip_active(struct tegra_soc_hwpm *hwpm,
 }
 
 bool t234_hwpm_is_resource_active(struct tegra_soc_hwpm *hwpm,
-	u32 res_index, u32 *config_ip_index)
+	u32 res_enum, u32 *config_ip_index)
 {
 	u32 config_ip = TEGRA_SOC_HWPM_IP_INACTIVE;
 
-	switch (res_index) {
-	case TEGRA_SOC_HWPM_RESOURCE_VI:
+	switch (res_enum) {
+	case TEGRA_HWPM_RESOURCE_VI:
 #if defined(CONFIG_T234_HWPM_IP_VI)
 		config_ip = T234_HWPM_IP_VI;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_ISP:
+	case TEGRA_HWPM_RESOURCE_ISP:
 #if defined(CONFIG_T234_HWPM_IP_ISP)
 		config_ip = T234_HWPM_IP_ISP;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_VIC:
+	case TEGRA_HWPM_RESOURCE_VIC:
 #if defined(CONFIG_T234_HWPM_IP_VIC)
 		config_ip = T234_HWPM_IP_VIC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_OFA:
+	case TEGRA_HWPM_RESOURCE_OFA:
 #if defined(CONFIG_T234_HWPM_IP_OFA)
 		config_ip = T234_HWPM_IP_OFA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_PVA:
+	case TEGRA_HWPM_RESOURCE_PVA:
 #if defined(CONFIG_T234_HWPM_IP_PVA)
 		config_ip = T234_HWPM_IP_PVA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_NVDLA:
+	case TEGRA_HWPM_RESOURCE_NVDLA:
 #if defined(CONFIG_T234_HWPM_IP_NVDLA)
 		config_ip = T234_HWPM_IP_NVDLA;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_MGBE:
+	case TEGRA_HWPM_RESOURCE_MGBE:
 #if defined(CONFIG_T234_HWPM_IP_MGBE)
 		config_ip = T234_HWPM_IP_MGBE;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_SCF:
+	case TEGRA_HWPM_RESOURCE_SCF:
 #if defined(CONFIG_T234_HWPM_IP_SCF)
 		config_ip = T234_HWPM_IP_SCF;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_NVDEC:
+	case TEGRA_HWPM_RESOURCE_NVDEC:
 #if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		config_ip = T234_HWPM_IP_NVDEC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_NVENC:
+	case TEGRA_HWPM_RESOURCE_NVENC:
 #if defined(CONFIG_T234_HWPM_IP_NVENC)
 		config_ip = T234_HWPM_IP_NVENC;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_PCIE:
+	case TEGRA_HWPM_RESOURCE_PCIE:
 #if defined(CONFIG_T234_HWPM_IP_PCIE)
 		config_ip = T234_HWPM_IP_PCIE;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_DISPLAY:
+	case TEGRA_HWPM_RESOURCE_DISPLAY:
 #if defined(CONFIG_T234_HWPM_IP_DISPLAY)
 		config_ip = T234_HWPM_IP_DISPLAY;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_MSS_CHANNEL:
+	case TEGRA_HWPM_RESOURCE_MSS_CHANNEL:
 #if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		config_ip = T234_HWPM_IP_MSS_CHANNEL;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_MSS_GPU_HUB:
+	case TEGRA_HWPM_RESOURCE_MSS_GPU_HUB:
 #if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
 		config_ip = T234_HWPM_IP_MSS_GPU_HUB;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_MSS_ISO_NISO_HUBS:
+	case TEGRA_HWPM_RESOURCE_MSS_ISO_NISO_HUBS:
 #if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
 		config_ip = T234_HWPM_IP_MSS_ISO_NISO_HUBS;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_MSS_MCF:
+	case TEGRA_HWPM_RESOURCE_MSS_MCF:
 #if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 		config_ip = T234_HWPM_IP_MSS_MCF;
 #endif
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_PMA:
+	case TEGRA_HWPM_RESOURCE_PMA:
 		config_ip = T234_HWPM_IP_PMA;
 		break;
-	case TEGRA_SOC_HWPM_RESOURCE_CMD_SLICE_RTR:
+	case TEGRA_HWPM_RESOURCE_CMD_SLICE_RTR:
 		config_ip = T234_HWPM_IP_RTR;
 		break;
 	default:
 		tegra_hwpm_err(hwpm, "Queried resource %d invalid",
-			res_index);
+			res_enum);
 		break;
 	}
 

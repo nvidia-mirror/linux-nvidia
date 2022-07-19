@@ -289,11 +289,10 @@ int t234_hwpm_validate_current_config(struct tegra_soc_hwpm *hwpm)
 
 int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 {
-
 	int ret = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
-#if defined(CONFIG_HWPM_ALLOW_FORCE_ENABLE)
+#if defined(CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE)
 
 #if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 	/* MSS CHANNEL */
@@ -477,7 +476,7 @@ int t234_hwpm_get_fs_info(struct tegra_soc_hwpm *hwpm,
 				}
 			}
 			*fs_mask = floorsweep;
-			*ip_status = TEGRA_SOC_HWPM_IP_STATUS_VALID;
+			*ip_status = TEGRA_HWPM_IP_STATUS_VALID;
 
 			return 0;
 		}
@@ -486,7 +485,7 @@ int t234_hwpm_get_fs_info(struct tegra_soc_hwpm *hwpm,
 	tegra_hwpm_dbg(hwpm, hwpm_dbg_floorsweep_info,
 		"SOC hwpm IP %d is unavailable", ip_enum);
 
-	*ip_status = TEGRA_SOC_HWPM_IP_STATUS_INVALID;
+	*ip_status = TEGRA_HWPM_IP_STATUS_INVALID;
 	*fs_mask = 0ULL;
 
 	return 0;

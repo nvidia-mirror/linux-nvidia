@@ -21,18 +21,84 @@
 
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
-#undef BIT
-#define BIT(x) (0x1U << (u32)(x))
-
-#undef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+#include <tegra_hwpm_types.h>
 
 #define TEGRA_SOC_HWPM_IP_INACTIVE	~(0U)
 
+/* These macro values should match TEGRA_SOC_HWPM_IP_STATUS_* */
+#define TEGRA_HWPM_IP_STATUS_VALID	0U
+#define TEGRA_HWPM_IP_STATUS_INVALID	1U
+
+/* These macro values should match TEGRA_SOC_HWPM_RESOURCE_STATUS_* */
+#define TEGRA_HWPM_RESOURCE_STATUS_INVALID	0U
+#define TEGRA_HWPM_RESOURCE_STATUS_VALID	1U
+
+#define TEGRA_HWPM_FUSE_PRODUCTION_MODE_MASK		BIT(0)
+#define TEGRA_HWPM_FUSE_SECURITY_MODE_MASK		BIT(1)
+#define TEGRA_HWPM_FUSE_HWPM_GLOBAL_DISABLE_MASK	BIT(2)
+
+struct tegra_hwpm_mem_mgmt;
+struct tegra_hwpm_allowlist_map;
+enum tegra_soc_hwpm_ip_reg_op;
+
+/*
+ * This is a copy of enum tegra_soc_hwpm_ip uapi structure.
+ * It is not a hard requirement as tegra_soc_hwpm_ip is translated to
+ * tegra_hwpm_ip_enum before each use.
+ */
+enum tegra_hwpm_ip_enum {
+	TEGRA_HWPM_IP_VI,
+	TEGRA_HWPM_IP_ISP,
+	TEGRA_HWPM_IP_VIC,
+	TEGRA_HWPM_IP_OFA,
+	TEGRA_HWPM_IP_PVA,
+	TEGRA_HWPM_IP_NVDLA,
+	TEGRA_HWPM_IP_MGBE,
+	TEGRA_HWPM_IP_SCF,
+	TEGRA_HWPM_IP_NVDEC,
+	TEGRA_HWPM_IP_NVENC,
+	TEGRA_HWPM_IP_PCIE,
+	TEGRA_HWPM_IP_DISPLAY,
+	TEGRA_HWPM_IP_MSS_CHANNEL,
+	TEGRA_HWPM_IP_MSS_GPU_HUB,
+	TEGRA_HWPM_IP_MSS_ISO_NISO_HUBS,
+	TEGRA_HWPM_IP_MSS_MCF,
+	TEGRA_HWPM_IP_APE,
+	TERGA_HWPM_NUM_IPS
+};
+
+/*
+ * This is a copy of enum tegra_soc_hwpm_resource uapi structure.
+ * It is not a hard requirement as tegra_soc_hwpm_resource is translated to
+ * tegra_hwpm_resource_enum before each use.
+ */
+enum tegra_hwpm_resource_enum {
+	TEGRA_HWPM_RESOURCE_VI,
+	TEGRA_HWPM_RESOURCE_ISP,
+	TEGRA_HWPM_RESOURCE_VIC,
+	TEGRA_HWPM_RESOURCE_OFA,
+	TEGRA_HWPM_RESOURCE_PVA,
+	TEGRA_HWPM_RESOURCE_NVDLA,
+	TEGRA_HWPM_RESOURCE_MGBE,
+	TEGRA_HWPM_RESOURCE_SCF,
+	TEGRA_HWPM_RESOURCE_NVDEC,
+	TEGRA_HWPM_RESOURCE_NVENC,
+	TEGRA_HWPM_RESOURCE_PCIE,
+	TEGRA_HWPM_RESOURCE_DISPLAY,
+	TEGRA_HWPM_RESOURCE_MSS_CHANNEL,
+	TEGRA_HWPM_RESOURCE_MSS_GPU_HUB,
+	TEGRA_HWPM_RESOURCE_MSS_ISO_NISO_HUBS,
+	TEGRA_HWPM_RESOURCE_MSS_MCF,
+	TEGRA_HWPM_RESOURCE_PMA,
+	TEGRA_HWPM_RESOURCE_CMD_SLICE_RTR,
+	TEGRA_HWPM_RESOURCE_APE,
+	TERGA_HWPM_NUM_RESOURCES
+};
+
 /*
  * This structure is copy of struct tegra_soc_hwpm_ip_ops uapi structure.
- * This is not a hard requirement as tegra_hwpm_validate_ip_ops conversion
- * function.
+ * This is not a hard requirement as each value from tegra_soc_hwpm_ip_ops
+ * is copied to struct tegra_hwpm_ip_ops.
  */
 struct tegra_hwpm_ip_ops {
 	/*
@@ -76,35 +142,11 @@ struct tegra_hwpm_ip_ops {
 				u32 *reg_data);
 };
 
-/*
- * One of the HWPM components is a perfmux. Perfmux registers belong to the
- * IP domain. There are 2 ways of accessing perfmux registers
- * - option 1: implement HWPM <-> IP interface. IP drivers register with HWPM
- *             driver and share required function pointers
- * - option 2: map perfmux register address in HWPM driver
- * Option 1 is a preferred solution. However, IP drivers have yet to
- * implement the interface. Such IPs can be force enabled from HWPM driver
- * perspective. However, forcing an IP will enable all instances of the IP.
- * Hence, IP force enable should only be done on full chip config.
- * Note as power management API is not available, unpowergating the IP via
- * command line is required.
- */
-/*#define CONFIG_HWPM_ALLOW_FORCE_ENABLE*/
-
 /* There are 3 types of HWPM components/apertures */
 #define TEGRA_HWPM_APERTURE_TYPE_PERFMUX	0U
 #define TEGRA_HWPM_APERTURE_TYPE_BROADCAST	1U
 #define TEGRA_HWPM_APERTURE_TYPE_PERFMON	2U
 #define TEGRA_HWPM_APERTURE_TYPE_MAX		3U
-
-#define TEGRA_HWPM_RESOURCE_STATUS_INVALID	\
-		TEGRA_SOC_HWPM_RESOURCE_STATUS_INVALID
-#define TEGRA_HWPM_RESOURCE_STATUS_VALID	\
-		TEGRA_SOC_HWPM_RESOURCE_STATUS_VALID
-
-#define TEGRA_HWPM_FUSE_PRODUCTION_MODE_MASK		BIT(0)
-#define TEGRA_HWPM_FUSE_SECURITY_MODE_MASK		BIT(1)
-#define TEGRA_HWPM_FUSE_HWPM_GLOBAL_DISABLE_MASK	BIT(2)
 
 /*
  * Devices handled by HWPM driver can be divided into 2 categories
@@ -337,9 +379,9 @@ struct tegra_soc_hwpm_chip {
 
 	/* Chip HALs */
 	bool (*is_ip_active)(struct tegra_soc_hwpm *hwpm,
-	u32 ip_index, u32 *config_ip_index);
+	u32 ip_enum, u32 *config_ip_index);
 	bool (*is_resource_active)(struct tegra_soc_hwpm *hwpm,
-	u32 res_index, u32 *config_ip_index);
+	u32 res_enum, u32 *config_ip_index);
 
 	u32 (*get_rtr_int_idx)(struct tegra_soc_hwpm *hwpm);
 	u32 (*get_ip_max_idx)(struct tegra_soc_hwpm *hwpm);

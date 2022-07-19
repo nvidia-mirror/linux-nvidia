@@ -83,7 +83,6 @@ static int tegra_hwpm_get_resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
 	}
 
 	return tegra_hwpm_get_resource_info(hwpm, rsrc_info);
-
 }
 
 static int tegra_hwpm_reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
@@ -106,7 +105,8 @@ static int tegra_hwpm_reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,
 		return -EINVAL;
 	}
 
-	ret = tegra_hwpm_reserve_resource(hwpm, resource);
+	ret = tegra_hwpm_reserve_resource(hwpm,
+		tegra_hwpm_translate_soc_hwpm_resource(hwpm, resource));
 	if (ret < 0) {
 		tegra_hwpm_err(hwpm, "Failed to reserve resource %d", resource);
 	}

@@ -192,6 +192,73 @@ int tegra_hwpm_complete_ip_register_impl(struct tegra_soc_hwpm *hwpm)
 	return ret;
 }
 
+static u32 tegra_hwpm_translate_soc_hwpm_ip(struct tegra_soc_hwpm *hwpm,
+	enum tegra_soc_hwpm_ip ip_enum)
+{
+	u32 ip_enum_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+
+	switch (ip_enum) {
+	case TEGRA_SOC_HWPM_IP_VI:
+		ip_enum_idx = TEGRA_HWPM_IP_VI;
+		break;
+	case TEGRA_SOC_HWPM_IP_ISP:
+		ip_enum_idx = TEGRA_HWPM_IP_ISP;
+		break;
+	case TEGRA_SOC_HWPM_IP_VIC:
+		ip_enum_idx = TEGRA_HWPM_IP_VIC;
+		break;
+	case TEGRA_SOC_HWPM_IP_OFA:
+		ip_enum_idx = TEGRA_HWPM_IP_OFA;
+		break;
+	case TEGRA_SOC_HWPM_IP_PVA:
+		ip_enum_idx = TEGRA_HWPM_IP_PVA;
+		break;
+	case TEGRA_SOC_HWPM_IP_NVDLA:
+		ip_enum_idx = TEGRA_HWPM_IP_NVDLA;
+		break;
+	case TEGRA_SOC_HWPM_IP_MGBE:
+		ip_enum_idx = TEGRA_HWPM_IP_MGBE;
+		break;
+	case TEGRA_SOC_HWPM_IP_SCF:
+		ip_enum_idx = TEGRA_HWPM_IP_SCF;
+		break;
+	case TEGRA_SOC_HWPM_IP_NVDEC:
+		ip_enum_idx = TEGRA_HWPM_IP_NVDEC;
+		break;
+	case TEGRA_SOC_HWPM_IP_NVENC:
+		ip_enum_idx = TEGRA_HWPM_IP_NVENC;
+		break;
+	case TEGRA_SOC_HWPM_IP_PCIE:
+		ip_enum_idx = TEGRA_HWPM_IP_PCIE;
+		break;
+	case TEGRA_SOC_HWPM_IP_DISPLAY:
+		ip_enum_idx = TEGRA_HWPM_IP_DISPLAY;
+		break;
+	case TEGRA_SOC_HWPM_IP_MSS_CHANNEL:
+		ip_enum_idx = TEGRA_HWPM_IP_MSS_CHANNEL;
+		break;
+	case TEGRA_SOC_HWPM_IP_MSS_GPU_HUB:
+		ip_enum_idx = TEGRA_HWPM_IP_MSS_GPU_HUB;
+		break;
+	case TEGRA_SOC_HWPM_IP_MSS_ISO_NISO_HUBS:
+		ip_enum_idx = TEGRA_HWPM_IP_MSS_ISO_NISO_HUBS;
+		break;
+	case TEGRA_SOC_HWPM_IP_MSS_MCF:
+		ip_enum_idx = TEGRA_HWPM_IP_MSS_MCF;
+		break;
+	case TEGRA_SOC_HWPM_IP_APE:
+		ip_enum_idx = TEGRA_HWPM_IP_APE;
+		break;
+	default:
+		tegra_hwpm_err(hwpm,
+			"Queried enum tegra_soc_hwpm_ip %d is invalid",
+			ip_enum);
+		break;
+	}
+
+	return ip_enum_idx;
+}
+
 int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info)
 {
@@ -201,8 +268,9 @@ int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 	tegra_hwpm_fn(hwpm, " ");
 
 	for (i = 0U; i < fs_info->num_queries; i++) {
-		ret = hwpm->active_chip->get_fs_info(
-			hwpm, (u32)fs_info->ip_fsinfo[i].ip,
+		ret = hwpm->active_chip->get_fs_info(hwpm,
+			tegra_hwpm_translate_soc_hwpm_ip(
+				hwpm, fs_info->ip_fsinfo[i].ip),
 			&fs_info->ip_fsinfo[i].ip_inst_mask,
 			&fs_info->ip_fsinfo[i].status);
 		if (ret < 0) {
@@ -211,12 +279,80 @@ int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 		}
 
 		tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_floorsweep_info,
-			"Query %d: ip %d: ip_status: %d inst_mask 0x%llx",
+			"Query %d: tegra_soc_hwpm_ip %d: ip_status: %d"
+			" inst_mask 0x%llx",
 			i, fs_info->ip_fsinfo[i].ip,
 			fs_info->ip_fsinfo[i].status,
 			fs_info->ip_fsinfo[i].ip_inst_mask);
 	}
 	return ret;
+}
+
+u32 tegra_hwpm_translate_soc_hwpm_resource(struct tegra_soc_hwpm *hwpm,
+	enum tegra_soc_hwpm_resource res_enum)
+{
+	u32 res_enum_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+
+	switch (res_enum) {
+	case TEGRA_SOC_HWPM_RESOURCE_VI:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_VI;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_ISP:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_ISP;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_VIC:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_VIC;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_OFA:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_OFA;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_PVA:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_PVA;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_NVDLA:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_NVDLA;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_MGBE:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_MGBE;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_SCF:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_SCF;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_NVDEC:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_NVDEC;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_NVENC:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_NVENC;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_PCIE:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_PCIE;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_DISPLAY:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_DISPLAY;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_MSS_CHANNEL:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_MSS_CHANNEL;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_MSS_GPU_HUB:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_MSS_GPU_HUB;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_MSS_ISO_NISO_HUBS:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_MSS_ISO_NISO_HUBS;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_MSS_MCF:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_MSS_MCF;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_APE:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_APE;
+		break;
+	default:
+		tegra_hwpm_err(hwpm,
+			"Queried enum tegra_soc_hwpm_resource %d is invalid",
+			res_enum);
+		break;
+	}
+
+	return res_enum_idx;
 }
 
 int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
@@ -229,7 +365,8 @@ int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
 
 	for (i = 0U; i < rsrc_info->num_queries; i++) {
 		ret = hwpm->active_chip->get_resource_info(
-			hwpm, (u32)rsrc_info->resource_info[i].resource,
+			hwpm, tegra_hwpm_translate_soc_hwpm_resource(
+				hwpm, rsrc_info->resource_info[i].resource),
 			&rsrc_info->resource_info[i].status);
 		if (ret < 0) {
 			/* Print error for debug purpose. */
