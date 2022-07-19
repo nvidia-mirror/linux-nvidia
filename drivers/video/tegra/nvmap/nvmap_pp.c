@@ -336,7 +336,7 @@ int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
 int nvmap_page_pool_alloc_lots_bp(struct nvmap_page_pool *pool,
 				struct page **pages, u32 nr)
 {
-	int ind = 0, nr_pages = nr;
+	u32 ind = 0, nr_pages = nr;
 	struct page *page;
 
 	if (!enable_pp || pool->pages_per_big_pg <= 1 ||
