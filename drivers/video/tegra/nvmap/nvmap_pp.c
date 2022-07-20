@@ -518,7 +518,7 @@ int nvmap_page_pool_clear(void)
  */
 static void nvmap_page_pool_resize(struct nvmap_page_pool *pool, u32 size)
 {
-	u32 curr;
+	u64 curr;
 
 	rt_mutex_lock(&pool->lock);
 
