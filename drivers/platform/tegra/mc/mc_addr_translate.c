@@ -256,7 +256,7 @@ static u64 mc_emem_bom(void)
 static u64 mc_device_size(void)
 {
 	/* Subp and lsb are each 1-bit */
-	u64 size = 1ll << (mc_cfg.channel_bits + mc_cfg.row_bits+
+	u64 size = 1ull << (mc_cfg.channel_bits + mc_cfg.row_bits+
 			mc_cfg.bank_bits + mc_cfg.col_bits + 2);
 	return size;
 }
