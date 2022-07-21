@@ -437,11 +437,11 @@ static int __nvmap_page_pool_fill_lots_locked(struct nvmap_page_pool *pool,
 	return ind;
 }
 
-int nvmap_page_pool_fill_lots(struct nvmap_page_pool *pool,
+u32 nvmap_page_pool_fill_lots(struct nvmap_page_pool *pool,
 				       struct page **pages, u32 nr)
 {
-	int ret = 0;
-	int i;
+	u32 ret = 0;
+	u32 i;
 	u32 save_to_zero;
 
 	rt_mutex_lock(&pool->lock);
