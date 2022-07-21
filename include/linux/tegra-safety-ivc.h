@@ -24,6 +24,8 @@
 #define TEGRA_SAFETY_SM_CMDRESP_CH     0
 #define TEGRA_SAFETY_IVC_READ_TIMEOUT	(2 * HZ)
 
+extern uint32_t ivc_chan_count;
+
 enum {
 	SAFETY_CONF_IVC_READY = 1,
 };

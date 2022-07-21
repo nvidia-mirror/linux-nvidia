@@ -47,7 +47,6 @@ static struct tegra_safety_dev_data *safety_dev_data[MAX_SAFETY_CHANNELS];
 static DEFINE_MUTEX(tegra_safety_dev_lock_open);
 static int tegra_safety_dev_major_number;
 static struct class *tegra_safety_dev_class;
-extern int ivc_chan_count;
 
 static inline struct tegra_safety_dev_data *get_file_to_devdata(struct file *fp)
 {
@@ -108,11 +107,19 @@ static int tegra_safety_dev_release(struct inode *in, struct file *fp)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 static unsigned int tegra_safety_dev_poll(struct file *fp, poll_table *pt)
+#else
+static __poll_t tegra_safety_dev_poll(struct file *fp, poll_table *pt)
+#endif
 {
 	struct tegra_safety_dev_data *dev_data = get_file_to_devdata(fp);
 	struct ivc *ivc = get_file_to_ivc(fp);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	unsigned int ret = 0;
+#else
+	__poll_t ret = 0;
+#endif
 
 	poll_wait(fp, &dev_data->read_waitq, pt);
 	poll_wait(fp, &dev_data->write_waitq, pt);
@@ -279,7 +286,7 @@ void tegra_safety_dev_notify(void)
 	}
 }
 
-void tegra_safety_class_exit(struct device *dev)
+static void tegra_safety_class_exit(struct device *dev)
 {
 	dev_t num = MKDEV(tegra_safety_dev_major_number, 0);
 
@@ -291,7 +298,7 @@ void tegra_safety_class_exit(struct device *dev)
 	tegra_safety_dev_class = NULL;
 }
 
-int tegra_safety_class_init(struct device *dev)
+static int tegra_safety_class_init(struct device *dev)
 {
 	dev_t start;
 	int ret;
