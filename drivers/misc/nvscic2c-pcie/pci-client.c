@@ -38,10 +38,9 @@
 #define MAX_LINK_EVENT_USERS	(MAX_ENDPOINTS)
 
 /*
- * BAR0 base + Offset:64K, Size=64K is not usable. We cannot leave a hole so
- * mark all first 128K as to be skipped for use.
+ * The size of  x86/peer edma rx descriptor
  */
-#define SKIP_BAR_AREA		(SZ_128K)
+#define EDMA_CH_DESC_SZ		(60 * SZ_1K)
 
 /* Internal private data-structure as PCI client. */
 struct pci_client_t {
@@ -83,6 +82,7 @@ struct pci_client_t {
 	 */
 	dma_addr_t edma_ch_desc_iova;
 	bool edma_ch_desc_iova_mapped;
+	void *edma_ch_desc_pva;
 	void *skip_iova;
 	void *skip_meta;
 	void *edma_ch_desc_iova_h;
@@ -130,15 +130,49 @@ allocate_link_status_mem(struct pci_client_t *ctx)
 	return ret;
 }
 
+/* Free edma rx desc_iova that originally mapped from bar0 */
+void
+free_edma_rx_desc_iova(struct pci_client_t *ctx)
+{
+
+	if (!ctx)
+		return;
+
+	if (ctx->skip_iova) {
+		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_iova);
+		ctx->skip_iova = NULL;
+	}
+
+	if (ctx->edma_ch_desc_iova_mapped) {
+		iommu_unmap(ctx->domain, ctx->edma_ch_desc_iova, EDMA_CH_DESC_SZ);
+		ctx->edma_ch_desc_iova_mapped = false;
+	}
+
+	if (ctx->edma_ch_desc_iova) {
+		iova_mngr_block_release(ctx->mem_mngr_h,
+					&ctx->edma_ch_desc_iova_h);
+		ctx->edma_ch_desc_iova_h = NULL;
+	}
+
+	if (ctx->edma_ch_desc_pva) {
+		free_pages_exact(ctx->edma_ch_desc_pva, EDMA_CH_DESC_SZ);
+		ctx->edma_ch_desc_pva = NULL;
+	}
+
+	if (ctx->skip_meta) {
+		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_meta);
+		ctx->skip_meta = NULL;
+	}
+
+}
+
 /* Allocate desc_iova and mapping to bar0 for remote edma, x86-orin c2c only */
 static int
-pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
+allocate_edma_rx_desc_iova(struct pci_client_t *ctx)
 {
 	int ret = 0;
 	int prot = 0;
-	void *pva;
-	u64 phys_addr;
-	struct pci_client_t *ctx = (struct pci_client_t *)pci_client_h;
+	u64 phys_addr = 0;
 
 	if (WARN_ON(!ctx))
 		return -EINVAL;
@@ -154,28 +188,32 @@ pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
 				      NULL, NULL, &ctx->skip_meta);
 	if (ret) {
 		pr_err("Failed to skip the 4K reserved iova region\n");
-		return ret;
+		goto err;
 	}
-	pva = alloc_pages_exact(60 * SZ_1K, (GFP_KERNEL | __GFP_ZERO));
-	if (!pva) {
+	ctx->edma_ch_desc_pva = alloc_pages_exact(EDMA_CH_DESC_SZ, (GFP_KERNEL | __GFP_ZERO));
+	if (!ctx->edma_ch_desc_pva) {
 		pr_err("Failed to allocate a page with size of 60K\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err;
 	}
-	phys_addr = page_to_phys(virt_to_page(pva));
-	ret = iova_mngr_block_reserve(ctx->mem_mngr_h, (60 * SZ_1K),
+	phys_addr = page_to_phys(virt_to_page(ctx->edma_ch_desc_pva));
+	if (!phys_addr) {
+		pr_err("Failed to retrieve physical address\n");
+		ret = -ENOMEM;
+		goto err;
+	}
+	ret = iova_mngr_block_reserve(ctx->mem_mngr_h, EDMA_CH_DESC_SZ,
 				      &ctx->edma_ch_desc_iova, NULL,
 				      &ctx->edma_ch_desc_iova_h);
 	if (ret) {
 		pr_err("Failed to reserve 60K iova space for remote edma desc\n");
-		return ret;
+		goto err;
 	}
-
 	prot = (IOMMU_CACHE | IOMMU_READ | IOMMU_WRITE);
-	ret = pci_client_map_addr(ctx, ctx->edma_ch_desc_iova,
-				  phys_addr, 60 * SZ_1K, prot);
+	ret = iommu_map(ctx->domain, ctx->edma_ch_desc_iova, phys_addr, EDMA_CH_DESC_SZ, prot);
 	if (ret) {
 		pr_err("pci client failed to map iova to 60K physical backing\n");
-		return ret;
+		goto err;
 	}
 	ctx->edma_ch_desc_iova_mapped = true;
 
@@ -184,8 +222,12 @@ pci_client_allocate_edma_rx_desc_iova(void *pci_client_h)
 				      NULL, NULL, &ctx->skip_iova);
 	if (ret) {
 		pr_err("Failed to skip the 64K reserved iova region\n");
-		return ret;
+		goto err;
 	}
+	return ret;
+
+err:
+	free_edma_rx_desc_iova(ctx);
 	return ret;
 }
 
@@ -256,7 +298,7 @@ pci_client_init(struct pci_client_params *params, void **pci_client_h)
 	 * the iova region and thereby marking it as unusable for others.
 	 */
 	/* remote edma on x86 */
-	ret = pci_client_allocate_edma_rx_desc_iova(ctx);
+	ret = allocate_edma_rx_desc_iova(ctx);
 	if (ret) {
 		pr_err("Failed to skip the reserved iova region\n");
 		goto err;
@@ -278,26 +320,7 @@ pci_client_deinit(void **pci_client_h)
 	if (!ctx)
 		return;
 
-	if (ctx->skip_iova) {
-		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_iova);
-		ctx->skip_iova = NULL;
-	}
-
-	if (ctx->edma_ch_desc_iova_mapped) {
-		pci_client_unmap_addr(ctx, ctx->edma_ch_desc_iova, 60 * SZ_1K);
-		ctx->edma_ch_desc_iova_mapped = false;
-	}
-
-	if (ctx->edma_ch_desc_iova) {
-		iova_mngr_block_release(ctx->mem_mngr_h,
-					&ctx->edma_ch_desc_iova_h);
-		ctx->edma_ch_desc_iova_h = NULL;
-	}
-
-	if (ctx->skip_meta) {
-		iova_mngr_block_release(ctx->mem_mngr_h, &ctx->skip_meta);
-		ctx->skip_meta = NULL;
-	}
+	free_edma_rx_desc_iova(ctx);
 
 	if (ctx->mem_mngr_h) {
 		iova_mngr_deinit(&ctx->mem_mngr_h);
