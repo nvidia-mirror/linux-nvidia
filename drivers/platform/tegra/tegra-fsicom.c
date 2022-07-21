@@ -152,12 +152,26 @@ static ssize_t device_file_ioctl(
 		if (copy_to_user((void __user *)&user_input->iova,
 				(void *)&dma_addr, sizeof(uint64_t)))
 			return -EACCES;
+		if (copy_to_user((void __user *)&user_input->dmabuf,
+				(void *)&dmabuf, sizeof(uint64_t)))
+			return -EACCES;
+		if (copy_to_user((void __user *)&user_input->attach,
+				(void *)&attach, sizeof(uint64_t)))
+			return -EACCES;
+		if (copy_to_user((void __user *)&user_input->sgt,
+				(void *)&sgt, sizeof(uint64_t)))
+			return -EACCES;
+
 	break;
 
 	case NVMAP_SMMU_UNMAP:
-		dma_buf_unmap_attachment(attach, sgt, DMA_BIDIRECTIONAL);
-		dma_buf_detach(dmabuf, attach);
-		dma_buf_put(dmabuf);
+		if (copy_from_user(&input, (void __user *)arg,
+					sizeof(struct rw_data)))
+			return -EACCES;
+		dma_buf_unmap_attachment((struct dma_buf_attachment *)input.attach,
+				(struct sg_table *) input.sgt, DMA_BIDIRECTIONAL);
+		dma_buf_detach((struct dma_buf *)input.dmabuf, (struct dma_buf_attachment *) input.attach);
+		dma_buf_put((struct dma_buf *)input.dmabuf);
 	break;
 
 	case TEGRA_HSP_WRITE:

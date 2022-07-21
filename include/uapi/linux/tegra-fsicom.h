@@ -12,6 +12,9 @@ struct rw_data {
 	uint32_t handle;
 	uint64_t pa;
 	uint64_t iova;
+	uint64_t dmabuf;
+	uint64_t attach;
+	uint64_t sgt;
 };
 
 /*Data type for sending the offset,IOVA and channel Id details to FSI */
