@@ -50,8 +50,10 @@
 #include <linux/completion.h>
 #include <linux/interrupt.h>
 #include <linux/kthread.h>
+#include <linux/nvhost.h>
 #include <linux/version.h>
 
+#define SE_MAX_SCHEDULE_TIMEOUT					LONG_MAX
 #define TEGRA_HV_VSE_SHA_MAX_LL_NUM_1				1
 #define TEGRA_HV_VSE_AES_CMAC_MAX_LL_NUM			1
 #define TEGRA_HV_VSE_MAX_TASKS_PER_SUBMIT			1
@@ -210,6 +212,9 @@ struct tegra_vse_priv_data {
 	u32 rx_status;
 	u8 iv[TEGRA_VIRTUAL_SE_AES_MAX_IV_SIZE];
 	struct tegra_vse_cmac_data cmac;
+	uint32_t syncpt_id;
+	uint32_t syncpt_threshold;
+	uint32_t syncpt_id_valid;
 };
 
 struct tegra_virtual_se_dev {
@@ -227,6 +232,7 @@ struct tegra_virtual_se_dev {
 	/* Integration with hwrng framework */
 	struct hwrng *hwrng;
 #endif /* CONFIG_HW_RANDOM */
+	struct platform_device *host1x_pdev;
 };
 
 struct tegra_virtual_se_addr {
@@ -337,6 +343,9 @@ struct tegra_virtual_se_ivc_resp_msg_t {
 		/** Keyslot for non */
 		unsigned char keyslot;
 	};
+	uint32_t syncpt_id;
+	uint32_t syncpt_threshold;
+	uint32_t syncpt_id_valid;
 };
 
 struct tegra_virtual_se_ivc_tx_msg_t {
@@ -563,6 +572,53 @@ static int tegra_hv_vse_safety_send_ivc(
 	return 0;
 }
 
+static int tegra_hv_vse_safety_send_ivc_wait(
+	struct tegra_virtual_se_dev *se_dev,
+	struct tegra_hv_ivc_cookie *pivck,
+	struct tegra_vse_priv_data *priv,
+	void *pbuf, int length)
+{
+	u64 time_left;
+	int err;
+
+	mutex_lock(&se_dev->server_lock);
+	/* Return error if engine is in suspended state */
+	if (atomic_read(&se_dev->se_suspended)) {
+		err = -ENODEV;
+		goto exit;
+	}
+	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, pbuf, length);
+	if (err) {
+		dev_err(se_dev->dev,
+			"\n %s send ivc failed %d\n", __func__, err);
+		goto exit;
+	}
+
+	time_left = wait_for_completion_timeout(&priv->alg_complete,
+			TEGRA_HV_VSE_TIMEOUT);
+	if (time_left == 0) {
+		dev_err(se_dev->dev, "%s timeout\n", __func__);
+		err = -ETIMEDOUT;
+		goto exit;
+	}
+
+	/* If this is not last request then wait using nvhost API*/
+	if (priv->syncpt_id_valid) {
+		err = nvhost_syncpt_wait_timeout_ext(se_dev->host1x_pdev, priv->syncpt_id,
+				priv->syncpt_threshold, (u32)SE_MAX_SCHEDULE_TIMEOUT, NULL, NULL);
+		if (err) {
+			dev_err(se_dev->dev, "timed out for syncpt %u threshold %u err %d\n",
+						 priv->syncpt_id, priv->syncpt_threshold, err);
+			err = -ETIMEDOUT;
+			goto exit;
+		}
+	}
+
+exit:
+	mutex_unlock(&se_dev->server_lock);
+	return err;
+}
+
 static int tegra_hv_vse_safety_prepare_ivc_linked_list(
 	struct tegra_virtual_se_dev *se_dev, struct scatterlist *sg,
 	u32 total_len, int max_ll_len, int block_size,
@@ -663,7 +719,6 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 	struct tegra_virtual_se_req_context *req_ctx;
 	struct tegra_vse_tag *priv_data_ptr;
 	union tegra_virtual_se_sha_args *psha = NULL;
-	int time_left;
 	int err = 0;
 	u64 total_count = 0, msg_len = 0;
 
@@ -735,26 +790,14 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 	vse_thread_start = true;
 	init_completion(&priv->alg_complete);
 
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		err = -ENODEV;
-		goto exit;
-	}
-
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
-	if (err)
+	if (err) {
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto exit;
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "%s timeout\n", __func__);
-		err = -ETIMEDOUT;
 	}
+
 exit:
-	mutex_unlock(&se_dev->server_lock);
 	devm_kfree(se_dev->dev, priv);
 
 	return err;
@@ -1583,7 +1626,6 @@ static int tegra_hv_vse_safety_aes_gen_random_iv(
 	union tegra_virtual_se_aes_args *aes = &ivc_tx->aes;
 	struct tegra_virtual_se_aes_context *aes_ctx;
 	int err = 0;
-	int time_left;
 
 	ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_ENCRYPT_INIT;
 	priv->cmd = VIRTUAL_SE_PROCESS;
@@ -1592,24 +1634,13 @@ static int tegra_hv_vse_safety_aes_gen_random_iv(
 	aes->op.key_length = aes_ctx->keylen;
 
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		dev_err(se_dev->dev,
-				"\n %s send ivc failed %d\n", __func__, err);
-		mutex_unlock(&se_dev->server_lock);
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		return err;
 	}
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "%s timeout\n", __func__);
-		err = -ETIMEDOUT;
-		mutex_unlock(&se_dev->server_lock);
-		return err;
-	}
-	mutex_unlock(&se_dev->server_lock);
 
 	err = status_to_errno(priv->rx_status);
 
@@ -1634,7 +1665,6 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	union tegra_virtual_se_aes_args *aes;
-	int time_left;
 	int num_sgs;
 	int dma_ents = 0;
 
@@ -1721,24 +1751,13 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 	aes->op.dst_addr.hi = req->cryptlen;
 
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		dev_err(se_dev->dev,
-			"\n %s send ivc failed %d\n", __func__, err);
-		mutex_unlock(&se_dev->server_lock);
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto exit;
 	}
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "%s timeout\n", __func__);
-		err = -ETIMEDOUT;
-		mutex_unlock(&se_dev->server_lock);
-		goto exit;
-	}
-	mutex_unlock(&se_dev->server_lock);
 
 	if (priv->rx_status == 0U) {
 		dma_sync_single_for_cpu(priv->se_dev->dev, priv->buf_addr,
@@ -1969,7 +1988,6 @@ static int tegra_hv_vse_safety_cmac_op(struct ahash_request *req, bool is_last)
 	u8 *temp_buffer = NULL;
 	int err = 0;
 	int num_lists = 0;
-	int time_left;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	unsigned int num_mapped_sgs = 0;
@@ -2097,26 +2115,12 @@ static int tegra_hv_vse_safety_cmac_op(struct ahash_request *req, bool is_last)
 		priv->cmd = VIRTUAL_SE_PROCESS;
 	priv->se_dev = se_dev;
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		err = -ENODEV;
-		goto unmap_exit;
-	}
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		mutex_unlock(&se_dev->server_lock);
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto unmap_exit;
-	}
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "cmac_op timeout\n");
-		err = -ETIMEDOUT;
 	}
 
 	if (is_last)
@@ -2152,7 +2156,6 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 	unsigned int total_len;
 	int err = 0;
 	int num_lists = 0;
-	u64 time_left;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	unsigned int num_mapped_sgs = 0;
@@ -2258,27 +2261,12 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 
 	priv->se_dev = se_dev;
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		err = -ENODEV;
-		goto unmap_exit;
-	}
 
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		mutex_unlock(&se_dev->server_lock);
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto unmap_exit;
-	}
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "cmac_op timeout\n");
-		err = -ETIMEDOUT;
 	}
 
 	if (priv->rx_status != 0) {
@@ -2296,27 +2284,11 @@ static int tegra_hv_vse_safety_cmac_sv_op(struct ahash_request *req, bool is_las
 			ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_CMAC_VERIFY;
 		priv->cmd = VIRTUAL_CMAC_PROCESS;
 		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			err = -ENODEV;
-			goto unmap_exit;
-		}
-
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
+		err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+			sizeof(struct tegra_virtual_se_ivc_msg_t));
 		if (err) {
-			mutex_unlock(&se_dev->server_lock);
+			dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 			goto unmap_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "cmac_op timeout\n");
-			err = -ETIMEDOUT;
 		}
 
 		if (cmac_req_data->request_type == CMAC_SIGN) {
@@ -2534,7 +2506,6 @@ static int tegra_hv_vse_safety_cmac_setkey(struct crypto_ahash *tfm, const u8 *k
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	int err = 0;
-	unsigned long time_left;
 	s8 label[TEGRA_VIRTUAL_SE_AES_MAX_KEY_SIZE];
 	u32 slot;
 	bool is_keyslot_label;
@@ -2595,28 +2566,10 @@ static int tegra_hv_vse_safety_cmac_setkey(struct crypto_ahash *tfm, const u8 *k
 		priv->se_dev = se_dev;
 		init_completion(&priv->alg_complete);
 
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			err = -ENODEV;
-			goto free_exit;
-		}
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
+		err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+			sizeof(struct tegra_virtual_se_ivc_msg_t));
 		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			goto free_exit;
-		}
-
-		time_left = wait_for_completion_timeout(
-				&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "%s timeout\n",
-				__func__);
-			err = -ETIMEDOUT;
+			dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 			goto free_exit;
 		}
 
@@ -2728,7 +2681,6 @@ static int tegra_hv_vse_safety_get_random(struct tegra_virtual_se_rng_context *r
 	struct tegra_virtual_se_ivc_hdr_t *ivc_hdr = NULL;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
-	int time_left;
 
 	if (dlen == 0) {
 		return -EINVAL;
@@ -2774,27 +2726,10 @@ static int tegra_hv_vse_safety_get_random(struct tegra_virtual_se_rng_context *r
 		init_completion(&priv->alg_complete);
 		vse_thread_start = true;
 
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			dlen = 0;
-			goto exit;
-		}
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-				sizeof(struct tegra_virtual_se_ivc_msg_t));
+		err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+			sizeof(struct tegra_virtual_se_ivc_msg_t));
 		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			dlen = 0;
-			goto exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "%s timeout\n", __func__);
-			dlen = 0;
+			dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 			goto exit;
 		}
 
@@ -2952,7 +2887,6 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
 	int err = 0;
-	u64 time_left;
 	uint32_t cryptlen = 0;
 
 	void *aad_buf = NULL;
@@ -3066,24 +3000,14 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 			ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_ENCRYPT_INIT;
 			priv->cmd = VIRTUAL_SE_PROCESS;
 			init_completion(&priv->alg_complete);
-			mutex_lock(&se_dev->server_lock);
-			err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-					sizeof(struct tegra_virtual_se_ivc_msg_t));
+
+			err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+				sizeof(struct tegra_virtual_se_ivc_msg_t));
 			if (err) {
-				dev_err(se_dev->dev,
-						"\n %s send ivc failed %d\n", __func__, err);
-				mutex_unlock(&se_dev->server_lock);
+				dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 				goto free_exit;
 			}
-			time_left = wait_for_completion_timeout(&priv->alg_complete,
-					TEGRA_HV_VSE_TIMEOUT);
-			if (time_left == 0) {
-				dev_err(se_dev->dev, "%s timeout\n", __func__);
-				err = -ETIMEDOUT;
-				mutex_unlock(&se_dev->server_lock);
-				goto free_exit;
-			}
-			mutex_unlock(&se_dev->server_lock);
+
 			err = status_to_errno(priv->rx_status);
 			if (err) {
 				dev_err(se_dev->dev,
@@ -3132,26 +3056,11 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	}
 
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		err = -ENODEV;
-		goto free_exit;
-	}
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-			sizeof(struct tegra_virtual_se_ivc_msg_t));
-	if (err) {
-		mutex_unlock(&se_dev->server_lock);
-		goto free_exit;
-	}
 
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0) {
-		dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-		err = -ETIMEDOUT;
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+		sizeof(struct tegra_virtual_se_ivc_msg_t));
+	if (err) {
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto free_exit;
 	}
 
@@ -3174,26 +3083,11 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 		priv->cmd = VIRTUAL_SE_PROCESS;
 		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GCM_DEC;
 		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			err = -ENODEV;
-			goto free_exit;
-		}
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+
+		err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 				sizeof(struct tegra_virtual_se_ivc_msg_t));
 		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			goto free_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0) {
-			dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-			err = -ETIMEDOUT;
+			dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 			goto free_exit;
 		}
 
@@ -3349,7 +3243,6 @@ static int tegra_hv_vse_aes_gmac_sv_init(struct ahash_request *req)
 	struct tegra_vse_tag *priv_data_ptr = NULL;
 	struct tegra_vse_priv_data *priv = NULL;
 	int err = 0;
-	u64 time_left;
 
 	/* Return error if engine is in suspended state */
 	if (atomic_read(&se_dev->se_suspended)) {
@@ -3428,28 +3321,11 @@ static int tegra_hv_vse_aes_gmac_sv_init(struct ahash_request *req)
 
 	vse_thread_start = true;
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		dev_err(se_dev->dev, "%s: engine is in suspended state", __func__);
-		err = -ENODEV;
-		goto free_exit;
-	}
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-			sizeof(struct tegra_virtual_se_ivc_msg_t));
-	if (err) {
-		dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-		mutex_unlock(&se_dev->server_lock);
-		goto free_exit;
-	}
 
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0UL) {
-		dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-		err = -ETIMEDOUT;
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+		sizeof(struct tegra_virtual_se_ivc_msg_t));
+	if (err) {
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto free_exit;
 	}
 
@@ -3463,28 +3339,10 @@ static int tegra_hv_vse_aes_gmac_sv_init(struct ahash_request *req)
 	ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_IV;
 	priv->cmd = VIRTUAL_SE_AES_GCM_ENC_PROCESS;
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		dev_err(se_dev->dev, "%s: engine is in suspended state", __func__);
-		err = -ENODEV;
-		goto free_exit;
-	}
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 			sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-		mutex_unlock(&se_dev->server_lock);
-		goto free_exit;
-	}
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0UL) {
-		dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-		err = -ETIMEDOUT;
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto free_exit;
 	}
 
@@ -3547,7 +3405,6 @@ static int tegra_hv_vse_aes_gmac_sv_op(struct ahash_request *req, bool is_last)
 	dma_addr_t aad_buf_addr;
 	dma_addr_t tag_buf_addr;
 	int err = 0;
-	u64 time_left;
 
 	gmac_ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
 	if (!gmac_ctx) {
@@ -3639,29 +3496,11 @@ static int tegra_hv_vse_aes_gmac_sv_op(struct ahash_request *req, bool is_last)
 
 	vse_thread_start = true;
 	init_completion(&priv->alg_complete);
-	mutex_lock(&se_dev->server_lock);
-	/* Return error if engine is in suspended state */
-	if (atomic_read(&se_dev->se_suspended)) {
-		mutex_unlock(&se_dev->server_lock);
-		dev_err(se_dev->dev, "%s: engine is in suspended state\n", __func__);
-		err = -ENODEV;
-		goto free_exit;
-	}
 
-	err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
-			sizeof(struct tegra_virtual_se_ivc_msg_t));
+	err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
+		sizeof(struct tegra_virtual_se_ivc_msg_t));
 	if (err) {
-		mutex_unlock(&se_dev->server_lock);
-		dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-		goto free_exit;
-	}
-
-	time_left = wait_for_completion_timeout(&priv->alg_complete,
-			TEGRA_HV_VSE_TIMEOUT);
-	mutex_unlock(&se_dev->server_lock);
-	if (time_left == 0UL) {
-		dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-		err = -ETIMEDOUT;
+		dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 		goto free_exit;
 	}
 
@@ -3680,29 +3519,10 @@ static int tegra_hv_vse_aes_gmac_sv_op(struct ahash_request *req, bool is_last)
 	if (is_last && gmac_req_data->request_type == GMAC_VERIFY) {
 		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_CMD_GET_GMAC_VERIFY;
 		init_completion(&priv->alg_complete);
-		mutex_lock(&se_dev->server_lock);
-		/* Return error if engine is in suspended state */
-		if (atomic_read(&se_dev->se_suspended)) {
-			mutex_unlock(&se_dev->server_lock);
-			dev_err(se_dev->dev, "%s: engine is in suspended state\n", __func__);
-			err = -ENODEV;
-			goto free_exit;
-		}
-
-		err = tegra_hv_vse_safety_send_ivc(se_dev, pivck, ivc_req_msg,
+		err = tegra_hv_vse_safety_send_ivc_wait(se_dev, pivck, priv, ivc_req_msg,
 				sizeof(struct tegra_virtual_se_ivc_msg_t));
 		if (err) {
-			mutex_unlock(&se_dev->server_lock);
-			dev_err(se_dev->dev, "%s: send_ivc failed %d\n", __func__, err);
-			goto free_exit;
-		}
-
-		time_left = wait_for_completion_timeout(&priv->alg_complete,
-				TEGRA_HV_VSE_TIMEOUT);
-		mutex_unlock(&se_dev->server_lock);
-		if (time_left == 0UL) {
-			dev_err(se_dev->dev, "%s: completion timeout\n", __func__);
-			err = -ETIMEDOUT;
+			dev_err(se_dev->dev, "failed to send data over ivc err %d\n", err);
 			goto free_exit;
 		}
 
@@ -4294,6 +4114,9 @@ static int tegra_vse_kthread(void *unused)
 				continue;
 			}
 			se_dev = priv->se_dev;
+			priv->syncpt_id = ivc_msg->rx[0].syncpt_id;
+			priv->syncpt_threshold = ivc_msg->rx[0].syncpt_threshold;
+			priv->syncpt_id_valid = ivc_msg->rx[0].syncpt_id_valid;
 
 			switch (priv->cmd) {
 			case VIRTUAL_SE_AES_CRYPTO:
@@ -4428,6 +4251,34 @@ static void tegra_hv_vse_safety_unregister_hwrng(struct tegra_virtual_se_dev *se
 		se_dev->hwrng = NULL;
 	}
 #endif /* CONFIG_HW_RANDOM */
+}
+
+static const struct of_device_id host1x_match[] = {
+	{ .compatible = "nvidia,tegra194-host1x-hv", },
+	{ .compatible = "nvidia,tegra234-host1x-hv", },
+	{},
+};
+
+static int se_get_nvhost_dev(struct tegra_virtual_se_dev *se_dev)
+{
+	struct platform_device *host1x_pdev;
+	struct device_node *np;
+
+	np = of_find_matching_node(NULL, host1x_match);
+	if (!np) {
+		dev_err(se_dev->dev, "Failed to find host1x, syncpt support disabled");
+		return -ENODATA;
+	}
+
+	host1x_pdev = of_find_device_by_node(np);
+	if (!host1x_pdev) {
+		dev_err(se_dev->dev, "host1x device not available");
+		return -EPROBE_DEFER;
+	}
+
+	se_dev->host1x_pdev = host1x_pdev;
+
+	return 0;
 }
 
 static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
@@ -4600,6 +4451,13 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	}
 
 	se_dev->engine_id = engine_id;
+
+	/* set host1x platform device */
+	err = se_get_nvhost_dev(se_dev);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to get nvhost dev with err: %d\n", err);
+		goto exit;
+	}
 
 	/* Set Engine suspended state to false*/
 	atomic_set(&se_dev->se_suspended, 0);
