@@ -50,7 +50,7 @@ extern int max96712_read_reg_Dser(int slaveAddr,int channel,
 #define AR0234_COARSE_TIME_SHS1_ADDR    0x3012
 #define AR0234_ANALOG_GAIN    0x3060
 
-const struct of_device_id ar0234_of_match[] = {
+static const struct of_device_id ar0234_of_match[] = {
 	{.compatible = "onsemi,ar0234",},
 	{ },
 };

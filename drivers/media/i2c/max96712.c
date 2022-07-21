@@ -28,8 +28,10 @@ struct max96712 {
 	struct regmap *regmap;
 	const char *channel;
 };
-struct max96712 *global_priv[4] ;
+static struct max96712 *global_priv[4];
 
+int max96712_write_reg_Dser(int slaveAddr, int channel, u16 addr, u8 val);
+int max96712_read_reg_Dser(int slaveAddr, int channel, u16 addr, unsigned int *val);
 
 int max96712_write_reg_Dser(int slaveAddr,int channel,
 			u16 addr, u8 val)
@@ -56,7 +58,6 @@ int max96712_write_reg_Dser(int slaveAddr,int channel,
 	}
 	return 0;
 }
-
 EXPORT_SYMBOL(max96712_write_reg_Dser);
 
 
@@ -82,7 +83,6 @@ int max96712_read_reg_Dser(int slaveAddr,int channel,
 	return 0;
 
 }
-
 EXPORT_SYMBOL(max96712_read_reg_Dser);
 
 static int max96712_read_reg(struct max96712 *priv,
@@ -257,7 +257,7 @@ static const struct i2c_device_id max96712_id[] = {
 	{ },
 };
 
-const struct of_device_id max96712_of_match[] = {
+static const struct of_device_id max96712_of_match[] = {
 	{ .compatible = "nvidia,max96712", },
 	{ },
 };

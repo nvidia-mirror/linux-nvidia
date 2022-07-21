@@ -1,3 +1,22 @@
+/*
+ * mcu_firmware.h - ar1335 mcu firmware
+ *
+ * Copyright (c) 2022, e-con Systems.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef _MCU_FIRMWARE_H
 #define _MCU_FIRMWARE_H
 
@@ -71,20 +90,20 @@ typedef struct __attribute__ ((packed)) _ihex_rec {
 	unsigned char recdata[];
 } IHEX_RECORD;
 
-unsigned int g_bload_flashaddr = 0x0000;
+static unsigned int g_bload_flashaddr;
 
-uint8_t *fw_version = NULL;
+static uint8_t *fw_version;
 
 /* MCU communication variables */
-unsigned char mc_data[MCU_BUFFER_SIZE];
-unsigned char mc_ret_data[MCU_BUFFER_SIZE];
+static unsigned char mc_data[MCU_BUFFER_SIZE];
+static unsigned char mc_ret_data[MCU_BUFFER_SIZE];
 
 /*   Buffer to Send Bootloader CMDs */
-unsigned char g_bload_buf[MAX_BUF_LEN] = { 0 };
+static unsigned char g_bload_buf[MAX_BUF_LEN] = { 0 };
 
-unsigned short int g_bload_crc16 = 0x0000;
+static unsigned short int g_bload_crc16;
 
-const char g_mcu_fw_buf[] =
+static const char g_mcu_fw_buf[] =
 #include "e-CAM130A_CUXVR_mcu_fw.bin"
 ;
 #endif                        //_MCU_FIRMWARE_H

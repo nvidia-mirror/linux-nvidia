@@ -630,7 +630,7 @@ static int cam_write(struct i2c_client *client, u8 * val, u32 count)
 	return 0;
 }
 
-int mcu_bload_ascii2hex(unsigned char ascii)
+static int mcu_bload_ascii2hex(unsigned char ascii)
 {
 	if (ascii <= '9') {
 		return (ascii - '0');
@@ -2095,7 +2095,7 @@ static int mcu_isp_init(struct i2c_client *client)
 	return -ETIMEDOUT;
 }
 
-unsigned short int mcu_bload_calc_crc16(unsigned char *buf, int len)
+static unsigned short int mcu_bload_calc_crc16(unsigned char *buf, int len)
 {
 	unsigned short int crc = 0;
 	int i = 0;
@@ -2110,7 +2110,7 @@ unsigned short int mcu_bload_calc_crc16(unsigned char *buf, int len)
 	return crc;
 }
 
-unsigned char mcu_bload_inv_checksum(unsigned char *buf, int len)
+static unsigned char mcu_bload_inv_checksum(unsigned char *buf, int len)
 {
 	unsigned int checksum = 0x00;
 	int i = 0;
@@ -2126,7 +2126,7 @@ unsigned char mcu_bload_inv_checksum(unsigned char *buf, int len)
 	return (~(checksum) + 1);
 }
 
-int mcu_bload_get_version(struct i2c_client *client)
+static int mcu_bload_get_version(struct i2c_client *client)
 {
 	int ret = 0;
 
@@ -2172,7 +2172,7 @@ int mcu_bload_get_version(struct i2c_client *client)
 	return 0;
 }
 
-int mcu_bload_parse_send_cmd(struct i2c_client *client,
+static int mcu_bload_parse_send_cmd(struct i2c_client *client,
 			     unsigned char *bytearray, int rec_len)
 {
 	IHEX_RECORD *ihex_rec = NULL;
@@ -2183,7 +2183,7 @@ int mcu_bload_parse_send_cmd(struct i2c_client *client,
 		return -1;
 
 	ihex_rec = (IHEX_RECORD *) bytearray;
-	ihex_rec->addr = htons(ihex_rec->addr);
+	ihex_rec->addr = (__force unsigned short int) htons(ihex_rec->addr);
 
 	checksum = bytearray[rec_len - 1];
 
@@ -2310,7 +2310,7 @@ int mcu_bload_parse_send_cmd(struct i2c_client *client,
 	return 0;
 }
 
-int mcu_bload_go(struct i2c_client *client)
+static int mcu_bload_go(struct i2c_client *client)
 {
 	int ret = 0;
 
@@ -2358,7 +2358,7 @@ int mcu_bload_go(struct i2c_client *client)
 	return 0;
 }
 
-int mcu_bload_update_fw(struct i2c_client *client)
+static int mcu_bload_update_fw(struct i2c_client *client)
 {
 	/* exclude NULL character at end of string */
 	unsigned long hex_file_size = ARRAY_SIZE(g_mcu_fw_buf) - 1;
@@ -2417,7 +2417,7 @@ int mcu_bload_update_fw(struct i2c_client *client)
 	return ret;
 }
 
-int mcu_bload_erase_flash(struct i2c_client *client)
+static int mcu_bload_erase_flash(struct i2c_client *client)
 {
 	unsigned short int pagenum = 0x0000;
 	int ret = 0, i = 0, checksum = 0;
@@ -2515,7 +2515,7 @@ poll_busy:
 	return 0;
 }
 
-int mcu_bload_read(struct i2c_client *client,
+static int mcu_bload_read(struct i2c_client *client,
 		   unsigned int g_bload_flashaddr, char *bytearray,
 		   unsigned int len)
 {
@@ -2600,7 +2600,7 @@ int mcu_bload_read(struct i2c_client *client,
 	return 0;
 }
 
-int mcu_bload_verify_flash(struct i2c_client *client,
+static int mcu_bload_verify_flash(struct i2c_client *client,
 			   unsigned short int orig_crc)
 {
 	char bytearray[FLASH_READ_LEN];

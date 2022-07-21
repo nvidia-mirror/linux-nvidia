@@ -1,7 +1,7 @@
 /*
  * ar1335.h - ar0330 sensor mode tables
  *
- * Copyright (c) 2017-2021, e-con Systems, All Rights Reserved.
+ * Copyright (c) 2017-2022, e-con Systems, All Rights Reserved.
  * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -268,7 +268,7 @@ struct cam {
 };
 
 /* Mutex for I2C lock */
-DEFINE_MUTEX(mcu_i2c_mutex);
+static DEFINE_MUTEX(mcu_i2c_mutex);
 
 static int cam_g_volatile_ctrl(struct v4l2_ctrl *ctrl);
 static int cam_s_ctrl(struct v4l2_ctrl *ctrl);
