@@ -1125,7 +1125,7 @@ do { \
 static int nvmap_debug_lru_allocations_show(struct seq_file *s, void *unused)
 {
 	struct nvmap_handle *h;
-	int total_handles = 0, migratable_handles = 0;
+	u32 total_handles = 0, migratable_handles = 0;
 	size_t total_size = 0, migratable_size = 0;
 
 	seq_printf(s, "%-18s %18s %8s %11s %8s %6s %6s %6s %6s %6s %8s\n",
@@ -1146,7 +1146,7 @@ static int nvmap_debug_lru_allocations_show(struct seq_file *s, void *unused)
 			    atomic_read(&h->umap_count),
 			    h);
 	}
-	seq_printf(s, "total_handles = %d, migratable_handles = %d,"
+	seq_printf(s, "total_handles = %u, migratable_handles = %u,"
 		"total_size=%zuK, migratable_size=%zuK\n",
 		total_handles, migratable_handles,
 		K(total_size), K(migratable_size));
