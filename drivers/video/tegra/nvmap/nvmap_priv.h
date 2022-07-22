@@ -557,16 +557,6 @@ struct nvmap_handle *nvmap_handle_get_from_dmabuf_fd(
 				struct nvmap_client *client, int fd);
 int nvmap_dmabuf_duplicate_gen_fd(struct nvmap_client *client,
 		struct dma_buf *dmabuf);
-struct sg_table *nvmap_dmabuf_map_dma_buf(
-	struct dma_buf_attachment *attach, enum dma_data_direction dir);
-struct sg_table *_nvmap_dmabuf_map_dma_buf(
-	struct dma_buf_attachment *attach, enum dma_data_direction dir);
-void nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
-				       struct sg_table *sgt,
-				       enum dma_data_direction dir);
-void _nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
-				       struct sg_table *sgt,
-				       enum dma_data_direction dir);
 
 int nvmap_get_handle_param(struct nvmap_client *client,
 		struct nvmap_handle_ref *ref, u32 param, u64 *result);

@@ -33,7 +33,6 @@ endif #NVMAP_CONFIG_PAGE_POOLS
 
 ifneq ($(filter y,$(CONFIG_ARCH_TEGRA_19x_SOC) $(CONFIG_ARCH_TEGRA_194_SOC)),)
 nvmap-y += nvmap_init_t19x.o
-nvmap-y += nvmap_dmabuf_t19x.o
 nvmap-y += nvmap_cache_t19x.o
 endif #CONFIG_ARCH_TEGRA_19x_SOC or CONFIG_ARCH_TEGRA_194_SOC
 

@@ -89,8 +89,8 @@ static inline bool access_vpr_phys(struct device *dev)
 	return !!of_find_property(dev->of_node, "access-vpr-phys", NULL);
 }
 
-struct sg_table *_nvmap_dmabuf_map_dma_buf(
-	struct dma_buf_attachment *attach, enum dma_data_direction dir)
+static struct sg_table *nvmap_dmabuf_map_dma_buf(struct dma_buf_attachment *attach,
+						  enum dma_data_direction dir)
 {
 	struct nvmap_handle_info *info = attach->dmabuf->priv;
 	int ents = 0;
@@ -163,13 +163,7 @@ err_map:
 	return ERR_PTR(-ENOMEM);
 }
 
-__weak struct sg_table *nvmap_dmabuf_map_dma_buf(
-	struct dma_buf_attachment *attach, enum dma_data_direction dir)
-{
-	return _nvmap_dmabuf_map_dma_buf(attach, dir);
-}
-
-void _nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
+static void nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
 				       struct sg_table *sgt,
 				       enum dma_data_direction dir)
 {
@@ -208,13 +202,6 @@ void _nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
 		nvmap_remove_device_name(device_name, heap_type);
 #endif /* NVMAP_CONFIG_DEBUG_MAPS */
 	mutex_unlock(&info->maps_lock);
-}
-
-__weak void nvmap_dmabuf_unmap_dma_buf(struct dma_buf_attachment *attach,
-				       struct sg_table *sgt,
-				       enum dma_data_direction dir)
-{
-	_nvmap_dmabuf_unmap_dma_buf(attach, sgt, dir);
 }
 
 static void nvmap_dmabuf_release(struct dma_buf *dmabuf)
