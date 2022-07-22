@@ -106,16 +106,6 @@ struct nvmap_handle *nvmap_handle_get_from_id(struct nvmap_client *client,
 	return	NULL;
 }
 
-struct nvmap_handle *nvmap_handle_get_from_fd(int fd)
-{
-	struct nvmap_handle *h;
-
-	h = nvmap_handle_get_from_dmabuf_fd(NULL, fd);
-	if (!IS_ERR(h))
-		return h;
-	return NULL;
-}
-
 static int nvmap_install_fd(struct nvmap_client *client,
 	struct nvmap_handle *handle, int fd, void __user *arg,
 	void *op, size_t op_size, bool free, struct dma_buf *dmabuf)
