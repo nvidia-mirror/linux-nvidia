@@ -96,6 +96,15 @@
 #define MAX_GMSL_DP_SER_TX3_2		0xAB
 #define MAX_GMSL_DP_SER_TX3_3		0xAF
 
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_X		0x449
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_Y		0x549
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_Z		0x649
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_U		0x749
+
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE		0x9
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_DET		0x4
+#define MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_INJ		0x10
+
 #define MAX_GMSL_ARRAY_SIZE		4
 
 
@@ -272,6 +281,32 @@ static int max_gmsl_read_lock(struct max_gmsl_dp_ser_priv *priv,
 	return -1;
 }
 
+static void max_gmsl_detect_internal_crc_error(struct max_gmsl_dp_ser_priv *priv,
+				 struct device *dev)
+{
+	int i, ret = 0;
+
+	static const int max_gmsl_internal_crc_regs[] = {
+		MAX_GMSL_DP_SER_INTERNAL_CRC_X,
+		MAX_GMSL_DP_SER_INTERNAL_CRC_Y,
+		MAX_GMSL_DP_SER_INTERNAL_CRC_Z,
+		MAX_GMSL_DP_SER_INTERNAL_CRC_U,
+	};
+
+	for (i = 0; i < MAX_GMSL_ARRAY_SIZE; i++) {
+		ret = max_gmsl_dp_ser_read(priv, max_gmsl_internal_crc_regs[i]);
+		/* Reading register will clear the detect bit */
+		if ((ret & MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_DET) != 0U) {
+			dev_err(dev, "%s: INTERNAL CRC video error detected at pipe %d\n", __func__, i);
+			if ((ret & MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_INJ) != 0U) {
+				/* CRC error is forcefuly injected, disable it */
+				ret = ret & (~MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_INJ);
+				max_gmsl_dp_ser_write(priv, max_gmsl_internal_crc_regs[i], ret);
+			}
+		}
+	}
+}
+
 static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 {
 	struct max_gmsl_dp_ser_priv *priv = dev_id;
@@ -281,6 +316,9 @@ static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
 	if (ret & MAX_GMSL_DP_SER_LOSS_OF_LOCK_FLAG)
 		dev_dbg(dev, "%s: Fault due to GMSL Link Loss\n", __func__);
+
+	/* Detect error for CRC */
+	max_gmsl_detect_internal_crc_error(priv, dev);
 
 	dev_dbg(dev, "%s: Sticky bit LOSS_OF_LOCK_FLAG cleared\n", __func__);
 
@@ -331,6 +369,16 @@ static void tegra_poll_gmsl_training_lock(struct work_struct *work)
 			"DP Link tranining hasn't completed\n");
 		goto reschedule;
 	}
+
+	/* enable internal CRC after link training */
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_X,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Y,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Z,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_U,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
 
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_X,
 			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
