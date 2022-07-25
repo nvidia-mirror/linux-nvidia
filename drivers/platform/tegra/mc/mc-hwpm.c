@@ -158,7 +158,7 @@ static void __iomem *tegra_mc_hwpm_map_regs(struct platform_device *pdev, u32 de
 
 static struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
 
-const struct of_device_id mc_hwpm_of_ids[] = {
+static const struct of_device_id mc_hwpm_of_ids[] = {
 	{ .compatible = "nvidia,tegra-t23x-mc-hwpm" },
 	{ }
 };
