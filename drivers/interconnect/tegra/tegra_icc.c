@@ -135,8 +135,8 @@ static int query_mrq_query_abi(struct tegra_icc_provider *tp, uint32_t mrq_id)
 	tp->msg.mrq = MRQ_QUERY_ABI;
 	tp->msg.tx.data = &req;
 	tp->msg.tx.size = sizeof(req);
-	tp->msg.rx.data = NULL;
-	tp->msg.rx.size = 0;
+	tp->msg.rx.data = &resp;
+	tp->msg.rx.size = sizeof(resp);
 
 	ret = tegra_bpmp_transfer(tp->bpmp_dev, &tp->msg);
 	if (ret == 0 && tp->msg.rx.ret < 0)
@@ -144,6 +144,7 @@ static int query_mrq_query_abi(struct tegra_icc_provider *tp, uint32_t mrq_id)
 	else if (resp.status != 0)
 		ret = resp.status;
 	tp->msg.tx.data = NULL;
+	tp->msg.rx.data = NULL;
 
 	return ret;
 }
@@ -154,15 +155,9 @@ static void query_mrqs_available(struct platform_device *pdev,
 	int ret = 0;
 	bool mrqs_available = true;
 
-	ret = query_mrq_query_abi(tp, MRQ_ISO_CLIENT);
+	ret = query_mrq_query_abi(tp, MRQ_BWMGR_INT);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "error querying MRQ_ISO_CLIENT\n");
-		mrqs_available = false;
-	}
-
-	ret = query_mrq_query_abi(tp, MRQ_BWMGR);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "error querying MRQ_BWMGR\n");
+		dev_err(&pdev->dev, "error querying MRQ_BWMGR_INT\n");
 		mrqs_available = false;
 	}
 
