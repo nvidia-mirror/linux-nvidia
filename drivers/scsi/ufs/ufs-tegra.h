@@ -374,6 +374,7 @@ struct ufs_tegra_host {
 	struct gpio_desc *cd_gpio_desc;
 	bool enable_scramble;
 	u8 chip_id;
+	u32 streamid;
 #ifdef CONFIG_DEBUG_FS
 	u32 refclk_value;
 	long program_refclk;

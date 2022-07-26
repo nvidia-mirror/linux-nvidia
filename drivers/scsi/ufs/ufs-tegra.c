@@ -1313,6 +1313,13 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		 * T234 does not require context restore
 		 */
 		ufs_tegra_context_restore(ufs_tegra);
+	} else {
+		writel(UFS_AUX_ADDR_VIRT_CTRL_EN,
+			ufs_tegra->ufs_virtualization_base +
+			UFS_AUX_ADDR_VIRT_CTRL_0);
+		writel(ufs_tegra->streamid,
+			ufs_tegra->ufs_virtualization_base +
+			UFS_AUX_ADDR_VIRT_REG_0);
 	}
 
 	ufs_tegra_cfg_vendor_registers(hba);
@@ -1830,7 +1837,6 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	int err = 0;
 	resource_size_t ufs_aux_base_addr, ufs_aux_addr_range, mphy_addr_range;
 	struct iommu_fwspec *fwspec;
-	u32 streamid;
 
 	ufs_tegra = devm_kzalloc(dev, sizeof(*ufs_tegra), GFP_KERNEL);
 	if (!ufs_tegra) {
@@ -1992,11 +1998,11 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 			dev_err(dev, "Failed to get MC streamidd\n");
 			goto out;
 		} else {
-			streamid = fwspec->ids[0] & 0xffff;
+			ufs_tegra->streamid = fwspec->ids[0] & 0xffff;
 			writel(UFS_AUX_ADDR_VIRT_CTRL_EN,
 				ufs_tegra->ufs_virtualization_base +
 				UFS_AUX_ADDR_VIRT_CTRL_0);
-			writel(streamid,
+			writel(ufs_tegra->streamid,
 				ufs_tegra->ufs_virtualization_base +
 				UFS_AUX_ADDR_VIRT_REG_0);
 		}
