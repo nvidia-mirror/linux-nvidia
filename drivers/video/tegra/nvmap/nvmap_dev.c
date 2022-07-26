@@ -1070,9 +1070,8 @@ next_page:
 			entry.size = K(PAGE_SIZE);
 		}
 
-		ret = seq_write(s, &entry, sizeof(entry));
-		if (ret < 0)
-			break;
+		seq_printf(s, "%llu %12llu %8u %8u %10llu\n", entry.base, entry.size,
+				entry.flags, entry.share_count, entry.mapped_size);
 
 		if ((handle->heap_type == NVMAP_HEAP_CARVEOUT_VPR) && handle->heap_pgalloc) {
 			i++;
@@ -1093,10 +1092,9 @@ static int nvmap_debug_handles_by_pid_show(struct seq_file *s, void *unused)
 	int ret;
 
 	header.version = 1;
-	ret = seq_write(s, &header, sizeof(header));
-	if (ret < 0)
-		return ret;
-
+	seq_printf(s, "%s: %u\n", "header.version", header.version);
+	seq_printf(s, "%s %8s %8s %12s %8s\n", "base",
+		"size", "flags", "share_count", "mapped_size");
 	mutex_lock(&nvmap_dev->clients_lock);
 
 	list_for_each_entry(client, &nvmap_dev->clients, list) {
