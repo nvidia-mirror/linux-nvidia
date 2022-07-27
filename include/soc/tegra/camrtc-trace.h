@@ -215,6 +215,7 @@ struct camrtc_event_struct {
 #define CAMRTC_EVENT_MODULE_ISP			MK_U32(9)
 #define CAMRTC_EVENT_MODULE_NVCSI		MK_U32(10)
 #define CAMRTC_EVENT_MODULE_CAPTURE		MK_U32(11)
+#define CAMRTC_EVENT_MODULE_PERF		MK_U32(12)
 
 // camrtc_trace_event_type_ids
 #define camrtc_trace_type_exception \
@@ -452,6 +453,22 @@ struct camrtc_event_struct {
 	camrtc_trace_capture_event_id(14)
 #define camrtc_trace_capture_event_suspend_isp \
 	camrtc_trace_capture_event_id(15)
+
+// camrtc_trace_perf id
+#define camrtc_trace_perf_id(_subid) \
+		CAMRTC_EVENT_MAKE_ID(CAMRTC_EVENT_TYPE_ARRAY, \
+			CAMRTC_EVENT_MODULE_PERF, (_subid))
+#define camrtc_trace_perf_counters \
+	camrtc_trace_perf_id(0)
+#define camrtc_trace_perf_reset \
+	camrtc_trace_perf_id(1)
+
+struct camrtc_trace_perf_counter_data {
+	uint64_t cycles;
+	uint32_t counters[3];
+	uint8_t events[3];
+	uint8_t name[25];
+};
 
 #pragma GCC diagnostic ignored "-Wpadded"
 
