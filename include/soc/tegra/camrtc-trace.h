@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -214,6 +214,7 @@ struct camrtc_event_struct {
 #define CAMRTC_EVENT_MODULE_VI			MK_U32(8)
 #define CAMRTC_EVENT_MODULE_ISP			MK_U32(9)
 #define CAMRTC_EVENT_MODULE_NVCSI		MK_U32(10)
+#define CAMRTC_EVENT_MODULE_CAPTURE		MK_U32(11)
 
 // camrtc_trace_event_type_ids
 #define camrtc_trace_type_exception \
@@ -419,6 +420,38 @@ struct camrtc_event_struct {
 			CAMRTC_EVENT_MODULE_NVCSI, (_subid))
 #define camrtc_trace_nvcsi_intr \
 	camrtc_trace_nvcsi_id(1)
+
+// camrtc_trace_capture_ids
+#define camrtc_trace_capture_event_id(_subid) \
+		CAMRTC_EVENT_MAKE_ID(CAMRTC_EVENT_TYPE_ARRAY, \
+			CAMRTC_EVENT_MODULE_CAPTURE, (_subid))
+#define camrtc_trace_capture_event_sof \
+	camrtc_trace_capture_event_id(0)
+#define camrtc_trace_capture_event_eof \
+	camrtc_trace_capture_event_id(1)
+#define camrtc_trace_capture_event_error \
+	camrtc_trace_capture_event_id(2)
+#define camrtc_trace_capture_event_reschedule \
+	camrtc_trace_capture_event_id(3)
+#define camrtc_trace_capture_event_sensor \
+	camrtc_trace_capture_event_id(4)
+#define camrtc_trace_capture_event_reschedule_isp \
+	camrtc_trace_capture_event_id(5)
+#define camrtc_trace_capture_event_isp_done \
+	camrtc_trace_capture_event_id(6)
+#define camrtc_trace_capture_event_isp_error \
+	camrtc_trace_capture_event_id(7)
+#define camrtc_trace_capture_event_inject \
+	camrtc_trace_capture_event_id(8)
+#define camrtc_trace_capture_event_wdt \
+	camrtc_trace_capture_event_id(9)
+#define camrtc_trace_capture_event_report_program \
+	camrtc_trace_capture_event_id(10)
+
+#define camrtc_trace_capture_event_suspend \
+	camrtc_trace_capture_event_id(14)
+#define camrtc_trace_capture_event_suspend_isp \
+	camrtc_trace_capture_event_id(15)
 
 #pragma GCC diagnostic ignored "-Wpadded"
 
