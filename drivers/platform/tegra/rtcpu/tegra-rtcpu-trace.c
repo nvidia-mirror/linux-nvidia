@@ -989,6 +989,7 @@ struct capture_event {
 	union {
 		struct capture_event_progress progress;
 		struct capture_event_isp isp;
+		bool suspend;
 	};
 };
 
@@ -1035,14 +1036,41 @@ static void rtcpu_trace_capture_event(struct camrtc_event_struct *event)
 		trace_capture_event_report_program(event->header.tstamp,
 				ev->progress.channel_id, ev->progress.sequence);
 		break;
+	case camrtc_trace_capture_event_suspend:
+		trace_capture_event_suspend(event->header.tstamp, ev->suspend);
+		break;
+	case camrtc_trace_capture_event_suspend_isp:
+		trace_capture_event_suspend_isp(event->header.tstamp, ev->suspend);
+		break;
 
 	case camrtc_trace_capture_event_inject:
 	case camrtc_trace_capture_event_sensor:
-	case camrtc_trace_capture_event_suspend:
-	case camrtc_trace_capture_event_suspend_isp:
 	default:
-		trace_capture_event_unknown(event->header.tstamp,
-			event->header.id);
+		trace_rtcpu_unknown(event->header.tstamp,
+			event->header.id,
+			event->header.len - CAMRTC_TRACE_EVENT_HEADER_SIZE,
+			event->data.data8);
+		break;
+	}
+}
+
+static void rtcpu_trace_perf_event(struct camrtc_event_struct *event)
+{
+	const struct camrtc_trace_perf_counter_data *perf = (const void *)&event->data;
+
+	switch (event->header.id) {
+	case camrtc_trace_perf_reset:
+		trace_rtcpu_perf_reset(event->header.tstamp, perf);
+		break;
+	case camrtc_trace_perf_counters:
+		trace_rtcpu_perf_counters(event->header.tstamp, perf);
+		break;
+
+	default:
+		trace_rtcpu_unknown(event->header.tstamp,
+			event->header.id,
+			event->header.len - CAMRTC_TRACE_EVENT_HEADER_SIZE,
+			event->data.data8);
 		break;
 	}
 }
@@ -1076,6 +1104,9 @@ static void rtcpu_trace_array_event(struct tegra_rtcpu_trace *tracer,
 		break;
 	case CAMRTC_EVENT_MODULE_CAPTURE:
 		rtcpu_trace_capture_event(event);
+		break;
+	case CAMRTC_EVENT_MODULE_PERF:
+		rtcpu_trace_perf_event(event);
 		break;
 	default:
 		trace_rtcpu_unknown(event->header.tstamp,

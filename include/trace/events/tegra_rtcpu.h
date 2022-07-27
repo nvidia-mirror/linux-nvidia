@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,6 +21,7 @@
 #define _TRACE_TEGRA_RTCPU_H
 
 #include <linux/tracepoint.h>
+#include <soc/tegra/camrtc-trace.h>
 
 /*
  * Classes
@@ -190,6 +191,42 @@ TRACE_EVENT(rtcpu_dbg_set_loglevel,
 	TP_printk("tstamp:%llu old:%u new:%u", __entry->tstamp,
 		__entry->old_level, __entry->new_level)
 );
+
+/*
+ * Perf events
+ */
+DECLARE_EVENT_CLASS(rtcpu__perf,
+	TP_PROTO(u64 tstamp, const struct camrtc_trace_perf_counter_data *perf),
+	TP_ARGS(tstamp, perf),
+	TP_STRUCT__entry(
+		__field(u64, tstamp)
+		__field_struct(struct camrtc_trace_perf_counter_data, perf)
+	),
+	TP_fast_assign(
+		__entry->tstamp = tstamp;
+		if (perf)
+			__entry->perf = *perf;
+		else
+			memset(&__entry->perf, 0, sizeof(*perf));
+	),
+	TP_printk("ts:%llu name:%.*s cc:%llu e%u:%u e%u:%u e%u:%u",
+		__entry->tstamp, (int)sizeof(__entry->perf.name),
+		__entry->perf.name, __entry->perf.cycles,
+		__entry->perf.events[0], __entry->perf.counters[0],
+		__entry->perf.events[1], __entry->perf.counters[1],
+		__entry->perf.events[2], __entry->perf.counters[2])
+);
+
+DEFINE_EVENT(rtcpu__perf, rtcpu_perf_counters,
+	TP_PROTO(u64 tstamp, const struct camrtc_trace_perf_counter_data *perf),
+	TP_ARGS(tstamp, perf)
+);
+
+DEFINE_EVENT(rtcpu__perf, rtcpu_perf_reset,
+	TP_PROTO(u64 tstamp, const struct camrtc_trace_perf_counter_data *perf),
+	TP_ARGS(tstamp, perf)
+);
+
 
 /*
  * VI Notify events
