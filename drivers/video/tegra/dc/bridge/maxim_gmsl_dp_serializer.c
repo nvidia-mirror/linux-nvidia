@@ -28,6 +28,16 @@
 #define MAX_GMSL_DP_SER_CTRL3_LOCK_MASK		(1 << 3)
 #define MAX_GMSL_DP_SER_CTRL3_LOCK_VAL		(1 << 3)
 
+#define MAX_GMSL_DP_SER_INTR2			0x1A
+#define MAX_GMSL_DP_SER_REM_ERR_OEN_A_MASK	(1 << 4)
+#define MAX_GMSL_DP_SER_REM_ERR_OEN_A_VAL	(1 << 4)
+#define MAX_GMSL_DP_SER_REM_ERR_OEN_B_MASK	(1 << 5)
+#define MAX_GMSL_DP_SER_REM_ERR_OEN_B_VAL	(1 << 5)
+
+#define MAX_GMSL_DP_SER_INTR3			0x1B
+#define MAX_GMSL_DP_SER_REM_ERR_FLAG_A		(1 << 4)
+#define MAX_GMSL_DP_SER_REM_ERR_FLAG_B		(1 << 5)
+
 #define MAX_GMSL_DP_SER_INTR8			0x20
 #define MAX_GMSL_DP_SER_INTR8_MASK		(1 << 0)
 #define MAX_GMSL_DP_SER_INTR8_VAL		0x1
@@ -307,6 +317,29 @@ static void max_gmsl_detect_internal_crc_error(struct max_gmsl_dp_ser_priv *priv
 	}
 }
 
+/*
+ * This function is responsible for detecting ANY remote deserializer
+ * errors. Note that the main error that we're interested in today is
+ * any video line CRC error reported by the deserializer.
+ */
+static void max_gmsl_detect_remote_error(struct max_gmsl_dp_ser_priv *priv,
+				 struct device *dev)
+{
+	int ret = 0;
+
+	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR3);
+
+	if (priv->link_a_is_enabled) {
+		if ((ret & MAX_GMSL_DP_SER_REM_ERR_FLAG_A) != 0)
+			dev_err(dev, "%s: Remote deserializer error detected on Link A\n", __func__);
+	}
+
+	if (priv->link_b_is_enabled) {
+		if ((ret & MAX_GMSL_DP_SER_REM_ERR_FLAG_B) != 0)
+			dev_err(dev, "%s: Remote deserializer error detected on Link B\n", __func__);
+	}
+}
+
 static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 {
 	struct max_gmsl_dp_ser_priv *priv = dev_id;
@@ -317,10 +350,11 @@ static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 	if (ret & MAX_GMSL_DP_SER_LOSS_OF_LOCK_FLAG)
 		dev_dbg(dev, "%s: Fault due to GMSL Link Loss\n", __func__);
 
-	/* Detect error for CRC */
+	/* Detect internal CRC errors inside serializer */
 	max_gmsl_detect_internal_crc_error(priv, dev);
 
-	dev_dbg(dev, "%s: Sticky bit LOSS_OF_LOCK_FLAG cleared\n", __func__);
+	/* Detect remote error across GMSL link */
+	max_gmsl_detect_remote_error(priv, dev);
 
 	return IRQ_HANDLED;
 }
@@ -476,12 +510,21 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	queue_delayed_work(priv->wq, &priv->delay_work,
 			   msecs_to_jiffies(500));
 
-
 	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
 	if (ret < 0) {
 		dev_err(dev, "%s: INTR9 register read failed\n", __func__);
 		return -EFAULT;
 	}
+
+	if (priv->link_a_is_enabled)
+		max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR2,
+				   MAX_GMSL_DP_SER_REM_ERR_OEN_A_MASK,
+				   MAX_GMSL_DP_SER_REM_ERR_OEN_A_VAL);
+	if (priv->link_b_is_enabled)
+		max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR2,
+				   MAX_GMSL_DP_SER_REM_ERR_OEN_B_MASK,
+				   MAX_GMSL_DP_SER_REM_ERR_OEN_B_VAL);
+
 	/* enable INTR8.LOSS_OF_LOCK_OEN */
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR8,
 			       MAX_GMSL_DP_SER_INTR8_MASK,
