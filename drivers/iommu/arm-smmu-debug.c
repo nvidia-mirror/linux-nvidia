@@ -681,7 +681,7 @@ void arm_smmu_debugfs_remove_master(struct device *dev,
 	}
 
 	list_for_each_entry(master, &smmu_dfs->masters_list, node) {
-		if (master->dev == dev)
+		if (master && (master->dev == dev))
 			break;
 	}
 
