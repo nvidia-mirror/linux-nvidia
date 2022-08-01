@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -161,6 +161,7 @@ struct camrtc_dbg_set_perf_counters {
  *     event: Event type that the value represents.
  *       For first entry, this field is don't care.
  *     value: Value of performance counter.
+ *   cycle_counter_div64: Nonzero if cycle counter divider is active
  */
 struct camrtc_dbg_get_perf_counters_result {
 	uint32_t number;
@@ -168,6 +169,7 @@ struct camrtc_dbg_get_perf_counters_result {
 		uint32_t event;
 		uint32_t value;
 	} counters[CAMRTC_DBG_MAX_PERF_COUNTERS];
+	uint32_t cycle_counter_div64;
 };
 
 
