@@ -1089,7 +1089,7 @@ static int nvmap_debug_handles_by_pid_show(struct seq_file *s, void *unused)
 	struct nvmap_pid_data *p = s->private;
 	struct nvmap_client *client;
 	struct nvmap_debugfs_handles_header header;
-	int ret;
+	int ret = 0;
 
 	header.version = 1;
 	seq_printf(s, "%s: %u\n", "header.version", header.version);
