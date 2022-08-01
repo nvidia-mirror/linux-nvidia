@@ -44,6 +44,16 @@ config ARCH_TEGRA_CHAIN_C
 	 be part of QSPI storage for reliability and
 	 need to be with minimal storage footprint.
 
+config ARCH_TEGRA_HYPERVISOR
+	bool "Add Tegra Hypervisor support"
+	default n
+	help
+	 NVIDIA Tegra Downstream options for hypervisor. Since
+	 Android Kernel 5.10, Tegra T23x enabled hypervisor
+	 support. Some special dts is added for hypervisor mode.
+	 But not all of platform enabled this support. Using
+	 this flag to separate Android platform with others.
+
 append_menu "Kernel Features"
 
 config TEGRA_EBP
