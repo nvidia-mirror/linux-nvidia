@@ -24,6 +24,9 @@
 #include <uapi/linux/nvhost_ioctl.h>
 #include <linux/kref.h>
 #include <linux/dma-buf.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+#include <linux/xarray.h>
+#endif
 
 struct nvhost_channel;
 struct nvhost_waitchk;
@@ -94,6 +97,9 @@ struct nvhost_job {
 	int num_relocs;
 	struct nvhost_job_unpin *unpins;
 	int num_unpins;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	struct xarray *reg_buffers;
+#endif
 
 	struct nvhost_pinid *pin_ids;
 	dma_addr_t *addr_phys;

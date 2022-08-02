@@ -273,6 +273,14 @@ struct nvhost_channel_attach_syncpt_args {
 	__u32 flags;
 };
 
+#define NVHOST_IOCTL_CHANNEL_REGISTER_BUFFER_UNREGISTER	(1 << 0)
+struct nvhost_channel_register_buffer_args {
+	__s32 fd;
+	__u32 id;
+	__u32 flags;
+	__u32 pad;
+};
+
 #define NVHOST_IOCTL_CHANNEL_GET_SYNCPOINTS	\
 	_IOR(NVHOST_IOCTL_MAGIC, 2, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_GET_WAITBASES	\
@@ -327,6 +335,8 @@ struct nvhost_channel_attach_syncpt_args {
 	_IOW(NVHOST_IOCTL_MAGIC, 30, struct nvhost_set_syncpt_name_args)
 #define NVHOST_IOCTL_CHANNEL_ATTACH_SYNCPT \
 	_IOWR(NVHOST_IOCTL_MAGIC, 31, struct nvhost_channel_attach_syncpt_args)
+#define NVHOST_IOCTL_CHANNEL_REGISTER_BUFFER \
+	_IOWR(NVHOST_IOCTL_MAGIC, 32, struct nvhost_channel_register_buffer_args)
 
 #define NVHOST_IOCTL_CHANNEL_SET_ERROR_NOTIFIER  \
 	_IOWR(NVHOST_IOCTL_MAGIC, 111, struct nvhost_set_error_notifier)

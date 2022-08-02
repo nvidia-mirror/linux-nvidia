@@ -262,6 +262,11 @@ struct nvhost_channel_userctx {
 
 	/* used for attaching to ctx list in device pdata */
 	struct list_head node;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	/* registered buffers */
+	struct xarray buffers;
+#endif
 };
 
 static int nvhost_channelrelease(struct inode *inode, struct file *filp)
@@ -276,6 +281,18 @@ static int nvhost_channelrelease(struct inode *inode, struct file *filp)
 	mutex_lock(&pdata->userctx_list_lock);
 	list_del(&priv->node);
 	mutex_unlock(&pdata->userctx_list_lock);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	{
+		long unsigned int idx;
+		struct dma_buf *buf;
+
+		xa_for_each(&priv->buffers, idx, buf)
+			dma_buf_put(buf);
+
+		xa_destroy(&priv->buffers);
+	}
+#endif
 
 	/* remove this client from acm */
 	nvhost_module_remove_client(priv->pdev, priv);
@@ -364,6 +381,10 @@ static int __nvhost_channelopen(struct inode *inode,
 		goto fail_allocate_priv;
 	}
 	filp->private_data = priv;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	xa_init_flags(&priv->buffers, XA_FLAGS_ALLOC1);
+#endif
 
 	/* Register this client to acm */
 	if (nvhost_module_add_client(pdev, priv))
@@ -785,6 +806,10 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 		job->error_notifier_offset = ctx->error_notifier_offset;
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	job->reg_buffers = &ctx->buffers;
+#endif
+
 	err = submit_add_gathers(args, job, pdata);
 	if (err)
 		goto put_job;
@@ -1186,6 +1211,44 @@ put_syncpt:
 	return err;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+static int nvhost_ioctl_channel_register_buffer(
+	struct nvhost_channel_userctx *ctx,
+	struct nvhost_channel_register_buffer_args *args)
+{
+	struct device *dev = &ctx->pdev->dev;
+	struct dma_buf *buf;
+	int err;
+
+	if (args->flags & ~(NVHOST_IOCTL_CHANNEL_REGISTER_BUFFER_UNREGISTER))
+		return -EINVAL;
+
+	if (args->flags == NVHOST_IOCTL_CHANNEL_REGISTER_BUFFER_UNREGISTER) {
+		buf = xa_erase(&ctx->buffers, args->id);
+		if (!buf) {
+			nvhost_err(dev, "tried to unregister non-existing buffer");
+			return -EINVAL;
+		}
+
+		dma_buf_put(buf);
+	} else {
+		buf = dma_buf_get(args->fd);
+		if (IS_ERR(buf)) {
+			nvhost_err(dev, "could not get buf err=%ld (register)", PTR_ERR(buf));
+			return PTR_ERR(buf);
+		}
+
+		err = xa_alloc(&ctx->buffers, &args->id, buf, XA_LIMIT(1, U32_MAX), GFP_KERNEL);
+		if (err) {
+			nvhost_err(dev, "failed to insert into buffer array err=%d", err);
+			return err;
+		}
+	}
+
+	return 0;
+}
+#endif
+
 static long nvhost_channelctl(struct file *filp,
 	unsigned int cmd, unsigned long arg)
 {
@@ -1476,6 +1539,14 @@ static long nvhost_channelctl(struct file *filp,
 			(struct nvhost_channel_attach_syncpt_args *)buf);
 		break;
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	case NVHOST_IOCTL_CHANNEL_REGISTER_BUFFER:
+	{
+		err = nvhost_ioctl_channel_register_buffer(priv,
+			(struct nvhost_channel_register_buffer_args *)buf);
+		break;
+	}
+#endif
 	default:
 		nvhost_dbg_info("unrecognized ioctl cmd: 0x%x", cmd);
 		err = -ENOTTY;

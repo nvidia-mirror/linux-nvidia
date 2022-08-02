@@ -271,7 +271,12 @@ static int pin_array_ids(struct platform_device *dev,
 		struct nvhost_pinid *ids,
 		dma_addr_t *phys_addr,
 		u32 count,
-		struct nvhost_job_unpin *unpin_data)
+		struct nvhost_job_unpin *unpin_data
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+		, struct xarray *reg_buffers)
+#else
+		)
+#endif
 {
 	int i, pin_count = 0;
 	struct sg_table *sgt;
@@ -292,12 +297,25 @@ static int pin_array_ids(struct platform_device *dev,
 			continue;
 		}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+		xa_lock(reg_buffers);
+		buf = xa_load(reg_buffers, ids[i].id);
+		if (!buf) {
+			xa_unlock(reg_buffers);
+			err = -EINVAL;
+			nvhost_err(&dev->dev, "could not get buf err=%d", err);
+			goto clean_up;
+		}
+		get_dma_buf(buf);
+		xa_unlock(reg_buffers);
+#else
 		buf = dma_buf_get(ids[i].id);
 		if (IS_ERR(buf)) {
 			err = -EINVAL;
 			nvhost_err(&dev->dev, "could not get buf err=%d", err);
 			goto clean_up;
 		}
+#endif
 
 		attach = dma_buf_attach(buf, &dev->dev);
 		if (IS_ERR(attach)) {
@@ -333,6 +351,7 @@ static int pin_array_ids(struct platform_device *dev,
 		prev_id = ids[i].id;
 		prev_addr = phys_addr[ids[i].index];
 	}
+
 	return pin_count;
 
 clean_up_iommu:
@@ -370,7 +389,12 @@ static int pin_job_mem(struct nvhost_job *job)
 	result = pin_array_ids(job->ch->vm->pdev,
 		job->pin_ids, job->addr_phys,
 		job->num_relocs,
-		job->unpins);
+		job->unpins
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+		, job->reg_buffers);
+#else
+		);
+#endif
 	if (result < 0)
 		return result;
 
@@ -389,7 +413,12 @@ static int pin_job_mem(struct nvhost_job *job)
 		&job->pin_ids[job->num_relocs],
 		&job->addr_phys[job->num_relocs],
 		job->num_gathers,
-		&job->unpins[job->num_unpins]);
+		&job->unpins[job->num_unpins]
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+		, job->reg_buffers);
+#else
+		);
+#endif
 	if (result < 0) {
 		nvhost_job_unpin(job);
 		return result;
@@ -514,12 +543,25 @@ int nvhost_job_pin(struct nvhost_job *job, struct nvhost_syncpt *sp)
 		if (!g->buf) {
 			u64 end_offset;
 
-			g->buf = dma_buf_get(g->mem_id);
-			if (IS_ERR(g->buf)) {
-				err = PTR_ERR(g->buf);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+			xa_lock(job->reg_buffers);
+			g->buf = xa_load(job->reg_buffers, g->mem_id);
+			if (!g->buf) {
+				xa_unlock(job->reg_buffers);
+				err = -EINVAL;
 				g->buf = NULL;
 				break;
 			}
+			get_dma_buf(g->buf);
+			xa_unlock(job->reg_buffers);
+#else
+			g->buf = dma_buf_get(g->mem_id);
+			if (IS_ERR(g->buf)) {
+				err = -EINVAL;
+				g->buf = NULL;
+				break;
+			}
+#endif
 
 			end_offset = (u64)g->offset + (u64)g->words * 4;
 			if (end_offset > g->buf->size) {
@@ -545,6 +587,7 @@ int nvhost_job_pin(struct nvhost_job *job, struct nvhost_syncpt *sp)
 				break;
 		}
 	}
+
 fail:
 	return err;
 }
