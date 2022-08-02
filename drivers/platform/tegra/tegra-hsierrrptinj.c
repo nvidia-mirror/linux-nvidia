@@ -93,8 +93,14 @@ static struct dentry *hsierrrptinj_debugfs_root;
 /* This file will point to `/sys/kernel/debug/tegra_hsierrrptinj/hsierrrpt`. */
 static const char *hsierrrptinj_debugfs_name = "hsierrrpt";
 
-/* This array stores callbacks registered by IP Drivers */
-static hsierrrpt_inj ip_driver_cb[NUM_IPS][MAX_INSTANCE] = {{NULL}};
+/* Data type to store IP Drivers callbacks and auxiliary data */
+struct hsierrrptinj_inj_cb_data {
+	hsierrrpt_inj cb;
+	void *data;
+};
+
+/* This array stores callbacks and auxiliary data registered by IP Drivers */
+static struct hsierrrptinj_inj_cb_data ip_driver_cb_data[NUM_IPS][MAX_INSTANCE] = {NULL};
 
 /* Data type for mailbox client and channel details */
 struct hsierrrptinj_hsp_sm {
@@ -106,7 +112,7 @@ static struct hsierrrptinj_hsp_sm hsierrrptinj_tx;
 
 
 /* Register Error callbacks from IP Drivers */
-int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func)
+int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data)
 {
 	pr_debug("tegra-hsierrrptinj: Register callback for IP Driver 0x%04x\n", ip_id);
 
@@ -125,18 +131,47 @@ int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt
 		return -EINVAL;
 	}
 
-	if (ip_driver_cb[ip_id][instance_id] != NULL) {
+	if (ip_driver_cb_data[ip_id][instance_id].cb != NULL) {
 		pr_err("tegra-hsierrrptinj: Callback for 0x%04X already registered\n", ip_id);
 		return -EINVAL;
 	}
 
-	ip_driver_cb[ip_id][instance_id] = cb_func;
+	ip_driver_cb_data[ip_id][instance_id].cb = cb_func;
+	ip_driver_cb_data[ip_id][instance_id].data = aux_data;
 
 	pr_debug("tegra-hsierrrptinj: Successfully registered callback for 0x%04X\n", ip_id);
 
 	return 0;
 }
 EXPORT_SYMBOL(hsierrrpt_reg_cb);
+
+/* De-register Error callbacks from IP Drivers */
+int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
+{
+	pr_debug("tegra-hsierrrptinj: De-register callback for IP Driver 0x%04x\n", ip_id);
+
+	if (ip_id >= NUM_IPS || ip_id < 0) {
+		pr_err("tegra-hsierrrptinj: Invalid IP ID 0x%04x\n", ip_id);
+		return -EINVAL;
+	}
+
+	if (instance_id >= ip_instances[ip_id]) {
+		pr_err("tegra-hsierrrptinj: Invalid instance 0x%04x\n", instance_id);
+		return -EINVAL;
+	}
+
+	if (ip_driver_cb_data[ip_id][instance_id].cb == NULL) {
+		pr_err("tegra-hsierrrptinj: Callback for 0x%04X has not been registered\n", ip_id);
+		return -EINVAL;
+	}
+
+	ip_driver_cb_data[ip_id][instance_id].cb = NULL;
+
+	pr_debug("tegra-hsierrrptinj: Successfully de-registered callback for 0x%04X\n", ip_id);
+
+	return 0;
+}
+EXPORT_SYMBOL(hsierrrpt_dereg_cb);
 
 /* Report errors to FSI */
 static int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
@@ -266,8 +301,9 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char __user *buf, si
 	 * We want certain logging statements to appear in the kernel log with the
 	 * OOTB level configuration. Therefore use pr_err for those statements.
 	 */
-	if (ip_driver_cb[ip_id][instance_id] != NULL) {
-		ret = ip_driver_cb[ip_id][instance_id](instance_id, error_report);
+	if (ip_driver_cb_data[ip_id][instance_id].cb != NULL) {
+		ret = ip_driver_cb_data[ip_id][instance_id].cb(instance_id, error_report,
+						ip_driver_cb_data[ip_id][instance_id].data);
 		pr_err("tegra-hsierrrptinj: Triggered registered error report callback\n");
 	} else {
 		ret = epl_report_error(error_report);

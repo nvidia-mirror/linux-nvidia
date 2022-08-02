@@ -58,6 +58,7 @@ IP_DLA   = 0x0009
  *
  * @param[in]   instance_id             Instance of supported IP.
  * @param[in]   err_rpt_frame           Error frame to be reported.
+ * @param[in]   aux_data                Auxiliary data shared by IP drivers
  *
  * API signature for the common callback function that will be
  * implemented by the set of Tegra onchip IP drivers that report HSI
@@ -69,7 +70,7 @@ IP_DLA   = 0x0009
  *  -EFAULT     (On IP driver failure to report error)
  *  -ETIME      (On timeout in IP driver)
  */
-typedef int (*hsierrrpt_inj)(unsigned int instance_id, struct epl_error_report_frame err_rpt_frame);
+typedef int (*hsierrrpt_inj)(unsigned int instance_id, struct epl_error_report_frame err_rpt_frame, void *aux_data);
 
 #if IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ)
 
@@ -79,6 +80,7 @@ typedef int (*hsierrrpt_inj)(unsigned int instance_id, struct epl_error_report_f
  * @param[in]   ip_id                   Supported IP Id.
  * @param[in]   instance_id             Instance of supported IP.
  * @param[in]   cb_func                 Pointer to callback function.
+ * @param[in]   aux_data                Auxiliary data shared by IP drivers
  *
  * API to register the HSI error report trigger callback function
  * with the utility. Tegra onchip IP drivers supporting HSI error
@@ -89,11 +91,35 @@ typedef int (*hsierrrpt_inj)(unsigned int instance_id, struct epl_error_report_f
  *  -EINVAL     (On invalid arguments)
  *  -ENODEV     (On device driver not loaded)
  */
-int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func);
+int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data);
+
+/**
+ * @brief HSI error report injection callback de-registration
+ *
+ * @param[in]   ip_id                   Supported IP Id.
+ * @param[in]   instance_id             Instance of supported IP.
+ *
+ *
+ * API to de-register the HSI error report trigger callback function
+ * with the utility. Tegra onchip IP drivers supporting HSI error
+ * reporting to FSI shall call this API during exit time.
+ *
+ * @returns
+ *  0           (success)
+ *  -EINVAL     (On invalid arguments)
+ *  -ENODEV     (On device driver not loaded)
+ */
+int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id);
 
 #else
 
-inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func)
+inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data)
+{
+	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
+	return -ENODEV;
+}
+
+inline int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
 {
 	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
 	return -ENODEV;
