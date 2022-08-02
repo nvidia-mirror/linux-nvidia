@@ -40,16 +40,16 @@
  * Note: Any update to this enum must be reflected in the macro NUM_IPS.
  */
 typedef enum {
-IP_EQOS  = 0x0000,
+IP_OTHER = 0x0000,
 IP_GPU   = 0x0001,
-IP_I2C   = 0x0002,
+IP_EQOS  = 0x0002,
 IP_MGBE  = 0x0003,
 IP_PCIE  = 0x0004,
 IP_PSC   = 0x0005,
-IP_QSPI  = 0x0006,
-IP_TSEC  = 0x0007,
+IP_I2C   = 0x0006,
+IP_QSPI  = 0x0007,
 IP_SDMMC = 0x0008,
-IP_DLA   = 0x0009
+IP_TSEC  = 0x0009
 } hsierrrpt_ipid_t;
 
 
@@ -115,14 +115,14 @@ int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id);
 
 inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data)
 {
-	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
-	return -ENODEV;
+	pr_info("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
+	return 0;
 }
 
 inline int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
 {
-	pr_err("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
-	return -ENODEV;
+	pr_info("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
+	return 0;
 }
 
 #endif /* CONFIG_TEGRA_HSIERRRPTINJ */
