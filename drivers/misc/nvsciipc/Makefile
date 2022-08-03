@@ -15,7 +15,7 @@
 
 ccflags-y += -Werror
 ccflags-y += -I$(srctree.nvidia)/include/
-
+ccflags-y += -I$(PWD)
 
 # Make as module for OOT module build
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)

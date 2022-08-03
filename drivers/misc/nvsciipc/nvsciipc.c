@@ -29,6 +29,7 @@
 #include <linux/mutex.h>
 #include <linux/cred.h>
 #include <linux/of.h>
+#include <linux/fs.h>
 
 #include <linux/version.h>
 #ifdef CONFIG_TEGRA_VIRTUALIZATION
@@ -79,20 +80,17 @@ NvSciError NvSciIpcEndpointValidateAuthTokenLinuxCurrent(
 	int i, ret;
 	char node[NVSCIIPC_MAX_EP_NAME+11];
 
+	if ((ctx == NULL) || (ctx->set_db_f != true)) {
+		ERR("not initialized\n");
+		return NvSciError_NotInitialized;
+	}
+
 	f = fdget((int)authToken);
 	if (!f.file) {
 		ERR("invalid auth token\n");
 		return NvSciError_BadParameter;
 	}
 	filp = f.file;
-
-	mutex_lock(&nvsciipc_mutex);
-	if (ctx == NULL) {
-		mutex_unlock(&nvsciipc_mutex);
-		fdput(f);
-		ERR("not initialized\n");
-		return NvSciError_NotInitialized;
-	}
 
 	for (i = 0; i < ctx->num_eps; i++) {
 		ret = snprintf(node, sizeof(node), "%s%d",
@@ -109,12 +107,10 @@ NvSciError NvSciIpcEndpointValidateAuthTokenLinuxCurrent(
 	}
 
 	if (i == ctx->num_eps) {
-		mutex_unlock(&nvsciipc_mutex);
 		fdput(f);
 		ERR("wrong auth token passed\n");
 		return NvSciError_BadParameter;
 	}
-	mutex_unlock(&nvsciipc_mutex);
 
 	fdput(f);
 
@@ -125,36 +121,46 @@ EXPORT_SYMBOL(NvSciIpcEndpointValidateAuthTokenLinuxCurrent);
 NvSciError NvSciIpcEndpointMapVuid(NvSciIpcEndpointVuid localUserVuid,
 		NvSciIpcTopoId *peerTopoId, NvSciIpcEndpointVuid *peerUserVuid)
 {
+	uint32_t backend = NVSCIIPC_BACKEND_UNKNOWN;
 	int i;
+	NvSciError ret;
 
-	mutex_lock(&nvsciipc_mutex);
-	if (ctx == NULL) {
-		mutex_unlock(&nvsciipc_mutex);
+	if ((peerTopoId == NULL) || (peerUserVuid == NULL)) {
+		ERR("Invalid parameter\n");
+		return NvSciError_BadParameter;
+	}
+
+	if ((ctx == NULL) || (ctx->set_db_f != true)) {
 		ERR("not initialized\n");
 		return NvSciError_NotInitialized;
 	}
 
-
 	for (i = 0; i < ctx->num_eps; i++) {
-		if (ctx->db[i]->vuid == localUserVuid)
+		if (ctx->db[i]->vuid == localUserVuid) {
+			backend = ctx->db[i]->backend;
 			break;
+		}
 	}
 
 	if (i == ctx->num_eps) {
-		mutex_unlock(&nvsciipc_mutex);
 		ERR("wrong localUserVuid passed\n");
 		return NvSciError_BadParameter;
 	}
 
-	mutex_unlock(&nvsciipc_mutex);
+	switch (backend) {
+	case NVSCIIPC_BACKEND_ITC:
+	case NVSCIIPC_BACKEND_IPC:
+		peerTopoId->SocId = NVSCIIPC_SELF_SOCID;
+		peerTopoId->VmId = NVSCIIPC_SELF_VMID;
+		*peerUserVuid = (localUserVuid ^ 1UL);
+		ret = NvSciError_Success;
+		break;
+	default:
+		ret = NvSciError_NotSupported;
+		break;
+	}
 
-	*peerUserVuid = (localUserVuid ^ 1);
-	peerTopoId->VmId = ((localUserVuid >> NVSCIIPC_VUID_VMID_SHIFT)
-			   & NVSCIIPC_VUID_VMID_MASK);
-	peerTopoId->SocId = ((localUserVuid >> NVSCIIPC_VUID_SOCID_SHIFT)
-			    & NVSCIIPC_VUID_SOCID_MASK);
-
-	return NvSciError_Success;
+	return ret;
 }
 EXPORT_SYMBOL(NvSciIpcEndpointMapVuid);
 
@@ -172,7 +178,7 @@ static void nvsciipc_free_db(struct nvsciipc *ctx)
 {
 	int i;
 
-	if (ctx->num_eps != 0) {
+	if ((ctx->num_eps != 0) && (ctx->set_db_f == true)) {
 		for (i = 0; i < ctx->num_eps; i++)
 			kfree(ctx->db[i]);
 
@@ -189,22 +195,96 @@ static int nvsciipc_dev_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static int nvsciipc_ioctl_get_db_by_name(struct nvsciipc *ctx, unsigned int cmd,
+		unsigned long arg)
+{
+	struct nvsciipc_get_db_by_name get_db;
+	int i;
+
+	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
+		ERR("need to set endpoint database first\n");
+		return -EPERM;
+	}
+
+	if (copy_from_user(&get_db, (void __user *)arg, _IOC_SIZE(cmd))) {
+		ERR("%s : copy_from_user failed\n", __func__);
+		return -EFAULT;
+	}
+
+	/* read operation */
+	for (i = 0; i < ctx->num_eps; i++) {
+		if (!strncmp(get_db.ep_name, ctx->db[i]->ep_name,
+			NVSCIIPC_MAX_EP_NAME)) {
+			get_db.entry = *ctx->db[i];
+			get_db.idx = i;
+			break;
+		}
+	}
+
+	if (i == ctx->num_eps) {
+		return -ENOENT;
+	} else if (copy_to_user((void __user *)arg, &get_db,
+				_IOC_SIZE(cmd))) {
+		ERR("%s : copy_to_user failed\n", __func__);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int nvsciipc_ioctl_get_db_by_vuid(struct nvsciipc *ctx, unsigned int cmd,
+		unsigned long arg)
+{
+	struct nvsciipc_get_db_by_vuid get_db;
+	int i;
+
+	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
+		ERR("need to set endpoint database first\n");
+		return -EPERM;
+	}
+
+	if (copy_from_user(&get_db, (void __user *)arg, _IOC_SIZE(cmd))) {
+		ERR("%s : copy_from_user failed\n", __func__);
+		return -EFAULT;
+	}
+
+	/* read operation */
+	for (i = 0; i < ctx->num_eps; i++) {
+		if (get_db.vuid == ctx->db[i]->vuid) {
+			get_db.entry = *ctx->db[i];
+			get_db.idx = i;
+			break;
+		}
+	}
+
+	if (i == ctx->num_eps) {
+		return -ENOENT;
+	} else if (copy_to_user((void __user *)arg, &get_db,
+				_IOC_SIZE(cmd))) {
+		ERR("%s : copy_to_user failed\n", __func__);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 static int nvsciipc_ioctl_get_vuid(struct nvsciipc *ctx, unsigned int cmd,
-				   unsigned long arg)
+		unsigned long arg)
 {
 	struct nvsciipc_get_vuid get_vuid;
 	int i;
+
+	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
+		ERR("need to set endpoint database first\n");
+		return -EPERM;
+	}
 
 	if (copy_from_user(&get_vuid, (void __user *)arg, _IOC_SIZE(cmd))) {
 		ERR("%s : copy_from_user failed\n", __func__);
 		return -EFAULT;
 	}
 
-	if (ctx->num_eps == 0) {
-		ERR("need to set endpoint database first\n");
-		return -EINVAL;
-	}
-
+	/* read operation */
 	for (i = 0; i < ctx->num_eps; i++) {
 		if (!strncmp(get_vuid.ep_name, ctx->db[i]->ep_name,
 			NVSCIIPC_MAX_EP_NAME)) {
@@ -214,8 +294,7 @@ static int nvsciipc_ioctl_get_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	}
 
 	if (i == ctx->num_eps) {
-		ERR("wrong endpoint name passed\n");
-		return -EINVAL;
+		return -ENOENT;
 	} else if (copy_to_user((void __user *)arg, &get_vuid,
 				_IOC_SIZE(cmd))) {
 		ERR("%s : copy_to_user failed\n", __func__);
@@ -226,22 +305,22 @@ static int nvsciipc_ioctl_get_vuid(struct nvsciipc *ctx, unsigned int cmd,
 }
 
 static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
-				 unsigned long arg)
+		unsigned long arg)
 {
 	struct nvsciipc_db user_db;
 	struct nvsciipc_config_entry **entry_ptr;
-	int vmid = 0;
 	int ret = 0;
 	int i;
 
+	/* check root user */
 	if (current_cred()->uid.val != 0) {
 		ERR("no permission to set db\n");
 		return -EPERM;
 	}
 
-	if (ctx->num_eps != 0) {
+	if ((ctx->num_eps != 0) || (ctx->set_db_f == true)) {
 		INFO("nvsciipc db is set already\n");
-		return -EINVAL;
+		return -EPERM;
 	}
 
 	if (copy_from_user(&user_db, (void __user *)arg, _IOC_SIZE(cmd))) {
@@ -305,21 +384,30 @@ static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
 	}
 
 #ifdef CONFIG_TEGRA_VIRTUALIZATION
-	if (is_tegra_hypervisor_mode()) {
-		ret = hyp_read_gid(&vmid);
-		if (ret != 0) {
-			ERR("Failed to read guest id\n");
-			goto ptr_error;
+	{
+		int vmid = -1;
+
+		if (is_tegra_hypervisor_mode()) {
+			ret = hyp_read_gid(&vmid);
+			if (ret != 0) {
+				ERR("Failed to read guest id\n");
+				goto ptr_error;
+			}
+		}
+
+		if (vmid != -1) {
+			for (i = 0; i < ctx->num_eps; i++) {
+				ctx->db[i]->vuid |= ((vmid & NVSCIIPC_VUID_VMID_MASK)
+					<< NVSCIIPC_VUID_VMID_SHIFT);
+			}
 		}
 	}
-#endif
-
-	for (i = 0; i < ctx->num_eps; i++) {
-		ctx->db[i]->vuid |= ((vmid & NVSCIIPC_VUID_VMID_MASK)
-				    << NVSCIIPC_VUID_VMID_SHIFT);
-	}
+#endif  /* CONFIG_TEGRA_VIRTUALIZATION */
 
 	kfree(entry_ptr);
+
+	ctx->set_db_f = true;
+
 	return ret;
 
 ptr_error:
@@ -366,9 +454,13 @@ static long nvsciipc_dev_ioctl(struct file *filp, unsigned int cmd,
 		mutex_unlock(&nvsciipc_mutex);
 		break;
 	case NVSCIIPC_IOCTL_GET_VUID:
-		mutex_lock(&nvsciipc_mutex);
 		ret = nvsciipc_ioctl_get_vuid(ctx, cmd, arg);
-		mutex_unlock(&nvsciipc_mutex);
+		break;
+	case NVSCIIPC_IOCTL_GET_DB_BY_NAME:
+		ret = nvsciipc_ioctl_get_db_by_name(ctx, cmd, arg);
+		break;
+	case NVSCIIPC_IOCTL_GET_DB_BY_VUID:
+		ret = nvsciipc_ioctl_get_db_by_vuid(ctx, cmd, arg);
 		break;
 	default:
 		ERR("unrecognised ioctl cmd: 0x%x\n", cmd);
@@ -379,12 +471,44 @@ static long nvsciipc_dev_ioctl(struct file *filp, unsigned int cmd,
 	return ret;
 }
 
+static ssize_t nvsciipc_dbg_read(struct file *filp, char __user *buf,
+		size_t count, loff_t *f_pos)
+{
+	struct nvsciipc *ctx = filp->private_data;
+	int i;
+
+	/* check root user */
+	if (current_cred()->uid.val != 0) {
+		ERR("no permission to read db\n");
+		return -EPERM;
+	}
+
+	if (ctx->set_db_f != true) {
+		ERR("need to set endpoint database first\n");
+		return -EPERM;
+	}
+
+	for (i = 0; i < ctx->num_eps; i++) {
+		INFO("EP[%03d]: ep_name: %s, dev_name: %s, backend: %u, nframes: %u, "
+		"frame_size: %u, id: %u\n", i,
+		ctx->db[i]->ep_name,
+		ctx->db[i]->dev_name,
+		ctx->db[i]->backend,
+		ctx->db[i]->nframes,
+		ctx->db[i]->frame_size,
+		ctx->db[i]->id);
+	}
+
+	return 0;
+}
+
 static const struct file_operations nvsciipc_fops = {
-	.owner          = THIS_MODULE,
-	.open           = nvsciipc_dev_open,
-	.release        = nvsciipc_dev_release,
-	.unlocked_ioctl = nvsciipc_dev_ioctl,
-	.llseek         = no_llseek,
+	.owner		= THIS_MODULE,
+	.open		= nvsciipc_dev_open,
+	.release		= nvsciipc_dev_release,
+	.unlocked_ioctl	= nvsciipc_dev_ioctl,
+	.llseek		= no_llseek,
+	.read		= nvsciipc_dbg_read,
 };
 
 static int nvsciipc_probe(struct platform_device *pdev)
@@ -403,6 +527,7 @@ static int nvsciipc_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto error;
 	}
+	ctx->set_db_f = false;
 
 	ctx->dev = &(pdev->dev);
 	platform_set_drvdata(pdev, ctx);
@@ -416,7 +541,7 @@ static int nvsciipc_probe(struct platform_device *pdev)
 	ctx->nvsciipc_class = class_create(THIS_MODULE, MODULE_NAME);
 	if (IS_ERR(ctx->nvsciipc_class)) {
 		ERR("failed to create class: %ld\n",
-		    PTR_ERR(ctx->nvsciipc_class));
+			PTR_ERR(ctx->nvsciipc_class));
 		ret = PTR_ERR(ctx->nvsciipc_class);
 		goto error;
 	}
@@ -461,9 +586,7 @@ static void nvsciipc_cleanup(struct nvsciipc *ctx)
 	if (ctx == NULL)
 		return;
 
-	mutex_lock(&nvsciipc_mutex);
 	nvsciipc_free_db(ctx);
-	mutex_unlock(&nvsciipc_mutex);
 
 	if (ctx->device != NULL) {
 		cdev_del(&ctx->cdev);

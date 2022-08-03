@@ -34,7 +34,9 @@
 
 #include <linux/ioctl.h>
 
-#define NVSCIIPC_MAX_EP_NAME      64
+#define NVSCIIPC_MAX_EP_NAME	64U
+#define NVSCIIPC_MAX_RDMA_NAME	64U
+#define NVSCIIPC_MAX_IP_NAME	16U
 
 struct nvsciipc_config_entry {
 	/* endpoint name */
@@ -50,6 +52,11 @@ struct nvsciipc_config_entry {
 	 */
 	uint32_t id;
 	uint64_t vuid;  /* VM-wide unique id */
+	char rdma_dev_name[NVSCIIPC_MAX_RDMA_NAME];
+	char remote_ip[NVSCIIPC_MAX_IP_NAME];
+	uint32_t remote_port;
+	uint32_t local_port;
+	uint32_t reserved;
 };
 
 struct nvsciipc_db {
@@ -62,6 +69,18 @@ struct nvsciipc_get_vuid {
 	uint64_t vuid;
 };
 
+struct nvsciipc_get_db_by_name {
+	char ep_name[NVSCIIPC_MAX_EP_NAME];
+	struct nvsciipc_config_entry entry;
+	uint32_t idx;
+};
+
+struct nvsciipc_get_db_by_vuid {
+	uint64_t vuid;
+	struct nvsciipc_config_entry entry;
+	uint32_t idx;
+};
+
 /* IOCTL magic number - seen available in ioctl-number.txt*/
 #define NVSCIIPC_IOCTL_MAGIC    0xC3
 
@@ -71,6 +90,12 @@ struct nvsciipc_get_vuid {
 #define NVSCIIPC_IOCTL_GET_VUID \
 	_IOWR(NVSCIIPC_IOCTL_MAGIC, 2, struct nvsciipc_get_vuid)
 
-#define NVSCIIPC_IOCTL_NUMBER_MAX 2
+#define NVSCIIPC_IOCTL_GET_DB_BY_NAME \
+	_IOWR(NVSCIIPC_IOCTL_MAGIC, 3, struct nvsciipc_get_db_by_name)
+
+#define NVSCIIPC_IOCTL_GET_DB_BY_VUID \
+	_IOWR(NVSCIIPC_IOCTL_MAGIC, 4, struct nvsciipc_get_db_by_vuid)
+
+#define NVSCIIPC_IOCTL_NUMBER_MAX 4
 
 #endif /* __NVSCIIPC_IOCTL_H__ */
