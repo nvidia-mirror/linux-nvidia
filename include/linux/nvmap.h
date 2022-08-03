@@ -3,7 +3,7 @@
  *
  * structure declarations for nvmem and nvmap user-space ioctls
  *
- * Copyright (c) 2009-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -22,6 +22,7 @@
 #include <linux/file.h>
 #include <linux/dma-buf.h>
 #include <linux/device.h>
+#include <linux/version.h>
 #include <uapi/linux/nvmap.h>
 
 #define NVMAP_HEAP_IOVMM   (1ul<<30)
@@ -61,7 +62,10 @@ static inline ulong nvmap_page_pool_get_unused_pages(void)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 ulong nvmap_iovmm_get_used_pages(void);
+#endif
+
 int nvmap_register_vidmem_carveout(struct device *dma_dev,
 		phys_addr_t base, size_t size);
 

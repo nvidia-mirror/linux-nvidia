@@ -1329,6 +1329,7 @@ static int nvmap_debug_iovmm_procrank_show(struct seq_file *s, void *unused)
 DEBUGFS_OPEN_FOPS(iovmm_procrank);
 #endif /* NVMAP_CONFIG_PROCRANK */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 ulong nvmap_iovmm_get_used_pages(void)
 {
 	u64 total;
@@ -1336,6 +1337,7 @@ ulong nvmap_iovmm_get_used_pages(void)
 	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_IOVMM);
 	return total >> PAGE_SHIFT;
 }
+#endif
 
 static void nvmap_iovmm_debugfs_init(void)
 {
