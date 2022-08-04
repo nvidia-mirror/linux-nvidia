@@ -1120,41 +1120,6 @@ do { \
 		"full in each clients \"%s\" that shared memory.\n", #x, #x); \
 } while (0)
 
-static int nvmap_debug_lru_allocations_show(struct seq_file *s, void *unused)
-{
-	struct nvmap_handle *h;
-	u32 total_handles = 0, migratable_handles = 0;
-	size_t total_size = 0, migratable_size = 0;
-
-	seq_printf(s, "%-18s %18s %8s %11s %8s %6s %6s %6s %6s %6s %8s\n",
-			"", "", "", "", "", "",
-			"", "PINS", "KMAPS", "UMAPS", "UID");
-	spin_lock(&nvmap_dev->lru_lock);
-	list_for_each_entry(h, &nvmap_dev->lru_handles, lru) {
-		total_handles++;
-		total_size += h->size;
-		if (!atomic_read(&h->pin) && !atomic_read(&h->kmap_count)) {
-			migratable_handles++;
-			migratable_size += h->size;
-		}
-		seq_printf(s, "%-18s %18s %8s %10zuK %8s %6s %6s %6u %6u "
-			"%6u %8p\n", "", "", "", K(h->size), "", "",
-			"", atomic_read(&h->pin),
-			    atomic_read(&h->kmap_count),
-			    atomic_read(&h->umap_count),
-			    h);
-	}
-	seq_printf(s, "total_handles = %u, migratable_handles = %u,"
-		"total_size=%zuK, migratable_size=%zuK\n",
-		total_handles, migratable_handles,
-		K(total_size), K(migratable_size));
-	spin_unlock(&nvmap_dev->lru_lock);
-	PRINT_MEM_STATS_NOTE(SIZE);
-	return 0;
-}
-
-DEBUGFS_OPEN_FOPS(lru_allocations);
-
 #ifdef NVMAP_CONFIG_PROCRANK
 struct procrank_stats {
 	struct vm_area_struct *vma;
