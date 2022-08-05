@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,18 +18,19 @@
 #include <linux/console.h>
 #include <linux/serial_core.h>
 
-#define NUM_BYTES_FIELD_BIT	24
-#define FLUSH_BIT		26
-#define INTR_TRIGGER_BIT	31
+#define NUM_BYTES_FIELD_BIT	24U
+#define FLUSH_BIT		26U
+#define INTR_TRIGGER_BIT	31U
 
 static u32 update_and_send_mbox(u8 __iomem *addr, u32 mbox_val, char c)
 {
-	int bytes = bytes = (mbox_val >> NUM_BYTES_FIELD_BIT) & 0x3;
+	unsigned int bytes = (mbox_val >> NUM_BYTES_FIELD_BIT) & 0x3U;
+	unsigned char uc = (unsigned char)c;
 
 	mbox_val |= BIT(INTR_TRIGGER_BIT);
-	mbox_val |= c << (bytes * 8);
+	mbox_val |= uc << (bytes * 8U);
 	bytes++;
-	mbox_val = (mbox_val & ~(3 << NUM_BYTES_FIELD_BIT)) |
+	mbox_val = (mbox_val & ~(3U << NUM_BYTES_FIELD_BIT)) |
 		(bytes << NUM_BYTES_FIELD_BIT);
 
 	if (bytes == 3) {
