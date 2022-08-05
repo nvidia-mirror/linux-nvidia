@@ -364,7 +364,7 @@ static void ep_test_dma_remove(struct pci_dev *pdev)
 	struct ep_pvt *ep = pci_get_drvdata(pdev);
 
 	debugfs_remove_recursive(ep->debugfs);
-	tegra_pcie_edma_deinit(ep->cookie);
+	tegra_pcie_edma_deinit(ep->edma.cookie);
 	dma_free_coherent(&pdev->dev, BAR0_SIZE, ep->dma_virt, ep->dma_phy);
 	free_irq(pci_irq_vector(pdev, 1), ep);
 	pci_free_irq_vectors(pdev);
