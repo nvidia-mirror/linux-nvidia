@@ -114,7 +114,7 @@ static int tegra_fde_dev_ioctl_process(struct tegra_fde_req *fde_req)
 		pr_err("%s: unable to copy result to user\n",
 		       __func__);
 		ret = -EFAULT;
-		goto free_ahash_req;
+		goto out;
 	}
 
 	input_buffer = kzalloc(16, GFP_KERNEL);
