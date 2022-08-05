@@ -423,36 +423,6 @@ static void nvmap_dmabuf_vunmap(struct dma_buf *dmabuf, struct dma_buf_map *map)
 }
 #endif
 
-int nvmap_dmabuf_set_drv_data(struct dma_buf *dmabuf,
-		struct device *dev, void *priv, void (*delete)(void *priv))
-{
-	struct nvmap_handle_info *info = dmabuf->priv;
-	struct nvmap_handle *handle = info->handle;
-	struct nvmap_handle_dmabuf_priv *curr = NULL;
-	int ret = 0;
-
-	mutex_lock(&handle->lock);
-	list_for_each_entry(curr, &handle->dmabuf_priv, list) {
-		if (curr->dev == dev) {
-			ret = -EEXIST;
-			goto unlock;
-		}
-	}
-
-	curr = kmalloc(sizeof(*curr), GFP_KERNEL);
-	if (!curr) {
-		ret = -ENOMEM;
-		goto unlock;
-	}
-	curr->priv = priv;
-	curr->dev = dev;
-	curr->priv_release = delete;
-	list_add_tail(&curr->list, &handle->dmabuf_priv);
-unlock:
-	mutex_unlock(&handle->lock);
-	return ret;
-}
-
 void *nvmap_dmabuf_get_drv_data(struct dma_buf *dmabuf,
 		struct device *dev)
 {
