@@ -582,6 +582,13 @@ static int tegra_hv_vse_safety_send_ivc_wait(
 	int err;
 
 	mutex_lock(&se_dev->server_lock);
+
+	if (!se_dev->host1x_pdev) {
+		dev_err(se_dev->dev, "host1x pdev not initialized\n");
+		err = -ENODATA;
+		goto exit;
+	}
+
 	/* Return error if engine is in suspended state */
 	if (atomic_read(&se_dev->se_suspended)) {
 		err = -ENODEV;
@@ -4298,6 +4305,13 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	if (!se_dev)
 		return -ENOMEM;
 
+	/* set host1x platform device */
+	err = se_get_nvhost_dev(se_dev);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to get nvhost dev with err: %d\n", err);
+		goto exit;
+	}
+
 	se_dev->dev = &pdev->dev;
 	err = of_property_read_u32(pdev->dev.of_node, "se-engine-id",
 				&engine_id);
@@ -4451,13 +4465,6 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	}
 
 	se_dev->engine_id = engine_id;
-
-	/* set host1x platform device */
-	err = se_get_nvhost_dev(se_dev);
-	if (err) {
-		dev_err(&pdev->dev, "Failed to get nvhost dev with err: %d\n", err);
-		goto exit;
-	}
 
 	/* Set Engine suspended state to false*/
 	atomic_set(&se_dev->se_suspended, 0);
