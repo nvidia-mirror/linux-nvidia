@@ -1,0 +1,11 @@
+version = "1.0.0"
+
+[oss]
+
+[oss.excluded]
+
+[[oss.excluded.directories]]
+paths = ['drivers/net/wireless/realtek/']
+comment = 'unused packages'
+nspect_ids = ['NSPECT-6R5S-W1WT','NSPECT-VX9G-CTNC']
+
