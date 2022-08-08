@@ -24,7 +24,6 @@ obj-$(CONFIG_TEGRA_BWMGR)               += emc_bwmgr-t21x.o emc_bwmgr-t18x.o emc
 obj-y                                   += tegra-mc-sid.o
 
 ifneq (,$(filter y,$(CONFIG_ARCH_TEGRA_18x_SOC) $(CONFIG_ARCH_TEGRA_186_SOC)))
-obj-y += mcerr_ecc_t18x.o
 obj-y += mc_addr_translate.o
 obj-y += mcerr-t18x.o
 obj-y += tegra18_emc.o
