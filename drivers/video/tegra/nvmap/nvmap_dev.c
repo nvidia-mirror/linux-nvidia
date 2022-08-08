@@ -338,8 +338,8 @@ static int nvmap_map(struct file *filp, struct vm_area_struct *vma)
 	char task_comm[TASK_COMM_LEN];
 
 	get_task_comm(task_comm, current);
-	pr_err("error: mmap not supported on nvmap file, pid=%d, %s\n",
-		task_tgid_nr(current), task_comm);
+	pr_debug("error: mmap not supported on nvmap file, pid=%d, %s\n",
+		  task_tgid_nr(current), task_comm);
 	return -EPERM;
 }
 
