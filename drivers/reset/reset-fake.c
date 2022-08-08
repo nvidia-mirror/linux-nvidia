@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,7 +31,7 @@ static struct reset_control_ops fake_reset_ops = {
 	.reset		= fake_reset_op,
 };
 
-int register_fake_reset(int num_resets, struct platform_device *pdev)
+static int register_fake_reset(int num_resets, struct platform_device *pdev)
 {
 	struct reset_controller_dev *rcdev;
 
