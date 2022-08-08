@@ -14,6 +14,7 @@
 
 #include "mods_internal.h"
 
+#include <linux/limits.h>
 #include <linux/tee_drv.h>
 #include <linux/uuid.h>
 
@@ -95,6 +96,15 @@ int esc_mods_invoke_optee_ta(struct mods_client *client,
 	ret = tee_client_invoke_func(ctx, &invoke_arg, params);
 	if (ret < 0) {
 		cl_info("tee_client_invoke_func failed.\n");
+		goto out_shm;
+	}
+
+	/*
+	 * OP-TEE complies with GlobalPlatform API specification.
+	 * Its output value(TEEC_VALUE) should be in the u32 range.
+	 */
+	if (params[1].u.value.a > U32_MAX || params[1].u.value.b > U32_MAX) {
+		ret = EOVERFLOW;
 		goto out_shm;
 	}
 	memmove(p->buf, temp_buf, p->buf_size);
