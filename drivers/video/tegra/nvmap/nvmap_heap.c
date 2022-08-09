@@ -530,7 +530,7 @@ fail:
 /* nvmap_heap_destroy: frees all resources in heap */
 void nvmap_heap_destroy(struct nvmap_heap *heap)
 {
-	WARN_ON(!list_is_singular(&heap->all_list));
+	WARN_ON(!list_empty(&heap->all_list));
 	while (!list_empty(&heap->all_list)) {
 		struct list_block *l;
 		l = list_first_entry(&heap->all_list, struct list_block,
