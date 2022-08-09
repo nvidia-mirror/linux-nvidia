@@ -100,7 +100,7 @@ int nvmap_query_heap_peer(struct nvmap_heap *heap)
 size_t nvmap_query_heap_size(struct nvmap_heap *heap)
 {
 	if (!heap)
-		return -EINVAL;
+		return 0;
 
 	return heap->len;
 }
