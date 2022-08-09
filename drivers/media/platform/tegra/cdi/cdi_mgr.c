@@ -434,7 +434,7 @@ static int __cdi_create_dev(
 		       cdi_mgr->adap->nr, cdi_dev->cfg.addr);
 
 	if (err < 0) {
-		dev_err(cdi_mgr->dev, "encoding error: %d", err);
+		dev_err(cdi_mgr->dev, "output error: %d", err);
 		goto dev_create_err;
 	}
 
@@ -470,12 +470,11 @@ static int __cdi_create_dev(
 	list_add(&cdi_dev->list, &cdi_mgr->dev_list);
 	mutex_unlock(&cdi_mgr->mutex);
 
+	return cdi_dev->id;
+
 dev_create_err:
-	if (err) {
-		devm_kfree(cdi_mgr->dev, cdi_dev);
-		return err;
-	} else
-		return cdi_dev->id;
+	devm_kfree(cdi_mgr->dev, cdi_dev);
+	return err;
 }
 
 static int cdi_create_dev(struct cdi_mgr_priv *cdi_mgr, const void __user *arg)
