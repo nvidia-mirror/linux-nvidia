@@ -21,6 +21,8 @@
 #include <linux/cdev.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
+#include <linux/pid.h>
 
 #ifdef CONFIG_PM_SLEEP
 #include <linux/suspend.h>
@@ -993,11 +995,33 @@ static int notify_client(char *msg, int msg_size)
 	struct tegra_hv_pm_ctl *data = tegra_hv_pm_ctl_data;
 	struct sk_buff *skb_out;
 	struct nlmsghdr *nlh;
+	struct pid *pid;
+	struct task_struct *task;
 	uint32_t i;
 	int ret = 0;
 
 	spin_lock(&netlink_lock);
 	for (i = 0; i < user_client_count; i++) {
+
+		if (user_client[i].client_pid == 0)
+			continue;
+
+		/* Check whether process is still alive or not
+		 * or the process has been killed without
+		 * deregistering itself.
+		 */
+		pid = find_vpid(user_client[i].client_pid);
+		if (pid == NULL) {
+			user_client[i].client_pid = 0;
+			continue;
+		}
+
+		task = pid_task(pid, PIDTYPE_PID);
+		if (task == NULL) {
+			user_client[i].client_pid = 0;
+			continue;
+		}
+
 		skb_out = nlmsg_new(msg_size, 0);
 		if (!skb_out) {
 			dev_err(data->dev, "Failed to allocate new skb\n");
