@@ -618,7 +618,7 @@ int nvmap_get_dmabuf_fd(struct nvmap_client *client, struct nvmap_handle *h,
 		return PTR_ERR(dmabuf);
 
 	fd = __nvmap_dmabuf_fd(client, dmabuf, O_CLOEXEC);
-	if (IS_ERR_VALUE((uintptr_t)fd))
+	if (fd < 0)
 		dma_buf_put(dmabuf);
 	return fd;
 }
