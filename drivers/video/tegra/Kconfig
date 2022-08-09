@@ -241,6 +241,15 @@ config MAXIM_GMSL_DP_SERIALIZER
 	 The Maxim serializer will take this DP output,
 	 and convert it into GMSL video data.
 
+config TI_FPDLINK_DP_SERIALIZER
+	bool "TI FPDLINK DP Serializer"
+	depends on I2C
+	help
+	 This driver supports the TI FPDLINK DP Serializer.
+	 The Tegra SOC will send DP output to the TI serializer.
+	 The TI serializer will take this DP output,
+	 and convert it into FPDLINK video data.
+
 config TEGRA_EDP2LVDS_PS8625
 	bool "Enable EDP2LVDS PS8625 bridge."
 	default n

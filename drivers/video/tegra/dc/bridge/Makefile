@@ -15,3 +15,4 @@ obj-$(CONFIG_TEGRA_DS90UH948Q_DESER)    += ds90uh948q_deser.o
 obj-$(CONFIG_TEGRA_EDP2LVDS_PS8625) += ps8625_edp2lvds.o
 obj-$(CONFIG_TEGRA_HDMI2GMSL_MAX929x) += max929x_hdmi2gmsl.o
 obj-$(CONFIG_MAXIM_GMSL_DP_SERIALIZER) += maxim_gmsl_dp_serializer.o
+obj-$(CONFIG_TI_FPDLINK_DP_SERIALIZER) += ti_fpdlink_dp_serializer.o
