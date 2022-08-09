@@ -187,7 +187,7 @@ static void debugfs_create_smmu_cb(struct smmu_debugfs_info *smmu_dfs, u8 cbndx)
 	struct debugfs_regset32 *cb;
 	int err;
 
-	err = sprintf(name, "cb%03d", cbndx);
+	err = sprintf(name, "cb%03u", cbndx);
 	if (err < 0) {
 		pr_err("%s: %d: sprintf failed to write\n", __func__, __LINE__);
 		return;
@@ -658,7 +658,7 @@ void arm_smmu_debugfs_add_master(struct device *dev,
 		kfree(master);
 		return;
 	}
-	err = sprintf(target, "../../cb%03d", *cbndx);
+	err = sprintf(target, "../../cb%03u", *cbndx);
 	if (err < 0) {
 		pr_err("%s: %d: sprintf failed to write\n", __func__, __LINE__);
 		debugfs_remove_recursive(master->dent);
