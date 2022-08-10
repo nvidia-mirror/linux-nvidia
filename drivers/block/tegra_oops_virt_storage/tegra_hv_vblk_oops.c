@@ -46,6 +46,15 @@
 static struct vblk_dev *vblkdev_oops;
 static struct pstore_zone_info pstore_zone;
 
+/*avg. wait time for storage operations*/
+#define WAIT_FOR_EMMC_READ_MS			2
+#define WAIT_FOR_EMMC_WRITE_MS			3
+#define WAIT_FOR_UFS_READ_MS			3
+#define WAIT_FOR_UFS_WRITE_MS			5
+#define VSC_RESPONSE_RETRIES_AVG_MS		1
+#define VSC_RESPONSE_RETRIES_WORST_EMMC_MS	30000
+#define VSC_RESPONSE_RETRIES_WORST_UFS_MS	30000
+
 #define POPULATE_BLK_REQ(x, req_type, req_opr, opr_offset, num_of_blk, opr_data_offset) \
 do { \
 	x.type = req_type;\
@@ -55,6 +64,69 @@ do { \
 	x.blkdev_req.blk_req.data_offset = opr_data_offset; \
 } while (0)
 
+static int32_t wait_for_fops_completion(struct vblk_dev *vblkdev_oops, bool is_read)
+{
+	int32_t retry;
+	int32_t sleep;
+
+	/*
+	 * 1. wait for response from Storage Server with
+	 *    average weighted.
+	 * 2. If we did not get the response then we wait
+	 *    for the response from Storage Server for every
+	 *    1ms with wrost case scenario.
+	 * 3. Below data represents read and write operation.
+	 *    Time taken in worst case:-
+	 *      UFS :- 1.5 secs
+	 *      EMMC :- 2secs
+	 *
+	 *    Time taken in average time :-
+	 *            EMMC         UFS
+	 *    read    2ms          3ms
+	 *    write   3ms          5ms
+	 */
+	if (vblkdev_oops->config.phys_dev == VSC_DEV_EMMC) {
+		if (is_read)
+			sleep = WAIT_FOR_EMMC_READ_MS;
+		else
+			sleep = WAIT_FOR_EMMC_WRITE_MS;
+	} else if (vblkdev_oops->config.phys_dev == VSC_DEV_UFS) {
+		if (is_read)
+			sleep = WAIT_FOR_UFS_READ_MS;
+		else
+			sleep = WAIT_FOR_UFS_WRITE_MS;
+	} else {
+		dev_err(vblkdev_oops->device, "not supportted for QSPI device\n");
+		retry = -1;
+		return retry;
+	}
+
+	retry = VSC_RESPONSE_RETRIES_AVG_MS;
+	while (!tegra_hv_ivc_can_read(vblkdev_oops->ivck) && (retry--)) {
+		dev_dbg(vblkdev_oops->device, "Waiting for IVC response\n");
+		msleep(sleep);
+	}
+
+	if (retry == -1) {
+		if (vblkdev_oops->config.phys_dev == VSC_DEV_EMMC) {
+			retry = VSC_RESPONSE_RETRIES_WORST_EMMC_MS;
+		} else if (vblkdev_oops->config.phys_dev == VSC_DEV_UFS) {
+			retry = VSC_RESPONSE_RETRIES_WORST_UFS_MS;
+		} else {
+			dev_err(vblkdev_oops->device, "not supportted for QSPI device\n");
+			retry = -1;
+			return retry;
+		}
+
+		while (!tegra_hv_ivc_can_read(vblkdev_oops->ivck) && (retry--)) {
+			dev_dbg(vblkdev_oops->device, "Waiting for IVC response\n");
+			msleep(VSC_RESPONSE_WAIT_MS);
+		}
+	}
+
+	return retry;
+}
+
 static ssize_t vblk_oops_read(char *buf, size_t bytes, loff_t pos)
 {
 	struct vsc_request *vsc_req;
@@ -62,7 +134,7 @@ static ssize_t vblk_oops_read(char *buf, size_t bytes, loff_t pos)
 	struct vs_request req_out;
 	uint32_t blocks, block_pos;
 	uint32_t block_size = vblkdev_oops->config.blk_config.hardblk_size;
-	int32_t retry;
+	int32_t ret;
 
 	dev_dbg(vblkdev_oops->device, "%s> pos:%lld, bytes:%lu\n", __func__,
 		pos, bytes);
@@ -109,12 +181,8 @@ static ssize_t vblk_oops_read(char *buf, size_t bytes, loff_t pos)
 		goto fail;
 	}
 
-	retry = VSC_RESPONSE_RETRIES;
-	while (!tegra_hv_ivc_can_read(vblkdev_oops->ivck) && (retry--)) {
-		dev_dbg(vblkdev_oops->device, "Waiting for IVC response\n");
-		msleep(VSC_RESPONSE_WAIT_MS);
-	}
-	if (retry == (-1)) {
+	ret = wait_for_fops_completion(vblkdev_oops, true);
+	if (ret == (-1)) {
 		dev_err(vblkdev_oops->device,
 			"%s: No response from virtual storage!\n", __func__);
 		goto fail;
@@ -151,7 +219,7 @@ static ssize_t vblk_oops_write(const char *buf, size_t bytes,
 	struct vs_request req_out;
 	uint32_t blocks, block_pos;
 	uint32_t block_size = vblkdev_oops->config.blk_config.hardblk_size;
-	int32_t retry;
+	int32_t ret;
 
 	dev_dbg(vblkdev_oops->device, "%s> pos:%lld, bytes:%lu\n", __func__,
 		pos, bytes);
@@ -210,12 +278,8 @@ static ssize_t vblk_oops_write(const char *buf, size_t bytes,
 		goto fail;
 	}
 
-	retry = VSC_RESPONSE_RETRIES;
-	while (!tegra_hv_ivc_can_read(vblkdev_oops->ivck) && (retry--)) {
-		dev_dbg(vblkdev_oops->device, "Waiting for IVC response\n");
-		msleep(VSC_RESPONSE_WAIT_MS);
-	}
-	if (retry == (-1)) {
+	ret = wait_for_fops_completion(vblkdev_oops, false);
+	if (ret == (-1)) {
 		dev_err(vblkdev_oops->device,
 			"%s: No response from virtual storage!\n", __func__);
 		goto fail;
