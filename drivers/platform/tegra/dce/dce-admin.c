@@ -309,10 +309,10 @@ int dce_admin_handle_ipc_requested_event(struct tegra_dce *d, void *params)
 			(struct dce_admin_send_msg_params *)params;
 
 	/*
-	 * Do not handle admin IPC if bootstrap is not completed
+	 * Do not handle admin IPC if boot commands are not completed
 	 */
-	if ((d->boot_status & DCE_FW_BOOTSTRAP_DONE) == 0) {
-		dce_err(d, "Bootstrap not yet completed\n");
+	if (!dce_is_bootcmds_done(d)) {
+		dce_err(d, "Boot commands are not yet completed\n");
 		ret = -EINVAL;
 		goto out;
 	}
