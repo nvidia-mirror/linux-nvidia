@@ -25,6 +25,7 @@ struct nvjpg_config {
 	const char *firmware;
 	unsigned int version;
 	bool supports_sid;
+	unsigned int num_instances;
 };
 
 struct nvjpg {
@@ -326,6 +327,7 @@ static const struct nvjpg_config nvjpg_t210_config = {
 	.firmware = NVIDIA_TEGRA_210_NVJPG_FIRMWARE,
 	.version = 0x21,
 	.supports_sid = false,
+	.num_instances = 1,
 };
 
 #define NVIDIA_TEGRA_186_NVJPG_FIRMWARE "nvidia/tegra186/nvjpg.bin"
@@ -334,6 +336,7 @@ static const struct nvjpg_config nvjpg_t186_config = {
 	.firmware = NVIDIA_TEGRA_186_NVJPG_FIRMWARE,
 	.version = 0x18,
 	.supports_sid = true,
+	.num_instances = 1,
 };
 
 #define NVIDIA_TEGRA_194_NVJPG_FIRMWARE "nvidia/tegra194/nvjpg.bin"
@@ -342,12 +345,23 @@ static const struct nvjpg_config nvjpg_t194_config = {
 	.firmware = NVIDIA_TEGRA_194_NVJPG_FIRMWARE,
 	.version = 0x19,
 	.supports_sid = true,
+	.num_instances = 1,
+};
+
+#define NVIDIA_TEGRA_234_NVJPG_FIRMWARE "nvidia/tegra234/nvjpg.bin"
+
+static const struct nvjpg_config nvjpg_t234_config = {
+	.firmware = NVIDIA_TEGRA_234_NVJPG_FIRMWARE,
+	.version = 0x23,
+	.supports_sid = true,
+	.num_instances = 2,
 };
 
 static const struct of_device_id tegra_nvjpg_of_match[] = {
 	{ .compatible = "nvidia,tegra210-nvjpg", .data = &nvjpg_t210_config },
 	{ .compatible = "nvidia,tegra186-nvjpg", .data = &nvjpg_t186_config },
 	{ .compatible = "nvidia,tegra194-nvjpg", .data = &nvjpg_t194_config },
+	{ .compatible = "nvidia,tegra234-nvjpg", .data = &nvjpg_t234_config },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_nvjpg_of_match);
@@ -357,6 +371,7 @@ static int nvjpg_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct host1x_syncpt **syncpts;
 	struct nvjpg *nvjpg;
+	u32 host_class;
 	int err;
 
 	/* inherit DMA mask from host1x parent */
@@ -392,6 +407,11 @@ static int nvjpg_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	err = of_property_read_u32(dev->of_node, "nvidia,host1x-class",
+				   &host_class);
+	if (err < 0)
+		host_class = HOST1X_CLASS_NVJPG;
+
 	nvjpg->falcon.dev = dev;
 	nvjpg->falcon.regs = nvjpg->regs;
 
@@ -404,7 +424,7 @@ static int nvjpg_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&nvjpg->client.base.list);
 	nvjpg->client.base.ops = &nvjpg_client_ops;
 	nvjpg->client.base.dev = dev;
-	nvjpg->client.base.class = HOST1X_CLASS_NVJPG;
+	nvjpg->client.base.class = host_class;
 	nvjpg->client.base.syncpts = syncpts;
 	nvjpg->client.base.num_syncpts = 1;
 	nvjpg->dev = dev;
@@ -468,4 +488,7 @@ MODULE_FIRMWARE(NVIDIA_TEGRA_186_NVJPG_FIRMWARE);
 #endif
 #if IS_ENABLED(CONFIG_ARCH_TEGRA_194_SOC)
 MODULE_FIRMWARE(NVIDIA_TEGRA_194_NVJPG_FIRMWARE);
+#endif
+#if IS_ENABLED(CONFIG_ARCH_TEGRA_234_SOC)
+MODULE_FIRMWARE(NVIDIA_TEGRA_234_NVJPG_FIRMWARE);
 #endif
