@@ -50,6 +50,7 @@
 
 #include <linux/uaccess.h>
 
+#include "amisc.h"
 #include "ape_actmon.h"
 #include "os.h"
 #include "dev.h"
@@ -2081,7 +2082,8 @@ static int __nvadsp_os_suspend(void)
 {
 	struct device *dev = &priv.pdev->dev;
 	struct nvadsp_drv_data *drv_data;
-	int ret;
+	int ret, cnt = 0;
+	u32 adsp_status;
 
 	drv_data = platform_get_drvdata(priv.pdev);
 
@@ -2112,6 +2114,26 @@ static int __nvadsp_os_suspend(void)
 		ret = (ret < 0) ? ret : -ETIMEDOUT;
 		goto out;
 	}
+
+	/*
+	 * Check L2_IDLE and L2_CLKSTOPPED in ADSP_STATUS
+	 * NOTE: Standby mode in ADSP L2CC Power Control
+	 *       register should be enabled for this
+	 */
+	do {
+		adsp_status = amisc_readl(drv_data, AMISC_ADSP_STATUS);
+		if ((adsp_status & AMISC_ADSP_L2_IDLE) &&
+		    (adsp_status & AMISC_ADSP_L2_CLKSTOPPED))
+			break;
+		cnt++;
+		mdelay(1);
+	} while (cnt < 5);
+	if (cnt >= 5) {
+		dev_err(dev, "ADSP L2C clock not halted: 0x%x\n", adsp_status);
+		ret = -EDEADLK;
+		goto out;
+	}
+
 	ret = 0;
 	dev_dbg(dev, "ADSP OS suspended!\n");
 
