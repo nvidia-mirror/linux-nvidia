@@ -21,9 +21,9 @@
 #define EDMA_PERF (edma->tsz / (diff / 1000))
 #define EDMA_CPERF ((edma->tsz * (edma->nents / edma->nents_per_ch)) / (diff / 1000))
 
-#define EDMA_PRIV_CH_OFF	16
-#define EDMA_PRIV_LR_OFF	20
-#define EDMA_PRIV_XF_OFF	21
+#define EDMA_PRIV_CH_OFF	32
+#define EDMA_PRIV_LR_OFF	(EDMA_PRIV_CH_OFF + 2)
+#define EDMA_PRIV_XF_OFF	(EDMA_PRIV_LR_OFF + 1)
 
 struct edmalib_common {
 	struct device *fdev;
@@ -49,7 +49,7 @@ struct edmalib_common {
 	u32 prev_edma_ch;
 	u32 nents;
 	struct tegra_pcie_edma_desc *ll_desc;
-	int priv_iter[DMA_WR_CHNL_NUM];
+	u64 priv_iter[DMA_WR_CHNL_NUM];
 	struct pcie_tegra_edma_remote_info edma_remote;
 	u32 nents_per_ch;
 	u32 st_as_ch;
@@ -62,8 +62,8 @@ static void edma_final_complete(void *priv, edma_xfer_status_t status,
 				struct tegra_pcie_edma_desc *desc)
 {
 	struct edmalib_common *edma = l_edma;
-	int cb = *(int *)priv;
-	u32 ch = (cb >> EDMA_PRIV_CH_OFF) & 0xF;
+	u64 cb = *(u64 *)priv;
+	u32 ch = (cb >> EDMA_PRIV_CH_OFF) & 0x3;
 	edma_xfer_type_t xfer_type = (cb >> EDMA_PRIV_XF_OFF) & 0x1;
 	char *xfer_str[2] = {"WR", "RD"};
 	u32 l_r = (cb >> EDMA_PRIV_LR_OFF) & 0x1;
@@ -71,12 +71,12 @@ static void edma_final_complete(void *priv, edma_xfer_status_t status,
 	u64 diff = ktime_to_ns(ktime_get()) - ktime_to_ns(edma->edma_start_time[ch]);
 	u64 cdiff = ktime_to_ns(ktime_get()) - ktime_to_ns(edma->edma_start_time[edma->st_as_ch]);
 
-	cb = cb & 0xFFFF;
+	cb = cb & 0xFFFFFFFF;
 	if (EDMA_ABORT_TEST_EN && status == EDMA_XFER_SUCCESS)
 		dma_common_wr(edma->dma_base, DMA_WRITE_DOORBELL_OFF_WR_STOP | (ch + 1),
 			      DMA_WRITE_DOORBELL_OFF);
 
-	dev_info(edma->fdev, "%s: %s-%s-Async complete for chan %d with status %d. Total desc %d of Sz %d Bytes done in time %llu nsec. Perf is %llu Mbps\n",
+	dev_info(edma->fdev, "%s: %s-%s-Async complete for chan %d with status %d. Total desc %llu of Sz %d Bytes done in time %llu nsec. Perf is %llu Mbps\n",
 		 __func__, xfer_str[xfer_type], l_r_str[l_r], ch, status, edma->nents_per_ch*(cb+1),
 		 edma->dma_size, diff, EDMA_PERF);
 
@@ -88,8 +88,8 @@ static void edma_final_complete(void *priv, edma_xfer_status_t status,
 static void edma_complete(void *priv, edma_xfer_status_t status, struct tegra_pcie_edma_desc *desc)
 {
 	struct edmalib_common *edma = l_edma;
-	int cb = *(int *)priv;
-	u32 ch = (cb >> 16);
+	u64 cb = *(u64 *)priv;
+	u32 ch = (cb >> EDMA_PRIV_CH_OFF) & 0x3;
 
 	if (BIT(ch) & edma->wr_busy) {
 		edma->wr_busy &= ~(BIT(ch));
@@ -97,7 +97,7 @@ static void edma_complete(void *priv, edma_xfer_status_t status, struct tegra_pc
 	}
 
 	if (status == 0)
-		dev_dbg(edma->fdev, "%s: status %d, cb %d\n", __func__, status, cb);
+		dev_dbg(edma->fdev, "%s: status %d, cb %llu\n", __func__, status, cb);
 }
 
 /* debugfs to perform eDMA lib transfers and do CRC check */
@@ -249,8 +249,9 @@ static int edmalib_common_test(struct edmalib_common *edma)
 				else
 					tx_info.complete = edma_complete;
 			}
-			edma->priv_iter[ch] = k | (xfer_type << EDMA_PRIV_XF_OFF) |
-					      (l_r << EDMA_PRIV_LR_OFF) | (ch << EDMA_PRIV_CH_OFF);
+			edma->priv_iter[ch] = k | (((u64)xfer_type) << EDMA_PRIV_XF_OFF) |
+					      (((u64)l_r) << EDMA_PRIV_LR_OFF) |
+					      (((u64)ch) << EDMA_PRIV_CH_OFF);
 			tx_info.priv = &edma->priv_iter[ch];
 			ret = tegra_pcie_edma_submit_xfer(edma->cookie, &tx_info);
 			if (ret == EDMA_XFER_FAIL_NOMEM) {
