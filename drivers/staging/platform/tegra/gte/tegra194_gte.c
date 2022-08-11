@@ -315,9 +315,9 @@ static ssize_t show_num_events_avail(struct kobject *kobj,
 	return scnprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&ev->usage));
 }
 
-struct kobj_attribute num_events_avail_attr =
+static struct kobj_attribute num_events_avail_attr =
 	__ATTR(num_events_avail, 0400, show_num_events_avail, NULL);
-struct kobj_attribute num_dropped_events_attr =
+static struct kobj_attribute num_dropped_events_attr =
 	__ATTR(num_dropped_events, 0400, show_num_dropped_events, NULL);
 
 static struct attribute *ev_attrs[] = {
@@ -652,11 +652,11 @@ struct gte_uspace_event_state {
 	struct tegra_gte_ev_desc *gte_data;
 };
 
-static unsigned int gte_event_poll(struct file *filep,
-				   struct poll_table_struct *wait)
+static __poll_t gte_event_poll(struct file *filep,
+			       struct poll_table_struct *wait)
 {
 	struct gte_uspace_event_state *le = filep->private_data;
-	unsigned int events = 0;
+	__poll_t events = 0;
 
 	poll_wait(filep, &le->wait, wait);
 
