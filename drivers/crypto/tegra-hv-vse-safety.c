@@ -2520,7 +2520,7 @@ static int tegra_hv_vse_safety_cmac_setkey(struct crypto_ahash *tfm, const u8 *k
 	if (!ctx)
 		return -EINVAL;
 
-	if (keylen != 16) {
+	if ((keylen != 16) && (keylen != 32)) {
 		dev_err(se_dev->dev, "%s: Unsupported key length: %d", __func__, keylen);
 		return -EINVAL;
 	}
