@@ -4193,8 +4193,8 @@ static int tegra_hv_vse_safety_register_hwrng(struct tegra_virtual_se_dev *se_de
 {
 #if defined(CONFIG_HW_RANDOM)
 	int ret;
-	struct hwrng *vse_hwrng;
-	struct tegra_virtual_se_rng_context *rng_ctx;
+	struct hwrng *vse_hwrng = NULL;
+	struct tegra_virtual_se_rng_context *rng_ctx = NULL;
 
 	vse_hwrng = devm_kzalloc(se_dev->dev, sizeof(*vse_hwrng), GFP_KERNEL);
 	if (!vse_hwrng) {
