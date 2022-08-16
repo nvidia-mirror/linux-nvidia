@@ -1,0 +1,114 @@
+#
+# Tegra SOC HWPM T234 sources
+#
+
+# SPDX-License-Identifier: GPL-2.0
+
+ifeq ($(CONFIG_TEGRA_T234_HWPM),y)
+nvhwpm-t234-objs += hal/t234/t234_alist.o
+nvhwpm-t234-objs += hal/t234/t234_aperture.o
+nvhwpm-t234-objs += hal/t234/t234_interface.o
+nvhwpm-t234-objs += hal/t234/t234_ip.o
+nvhwpm-t234-objs += hal/t234/t234_mem_mgmt.o
+nvhwpm-t234-objs += hal/t234/t234_regops_allowlist.o
+nvhwpm-t234-objs += hal/t234/t234_resource.o
+
+#
+# Control IP config
+# To disable an IP config in compilation, add condition for both
+# IP config flag and IP specific .o file.
+#
+
+#
+# RTR/PMA are HWPM IPs and can be enabled by default
+#
+nvhwpm-t234-objs += hal/t234/ip/rtr/t234_rtr.o
+nvhwpm-t234-objs += hal/t234/ip/pma/t234_pma.o
+
+#
+# Define a Minimal IP config flag
+# Enable only MSS_Channel, NVDLA and PVA IPs
+# When CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE is set to y.
+#
+CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE=y
+
+ifeq ($(CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE),y)
+ccflags-y += -DCONFIG_HWPM_ALLOW_FORCE_ENABLE
+endif
+
+ifeq ($(CONFIG_TEGRA_GRHOST_NVDLA),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_NVDLA
+nvhwpm-t234-objs += hal/t234/ip/nvdla/t234_nvdla.o
+endif
+
+ifeq ($(CONFIG_TEGRA_GRHOST_PVA),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_PVA
+nvhwpm-t234-objs += hal/t234/ip/pva/t234_pva.o
+endif
+
+ifeq ($(CONFIG_NV_TEGRA_MC),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_MSS_CHANNEL
+nvhwpm-t234-objs += hal/t234/ip/mss_channel/t234_mss_channel.o
+endif
+
+ifneq ($(CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_DISPLAY
+nvhwpm-t234-objs += hal/t234/ip/display/t234_display.o
+
+ifeq ($(CONFIG_TEGRA_GRHOST_ISP),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_ISP
+nvhwpm-t234-objs += hal/t234/ip/isp/t234_isp.o
+endif
+
+ifeq ($(CONFIG_NVETHERNET),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_MGBE
+nvhwpm-t234-objs += hal/t234/ip/mgbe/t234_mgbe.o
+endif
+
+ifeq ($(CONFIG_NV_TEGRA_MC),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS
+nvhwpm-t234-objs += hal/t234/ip/mss_iso_niso_hubs/t234_mss_iso_niso_hubs.o
+
+ccflags-y += -DCONFIG_T234_HWPM_IP_MSS_MCF
+nvhwpm-t234-objs += hal/t234/ip/mss_mcf/t234_mss_mcf.o
+endif
+
+ccflags-y += -DCONFIG_T234_HWPM_IP_MSS_GPU_HUB
+nvhwpm-t234-objs += hal/t234/ip/mss_gpu_hub/t234_mss_gpu_hub.o
+
+ifeq ($(CONFIG_TEGRA_GRHOST_NVDEC),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_NVDEC
+nvhwpm-t234-objs += hal/t234/ip/nvdec/t234_nvdec.o
+endif
+
+ifeq ($(CONFIG_TEGRA_GRHOST_NVENC),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_NVENC
+nvhwpm-t234-objs += hal/t234/ip/nvenc/t234_nvenc.o
+endif
+
+ifeq ($(CONFIG_TEGRA_GRHOST_OFA),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_OFA
+nvhwpm-t234-objs += hal/t234/ip/ofa/t234_ofa.o
+endif
+
+ifeq ($(CONFIG_PCIE_TEGRA194),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_PCIE
+nvhwpm-t234-objs += hal/t234/ip/pcie/t234_pcie.o
+endif
+
+ccflags-y += -DCONFIG_T234_HWPM_IP_SCF
+nvhwpm-t234-objs += hal/t234/ip/scf/t234_scf.o
+
+ifeq ($(CONFIG_VIDEO_TEGRA_VI),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_VI
+nvhwpm-t234-objs += hal/t234/ip/vi/t234_vi.o
+endif
+
+ifeq ($(CONFIG_TEGRA_GRHOST_VIC),y)
+ccflags-y += -DCONFIG_T234_HWPM_IP_VIC
+nvhwpm-t234-objs += hal/t234/ip/vic/t234_vic.o
+endif
+
+endif
+
+endif

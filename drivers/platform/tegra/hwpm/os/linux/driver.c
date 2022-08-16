@@ -36,7 +36,7 @@ static const struct of_device_id tegra_soc_hwpm_of_match[] = {
 		.compatible     = "nvidia,t234-soc-hwpm",
 	},
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
-#include <os/linux/tegra_hwpm_next_linux.h>
+#include <os/linux/next1_driver.h>
 #endif
 	{ },
 };

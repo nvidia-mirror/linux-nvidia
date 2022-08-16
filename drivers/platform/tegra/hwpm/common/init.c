@@ -21,7 +21,7 @@
 
 #include <hal/t234/t234_init.h>
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
-#include <tegra_hwpm_next_init.h>
+#include <tegra_hwpm_next1_init.h>
 #endif
 
 
