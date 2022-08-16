@@ -308,6 +308,7 @@ static u16  __attribute__ ((unused)) mphy_tx_apb[] = {
 struct ufs_tegra_host {
 	struct ufs_hba *hba;
 	bool is_lane_clks_enabled;
+	bool enable_auto_suspend;
 	bool x2config;
 	bool enable_mphy_rx_calib;
 	bool enable_hs_mode;
