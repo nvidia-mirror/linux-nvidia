@@ -22,6 +22,7 @@
 #if defined(CONFIG_TEGRA_HWPM_OOT)
 #include <linux/bitmap.h>
 #include <linux/limits.h>
+#include <linux/kernel.h>
 #endif
 #endif
 

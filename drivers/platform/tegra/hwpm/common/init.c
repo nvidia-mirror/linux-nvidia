@@ -20,8 +20,12 @@
 #include <tegra_hwpm.h>
 
 #include <hal/t234/t234_init.h>
+
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
 #include <tegra_hwpm_next1_init.h>
+#endif
+#ifdef CONFIG_TEGRA_NEXT2_HWPM
+#include <tegra_hwpm_next2_init.h>
 #endif
 
 
@@ -50,7 +54,12 @@ static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm,
 		}
 		break;
 	default:
+#ifdef CONFIG_TEGRA_NEXT2_HWPM
+		err = tegra_hwpm_next2_init_chip_info(
+			hwpm, chip_id, chip_id_rev);
+#else
 		tegra_hwpm_err(hwpm, "Chip 0x%x not supported", chip_id);
+#endif
 		break;
 	}
 

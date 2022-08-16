@@ -36,6 +36,9 @@ static const struct of_device_id tegra_soc_hwpm_of_match[] = {
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
 #include <os/linux/next1_driver.h>
 #endif
+#ifdef CONFIG_TEGRA_NEXT2_HWPM
+#include <os/linux/next2_driver.h>
+#endif
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_soc_hwpm_of_match);
@@ -56,6 +59,10 @@ static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	bool allow_node = of_property_read_bool(np, "support-soc-tools");
+
+	if (!tegra_hwpm_is_platform_silicon()) {
+		return true;
+	}
 
 	if (!allow_node) {
 		tegra_hwpm_err(NULL, "support-soc-tools is absent");
@@ -263,7 +270,11 @@ static void __exit tegra_hwpm_exit(void)
 	platform_driver_unregister(&tegra_soc_hwpm_pdrv);
 }
 
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+module_init(tegra_hwpm_init);
+#else
 postcore_initcall(tegra_hwpm_init);
+#endif
 module_exit(tegra_hwpm_exit);
 
 MODULE_ALIAS(TEGRA_SOC_HWPM_MODULE_NAME);

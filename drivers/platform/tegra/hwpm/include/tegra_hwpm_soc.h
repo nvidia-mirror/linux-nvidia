@@ -15,6 +15,9 @@
 #define TEGRA_HWPM_SOC_H
 
 #if defined(CONFIG_TEGRA_HWPM_OOT)
+#define CHIP_ID_UNKNOWN			0x0U
+#define CHIP_ID_REV_UNKNOWN		0x0U
+
 #define PLAT_SI				0
 #define PLAT_PRE_SI_QT			1
 #define PLAT_PRE_SI_VDK			8
