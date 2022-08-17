@@ -137,27 +137,26 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 #endif
 	struct device *dev = h->dma_dev;
 
+	if (len > UINT_MAX) {
+		dev_err(dev, "%s: %d alloc size is out of range\n",
+			__func__, __LINE__);
+			return DMA_ERROR_CODE;
+	}
+
 #ifdef CONFIG_TEGRA_VIRTUALIZATION
 	if (start && h->is_ivm) {
 		void *ret;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 		pa = h->base + (*start);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 		ret = dma_mark_declared_memory_occupied(dev, pa, len,
 					DMA_ATTR_ALLOC_EXACT_SIZE);
+#else
+		ret = nvmap_dma_mark_declared_memory_occupied(dev, pa, len);
+#endif
 		if (IS_ERR(ret)) {
 			dev_err(dev, "Failed to reserve (%pa) len(%zu)\n",
 					&pa, len);
 			return DMA_ERROR_CODE;
-		}
-#else
-		if (nvmap_dma_alloc_from_dev_coherent(dev, len, &pa, &ret)) {
-			dev_err(dev, "Failed to reserve len(%zu)\n", len);
-			return DMA_ERROR_CODE;
-		}
-#endif
- 		else {
-			dev_dbg(dev, "reserved (%pa) len(%zu)\n",
-				&pa, len);
 		}
 	} else
 #endif
@@ -200,17 +199,20 @@ static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
 	struct device *dev = h->dma_dev;
 
 	dev_dbg(dev, "Free base (%pa) size (%zu)\n", &base, len);
+
+	if (len > UINT_MAX) {
+		dev_err(dev, "%s: %d freeing length out of range\n",
+			__func__, __LINE__);
+			return;
+	}
+
 #ifdef CONFIG_TEGRA_VIRTUALIZATION
 	if (h->is_ivm && !h->can_alloc) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 		dma_mark_declared_memory_unoccupied(dev, base, len,
 						    DMA_ATTR_ALLOC_EXACT_SIZE);
 #else
-		if (len > INT_MAX) {
-			pr_err("len exceeded\n");
-			return;
-		}
-		nvmap_dma_release_from_dev_coherent(dev, len, (void *)(uintptr_t)base);
+		nvmap_dma_mark_declared_memory_unoccupied(dev, base, len);
 #endif
 	} else
 #endif

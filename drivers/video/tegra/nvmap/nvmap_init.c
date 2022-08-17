@@ -517,63 +517,48 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 }
 EXPORT_SYMBOL(nvmap_dma_free_attrs);
 
-int nvmap_dma_alloc_from_dev_coherent(struct device *dev, ssize_t size,
-		dma_addr_t *dma_handle, void **ret)
+void *nvmap_dma_mark_declared_memory_occupied(struct device *dev,
+					dma_addr_t device_addr, size_t size)
 {
 	struct dma_coherent_mem_replica *mem;
-	int order;
 	unsigned long flags;
-	int pageno;
+	int pos, err;
 
 	if (!dev || !dev->dma_mem)
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 
-	if (size < 0)
-		return -EINVAL;
-	order = get_order(size);
+	size += device_addr & ~PAGE_MASK;
+
 	spin_lock_irqsave(&mem->spinlock, flags);
-	if (unlikely(size > (mem->size << PAGE_SHIFT)))
-		goto err;
-
-	pageno = bitmap_find_free_region(mem->bitmap, mem->size, order);
-	if (unlikely(pageno < 0))
-		goto err;
-
-	/*
-	 * Memory was found in the coherent area.
-	 */
-	*dma_handle = mem->device_base + ((dma_addr_t)pageno << PAGE_SHIFT);
-	*ret = mem->virt_base + ((dma_addr_t)pageno << PAGE_SHIFT);
+	pos = PFN_DOWN(device_addr - mem->device_base);
+	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
 	spin_unlock_irqrestore(&mem->spinlock, flags);
-	memset(*ret, 0, size);
-	return 0;
 
-err:
-	spin_unlock_irqrestore(&mem->spinlock, flags);
-	*ret = NULL;
-	return -EINVAL;
+	if (err != 0)
+		return ERR_PTR(err);
+	return mem->virt_base + (pos << PAGE_SHIFT);
 }
 
-int nvmap_dma_release_from_dev_coherent(struct device *dev, int order, void *vaddr)
+void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
+					 dma_addr_t device_addr, size_t size)
 {
 	struct dma_coherent_mem_replica *mem;
+	unsigned long flags;
+	int pos;
 
 	if (!dev || !dev->dma_mem)
-		return -EINVAL;
-	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
-	if (vaddr >= mem->virt_base && vaddr <
-		(mem->virt_base + (mem->size << PAGE_SHIFT))) {
-		unsigned int page = (unsigned int)((vaddr - mem->virt_base) >> PAGE_SHIFT);
-		unsigned long flags;
+		return;
 
-		spin_lock_irqsave(&mem->spinlock, flags);
-		bitmap_release_region(mem->bitmap, page, order);
-		spin_unlock_irqrestore(&mem->spinlock, flags);
-		return 0;
-	}
-	return -EINVAL;
+	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
+
+	size += device_addr & ~PAGE_MASK;
+
+	spin_lock_irqsave(&mem->spinlock, flags);
+	pos = PFN_DOWN(device_addr - mem->device_base);
+	bitmap_release_region(mem->bitmap, pos, get_order(size));
+	spin_unlock_irqrestore(&mem->spinlock, flags);
 }
 
 static void nvmap_dma_release_coherent_memory(struct dma_coherent_mem_replica *mem)
