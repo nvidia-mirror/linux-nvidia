@@ -423,36 +423,6 @@ static void nvmap_dmabuf_vunmap(struct dma_buf *dmabuf, struct dma_buf_map *map)
 }
 #endif
 
-void *nvmap_dmabuf_get_drv_data(struct dma_buf *dmabuf,
-		struct device *dev)
-{
-	struct nvmap_handle_dmabuf_priv *curr = NULL;
-	struct nvmap_handle_info *info;
-	struct nvmap_handle *handle;
-	void *priv = NULL;
-
-	if (dmabuf && dmabuf->priv)
-		info = dmabuf->priv;
-	else
-		return NULL;
-
-	if (info && info->handle)
-		handle = info->handle;
-	else
-		return NULL;
-
-	mutex_lock(&handle->lock);
-	list_for_each_entry(curr, &handle->dmabuf_priv, list) {
-		if (curr->dev == dev) {
-			priv = curr->priv;
-			goto unlock;
-		}
-	}
-unlock:
-	mutex_unlock(&handle->lock);
-	return priv;
-}
-
 static struct dma_buf_ops nvmap_dma_buf_ops = {
 	.attach		= NVMAP_DMABUF_ATTACH,
 	.detach		= nvmap_dmabuf_detach,

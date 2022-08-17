@@ -526,8 +526,6 @@ struct nvmap_handle_ref *nvmap_create_handle_from_id(
 struct nvmap_handle_ref *nvmap_create_handle_from_fd(
 			struct nvmap_client *client, int fd);
 
-void nvmap_handle_get_cacheability(struct nvmap_handle *h,
-		bool *inner, bool *outer);
 void inner_cache_maint(unsigned int op, void *vaddr, size_t size);
 void outer_cache_maint(unsigned int op, phys_addr_t paddr, size_t size);
 

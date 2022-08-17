@@ -217,7 +217,7 @@ out:
 	return 0;
 }
 
-__weak void nvmap_handle_get_cacheability(struct nvmap_handle *h,
+static void nvmap_handle_get_cacheability(struct nvmap_handle *h,
 		bool *inner, bool *outer)
 {
 	*inner = h->flags == NVMAP_HANDLE_CACHEABLE ||
