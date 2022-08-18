@@ -34,9 +34,6 @@ __weak struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
 
 #include "nvmap_priv.h"
 
-static struct static_key nvmap_disable_vaddr_for_cache_maint;
-
-
 /*
  * FIXME:
  *
@@ -89,9 +86,6 @@ static void heap_page_cache_maint(
 		nvmap_handle_mkclean(h, start, end-start);
 		nvmap_zap_handle(h, start, end - start);
 	}
-
-	if (static_key_false(&nvmap_disable_vaddr_for_cache_maint))
-		goto per_page_cache_maint;
 
 	if (inner) {
 		if (!h->vaddr) {
@@ -433,24 +427,5 @@ inline int nvmap_do_cache_maint_list(struct nvmap_handle **handles,
 #endif
 		return __nvmap_do_cache_maint_list(handles,
 				offsets, sizes, op, nr_ops, is_32);
-	return 0;
-}
-
-int nvmap_cache_debugfs_init(struct dentry *nvmap_root)
-{
-	struct dentry *cache_root;
-
-	if (!nvmap_root)
-		return -ENODEV;
-
-	cache_root = debugfs_create_dir("cache", nvmap_root);
-	if (!cache_root)
-		return -ENODEV;
-
-	debugfs_create_atomic_t("nvmap_disable_vaddr_for_cache_maint",
-				S_IRUSR | S_IWUSR,
-				cache_root,
-				&nvmap_disable_vaddr_for_cache_maint.enabled);
-
 	return 0;
 }

@@ -575,7 +575,6 @@ int nvmap_do_cache_maint_list(struct nvmap_handle **handles, u64 *offsets,
 			      u64 *sizes, int op, u32 nr_ops, bool is_32);
 int __nvmap_cache_maint(struct nvmap_client *client,
 			       struct nvmap_cache_op_64 *op);
-int nvmap_cache_debugfs_init(struct dentry *nvmap_root);
 
 /* Internal API to support dmabuf */
 struct dma_buf *__nvmap_make_dmabuf(struct nvmap_client *client,

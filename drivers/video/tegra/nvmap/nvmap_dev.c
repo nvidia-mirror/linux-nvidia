@@ -1458,7 +1458,6 @@ int __init nvmap_probe(struct platform_device *pdev)
 #ifdef NVMAP_CONFIG_PAGE_POOLS
 	nvmap_page_pool_debugfs_init(nvmap_dev->debug_root);
 #endif
-	nvmap_cache_debugfs_init(nvmap_dev->debug_root);
 	nvmap_stats_init(nvmap_debug_root);
 	platform_set_drvdata(pdev, dev);
 
