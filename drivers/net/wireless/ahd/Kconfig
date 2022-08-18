@@ -1,84 +1,90 @@
 #
 # $ Copyright Open Broadcom $
-#
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 #
 # <<Broadcom-WL-IPTag/Open:>>
 #
 
-config BCMDHD
+config AHD
 	tristate "Broadcom FullMAC wireless cards support"
-	---help---
+	help
 	  This module adds support for wireless adapters based on
 	  Broadcom FullMAC chipset.
 
 	  If you choose to build a module, it'll be called dhd. Say M if
 	  unsure.
 
-config BCMDHD_SDIO
+config AHD_SDIO
 	bool "SDIO bus interface support"
-	depends on BCMDHD && MMC
+	depends on AHD && MMC
 
-config BCMDHD_PCIE
+config AHD_PCIE
 	bool "PCIe bus interface support"
-	depends on BCMDHD && PCI && !BCMDHD_SDIO
+	depends on AHD && PCI && !AHD_SDIO
+	default y
 
 config BCM4354
 	tristate "BCM4354 support"
-	depends on BCMDHD
+	depends on AHD
 
 config BCM4356
 	tristate "BCM4356 support"
-	depends on BCMDHD
+	depends on AHD
 	default n
 
 config BCM4358
 	tristate "BCM4358 support"
-	depends on BCMDHD
+	depends on AHD
 	default n
 
 config BCM4359
-	tristate "BCM4359 support"
-	depends on BCMDHD
+	bool "BCM4359 support"
+	depends on AHD
 	default y
 
 config BCM4361
 	tristate "BCM4361 support"
-	depends on BCMDHD
+	depends on AHD
 	default n
 
 config CYW89570
 	tristate "CYW89570 support"
-	depends on BCMDHD
+	depends on AHD
 	default y
 
 config DHD_OF_SUPPORT
 	bool "Use in-drive platform device"
-	depends on BCMDHD
+	depends on AHD
 	default n
 
+config ANDROID12
+	bool "Android12 support"
+	depends on AHD
+	default y
+
 config BCMDHD_FW_PATH
-	depends on BCMDHD
+	depends on AHD
 	string "Firmware path"
-	default "/system/vendor/firmware/fw_bcmdhd.bin"
-	---help---
+	default "/firmware/bcm54591.bin"
+	help
 	  Path to the firmware file.
 
 config BCMDHD_NVRAM_PATH
-	depends on BCMDHD
+	depends on AHD
 	string "NVRAM path"
-	default "/system/etc/wifi/bcmdhd.cal"
-	---help---
+	default "/firmware/bcm54591.txt"
+	help
 	  Path to the calibration file.
 
 config BROADCOM_WIFI_RESERVED_MEM
 	bool "BROADCOM Reserved memory for wifi device"
-	depends on BCMDHD
-	---help---
+	depends on AHD
+	help
 	  This is a configuration for Broadcom WLAN driver.
 
-config BCMDHD_WEXT
+config AHD_WEXT
 	bool "Enable WEXT support"
-	depends on BCMDHD && CFG80211 = n
+	depends on AHD && CFG80211 = n
 	select WIRELESS_EXT
 	select WEXT_PRIV
 	help
@@ -86,30 +92,30 @@ config BCMDHD_WEXT
 
 config DHD_USE_STATIC_BUF
 	bool "Enable memory preallocation"
-	depends on BCMDHD
+	depends on AHD
 	default n
-	---help---
+	help
 	  Use memory preallocated in platform
 
 config DHD_USE_SCHED_SCAN
 	bool "Use CFG80211 sched scan"
-	depends on BCMDHD && CFG80211
+	depends on AHD && CFG80211
 	default n
-	---help---
+	help
 	  Use CFG80211 sched scan
 
 config DHD_SET_RANDOM_MAC_VAL
 	hex "Vendor OUI"
-	depends on BCMDHD
+	depends on AHD
 	default 0x001A11
-	---help---
+	help
 	  Set vendor OUI for SoftAP
 
 config WLAN_REGION_CODE
 	int "---Region codes for Broadcom WiFi Driver"
-	depends on BCMDHD
+	depends on AHD
 	default 100
-	---help---
+	help
 		This is a region code for Broadcom Wi-Fi featured functions.
 		- 100 : EUR OPEN
 		- 101 : EUR ORG
@@ -123,58 +129,58 @@ config WLAIBSS
 	bool "Advanced IBSS mode"
 	depends on (BCM4335 || BCM4339 || BCM4354 || BCM4358 || BCM4359 || BCM4361)
 	default y
-	---help---
+	help
 	  This is a configuration for Oxygen Network.
 
 config WL_RELMCAST
 	bool "Reliable Multicast Support"
 	depends on (BCM4335 || BCM4339 || BCM4354 || BCM4358 || BCM4359 || BCM4361)
 	default y
-	---help---
+	help
 	  This is a configuration for RMC.
 
 config WL_NAN
 	bool "NAN Feature"
-	depends on BCMDHD
+	depends on AHD
 	default n
-	---help---
+	help
 	  This is a configuration for NAN Feature.
 
 config WL_AP_IF
 	bool "Create additional AP interface during intialization"
 	default n
-	---help---
+	help
 	  Create additional AP interface during initialization.
 
-config BCMDHD_PREALLOC_PKTIDMAP
+config AHD_PREALLOC_PKTIDMAP
 	bool "BROADCOM PCIE specific memory reserved for PKTIDMAP"
-	depends on BROADCOM_WIFI_RESERVED_MEM && BCMDHD_PCIE
-	---help---
+	depends on BROADCOM_WIFI_RESERVED_MEM && AHD_PCIE
+	help
 	  Preallocated memory support for PCIE interface in Broadcom
 	  WLAN driver.
 
-config BCMDHD_PREALLOC_MEMDUMP
+config AHD_PREALLOC_MEMDUMP
 	bool "BROADCOM PCIE specific memory reserved for MEMDUMP"
 	depends on BROADCOM_WIFI_RESERVED_MEM
-	---help---
+	help
 	  Preallocated memory support for dongle memory dump
 
-config BCMDHD_OOB_HOST_WAKE
+config AHD_OOB_HOST_WAKE
         bool "Use the external WLAN_HOST_WAKE pin"
-        depends on BCMDHD
-        ---help---
+        depends on AHD
+        help
           Use the external GPIO pin to wake up host
 
-config BCMDHD_GET_OOB_STATE
+config AHD_GET_OOB_STATE
         bool "Support WLAN_HOST_WAKE pin level information"
-        depends on BCMDHD_OOB_HOST_WAKE
+        depends on AHD_OOB_HOST_WAKE
         default y
-        ---help---
+        help
           Support WLAN_HOST_WAKE pin level information
 
-config BCMDHD_WPA3
+config AHD_WPA3
 	bool "Support WPA3 feature"
-	depends on BCMDHD
+	depends on AHD
 	default n
-	---help---
+	help
 	  This will enable WPA3 support

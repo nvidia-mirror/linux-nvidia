@@ -4,6 +4,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -29,6 +30,7 @@
  * $Id: wl_cfg80211.c 814814 2019-04-15 03:31:10Z $
  */
 /* */
+
 #include <typedefs.h>
 #include <linuxver.h>
 #include <linux/kernel.h>
@@ -568,10 +570,12 @@ static s32 wl_cfg80211_get_station(struct wiphy *wiphy,
 #endif // endif
 static int wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	struct cfg80211_connect_params *sme);
+#if defined(WL_FILS) || defined(WL_OWE)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
 static int wl_cfg80211_update_connect_params(struct wiphy *wiphy, struct net_device *dev,
 	struct cfg80211_connect_params *sme, u32 changed);
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) */
+#endif /* WL_FILS || defined(WL_OWE) */
 static s32 wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 	u16 reason_code);
 #if defined(WL_CFG80211_P2P_DEV_IF)
@@ -6610,6 +6614,7 @@ wl_fils_add_hlp_container(struct bcm_cfg80211 *cfg, struct net_device *dev,
 }
 #endif /* WL_FILS */
 
+#if defined(WL_FILS) || defined(WL_OWE)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
 #define UPDATE_ASSOC_IES	BIT(0)
 #ifndef UPDATE_FILS_ERP_INFO
@@ -6663,6 +6668,7 @@ exit:
 
 }
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) */
+#endif /* WL_FILS || defined(WL_OWE) */
 
 #ifdef WL_SAE
 static int

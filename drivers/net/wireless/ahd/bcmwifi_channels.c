@@ -6,6 +6,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -162,25 +163,31 @@ static const uint8 wf_5g_160m_chans[] =
 
 /* Based on IEEE 802.11ax D6.1 */
 /* 40MHz channels in 6GHz band */
+/*
 static const uint8 wf_6g_40m_chans[] =
 {3, 11, 19, 27, 35, 43, 51, 59, 67, 75, 83, 91, 99,
 107, 115, 123, 131, 139, 147, 155, 163, 171, 179,
 187, 195, 203, 211, 219, 227};
 #define WF_NUM_6G_40M_CHANS \
 	(sizeof(wf_6g_40m_chans)/sizeof(uint8))
+*/
 
 /* 80MHz channels in 6GHz band */
+/*
 static const uint8 wf_6g_80m_chans[] =
 {7, 23, 39, 55, 71, 87, 103, 119, 135, 151, 167, 183,
 199, 215};
 #define WF_NUM_6G_80M_CHANS \
 	(sizeof(wf_6g_80m_chans)/sizeof(uint8))
+*/
 
 /* 160MHz channels in 6GHz band */
+/*
 static const uint8 wf_6g_160m_chans[] =
 {15, 47, 79, 111, 143, 175, 207};
 #define WF_NUM_6G_160M_CHANS \
 	(sizeof(wf_6g_160m_chans)/sizeof(uint8))
+*/
 
 /* 6GHz PSC channels */
 uint8 wf_6g_psc_chans[] =
@@ -699,28 +706,7 @@ wf_chspec_malformed(chanspec_t chanspec)
 			/* invalid bandwidth */
 			return TRUE;
 		}
-	} else if (CHSPEC_IS6G(chanspec)) {
-		if (chspec_bw == WL_CHANSPEC_BW_8080) {
-			uint ch1_id, ch2_id;
-
-			/* channel IDs in 80+80 must be in range */
-			ch1_id = CHSPEC_CHAN1(chanspec);
-			ch2_id = CHSPEC_CHAN2(chanspec);
-			if (ch1_id >= WF_NUM_6G_80M_CHANS || ch2_id >= WF_NUM_6G_80M_CHANS)
-				return TRUE;
-
-		} else if (chspec_bw == WL_CHANSPEC_BW_20 || chspec_bw == WL_CHANSPEC_BW_40 ||
-		           chspec_bw == WL_CHANSPEC_BW_80 || chspec_bw == WL_CHANSPEC_BW_160) {
-
-			if (chspec_ch > MAXCHANNEL) {
-				return TRUE;
-			}
-		} else {
-			/* invalid bandwidth */
-			return TRUE;
-		}
 	} else {
-
 		/* must be 2G, 5G or 6G band */
 		return TRUE;
 	}

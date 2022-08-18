@@ -5,6 +5,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -100,9 +101,9 @@
 #include <dhd_dbg.h>
 #include <dhd_dbg_ring.h>
 #include <dhd_debug.h>
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 #if defined(WL_CFG80211)
 #include <wl_cfg80211.h>
 #ifdef WL_BAM
@@ -288,7 +289,7 @@ extern int dhdsdio_func_blocksize(dhd_pub_t *dhd, int function_num, int block_si
 #include <wl_iw.h>
 extern wl_iw_extra_params_t  g_wl_iw_params;
 #endif /* defined(WL_WIRELESS_EXT) */
-
+char fw_path[PATH_MAX];         /* path to firmware image */
 #ifdef CONFIG_PARTIALSUSPEND_SLP
 #include <linux/partialsuspend_slp.h>
 #define CONFIG_HAS_EARLYSUSPEND
@@ -8593,9 +8594,9 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	DHD_OS_WAKE_LOCK_INIT(dhd);
 	dhd->wakelock_counter = 0;
 	/* wakelocks prevent a system from going into a low power state */
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	wake_lock_init(&dhd->wl_wdwake, WAKE_LOCK_SUSPEND, "wlan_wd_wake");
-#endif /* CONFIG_PM_WAKELOCKS  || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS  || CONFIG_HAS_WAKELOCK */
 
 #if defined(OEM_ANDROID)
 	mutex_init(&dhd->dhd_net_if_mutex);
@@ -9156,17 +9157,17 @@ bool dhd_update_fw_nv_path(dhd_info_t *dhdinfo)
 	ucode_path[0] = '\0';
 	DHD_ERROR(("ucode path: %s\n", dhdinfo->uc_path));
 #endif /* DHD_UCODE_DOWNLOAD */
-
+#ifndef BCMEMBEDIMAGE
 	/* fw_path and nv_path are not mandatory for BCMEMBEDIMAGE */
-	if (dhdinfo->fw_path[0] == '\0') {
-		DHD_ERROR(("firmware path not found\n"));
+	if (dhdinfo->fw_path[1] == '\0') {
+		DHD_ERROR(("firmware path not found: %s\n", dhdinfo->fw_path));
 		return FALSE;
 	}
 	if (dhdinfo->nv_path[0] == '\0') {
 		DHD_ERROR(("nvram path not found\n"));
 		return FALSE;
 	}
-
+#endif /* BCMEMBEDIMAGE */
 	return TRUE;
 }
 
@@ -12591,10 +12592,10 @@ void dhd_detach(dhd_pub_t *dhdp)
 		dhd->new_freq = NULL;
 		cpufreq_unregister_notifier(&dhd->freq_trans, CPUFREQ_TRANSITION_NOTIFIER);
 #endif // endif
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd->wakelock_wd_counter = 0;
 	wake_lock_destroy(&dhd->wl_wdwake);
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 	if (dhd->dhd_state & DHD_ATTACH_STATE_WAKELOCKS_INIT) {
 		DHD_TRACE(("wd wakelock count:%d\n", dhd->wakelock_wd_counter));
 		DHD_OS_WAKE_LOCK_DESTROY(dhd);
@@ -16096,7 +16097,7 @@ int dhd_os_wake_lock_timeout(dhd_pub_t *pub)
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 		ret = dhd->wakelock_rx_timeout_enable > dhd->wakelock_ctrl_timeout_enable ?
 			dhd->wakelock_rx_timeout_enable : dhd->wakelock_ctrl_timeout_enable;
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		if (dhd->wakelock_rx_timeout_enable)
 			wake_lock_timeout(&dhd->wl_rxwake,
 				msecs_to_jiffies(dhd->wakelock_rx_timeout_enable));
@@ -16157,7 +16158,7 @@ int dhd_os_wake_lock_ctrl_timeout_cancel(dhd_pub_t *pub)
 	if (dhd && (dhd->dhd_state & DHD_ATTACH_STATE_WAKELOCKS_INIT)) {
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 		dhd->wakelock_ctrl_timeout_enable = 0;
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		if (wake_lock_active(&dhd->wl_ctrlwake))
 			wake_unlock(&dhd->wl_ctrlwake);
 #endif // endif
@@ -16383,7 +16384,7 @@ int dhd_os_wake_lock(dhd_pub_t *pub)
 	if (dhd && (dhd->dhd_state & DHD_ATTACH_STATE_WAKELOCKS_INIT)) {
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 		if (dhd->wakelock_counter == 0 && !dhd->waive_wakelock) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 			wake_lock(&dhd->wl_wifi);
 #elif defined(BCMSDIO)
 			dhd_bus_dev_pm_stay_awake(pub);
@@ -16407,7 +16408,7 @@ void dhd_event_wake_lock(dhd_pub_t *pub)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		wake_lock(&dhd->wl_evtwake);
 #elif defined(BCMSDIO)
 		dhd_bus_dev_pm_stay_awake(pub);
@@ -16418,25 +16419,25 @@ void dhd_event_wake_lock(dhd_pub_t *pub)
 void
 dhd_pm_wake_lock_timeout(dhd_pub_t *pub, int val)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
 		wake_lock_timeout(&dhd->wl_pmwake, msecs_to_jiffies(val));
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 void
 dhd_txfl_wake_lock_timeout(dhd_pub_t *pub, int val)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
 		wake_lock_timeout(&dhd->wl_txflwake, msecs_to_jiffies(val));
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 int net_os_wake_lock(struct net_device *dev)
@@ -16467,7 +16468,7 @@ int dhd_os_wake_unlock(dhd_pub_t *pub)
 			}
 #endif /* DHD_TRACE_WAKE_LOCK */
 			if (dhd->wakelock_counter == 0 && !dhd->waive_wakelock) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 				wake_unlock(&dhd->wl_wifi);
 #elif defined(BCMSDIO)
 				dhd_bus_dev_pm_relax(pub);
@@ -16485,7 +16486,7 @@ void dhd_event_wake_unlock(dhd_pub_t *pub)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		wake_unlock(&dhd->wl_evtwake);
 #elif defined(BCMSDIO)
 		dhd_bus_dev_pm_relax(pub);
@@ -16495,7 +16496,7 @@ void dhd_event_wake_unlock(dhd_pub_t *pub)
 
 void dhd_pm_wake_unlock(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
@@ -16504,12 +16505,12 @@ void dhd_pm_wake_unlock(dhd_pub_t *pub)
 			wake_unlock(&dhd->wl_pmwake);
 		}
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 void dhd_txfl_wake_unlock(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
@@ -16518,20 +16519,20 @@ void dhd_txfl_wake_unlock(dhd_pub_t *pub)
 			wake_unlock(&dhd->wl_txflwake);
 		}
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 int dhd_os_check_wakelock(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK) || defined(BCMSDIO)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK) || defined(BCMSDIO)
 	dhd_info_t *dhd;
 
 	if (!pub)
 		return 0;
 	dhd = (dhd_info_t *)(pub->info);
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK || BCMSDIO */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK || BCMSDIO */
 
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	/* Indicate to the SD Host to avoid going to suspend if internal locks are up */
 	if (dhd && (wake_lock_active(&dhd->wl_wifi) ||
 		(wake_lock_active(&dhd->wl_wdwake))))
@@ -16546,12 +16547,12 @@ int dhd_os_check_wakelock(dhd_pub_t *pub)
 int
 dhd_os_check_wakelock_all(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK) || defined(BCMSDIO)
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK) || defined(BCMSDIO)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	int l1, l2, l3, l4, l7, l8, l9;
 	int l5 = 0, l6 = 0;
 	int c, lock_active;
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 	dhd_info_t *dhd;
 
 	if (!pub) {
@@ -16561,9 +16562,9 @@ dhd_os_check_wakelock_all(dhd_pub_t *pub)
 	if (!dhd) {
 		return 0;
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK || BCMSDIO */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK || BCMSDIO */
 
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	c = dhd->wakelock_counter;
 	l1 = wake_lock_active(&dhd->wl_wifi);
 	l2 = wake_lock_active(&dhd->wl_wdwake);
@@ -16614,10 +16615,10 @@ int dhd_os_wd_wake_lock(dhd_pub_t *pub)
 	if (dhd) {
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 		if (dhd->wakelock_wd_counter == 0 && !dhd->waive_wakelock) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 			/* if wakelock_wd_counter was never used : lock it at once */
 			wake_lock(&dhd->wl_wdwake);
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 		}
 		dhd->wakelock_wd_counter++;
 		ret = dhd->wakelock_wd_counter;
@@ -16637,9 +16638,9 @@ int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
 		if (dhd->wakelock_wd_counter > 0) {
 			dhd->wakelock_wd_counter = 0;
 			if (!dhd->waive_wakelock) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 				wake_unlock(&dhd->wl_wdwake);
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 			}
 		}
 		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
@@ -16651,19 +16652,19 @@ int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
 void
 dhd_os_oob_irq_wake_lock_timeout(dhd_pub_t *pub, int val)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
 		wake_lock_timeout(&dhd->wl_intrwake, msecs_to_jiffies(val));
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 void
 dhd_os_oob_irq_wake_unlock(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
@@ -16672,7 +16673,7 @@ dhd_os_oob_irq_wake_unlock(dhd_pub_t *pub)
 			wake_unlock(&dhd->wl_intrwake);
 		}
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 
@@ -16680,19 +16681,19 @@ dhd_os_oob_irq_wake_unlock(dhd_pub_t *pub)
 void
 dhd_os_scan_wake_lock_timeout(dhd_pub_t *pub, int val)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
 		wake_lock_timeout(&dhd->wl_scanwake, msecs_to_jiffies(val));
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 void
 dhd_os_scan_wake_unlock(dhd_pub_t *pub)
 {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd) {
@@ -16701,7 +16702,7 @@ dhd_os_scan_wake_unlock(dhd_pub_t *pub)
 			wake_unlock(&dhd->wl_scanwake);
 		}
 	}
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 #endif /* DHD_USE_SCAN_WAKELOCK */
 
@@ -16763,13 +16764,13 @@ int dhd_os_wake_lock_restore(dhd_pub_t *pub)
 #endif /* DHD_TRACE_WAKE_LOCK */
 
 	if (dhd->wakelock_before_waive == 0 && dhd->wakelock_counter > 0) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		wake_lock(&dhd->wl_wifi);
 #elif defined(BCMSDIO)
 		dhd_bus_dev_pm_stay_awake(&dhd->pub);
 #endif // endif
 	} else if (dhd->wakelock_before_waive > 0 && dhd->wakelock_counter == 0) {
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 		wake_unlock(&dhd->wl_wifi);
 #elif defined(BCMSDIO)
 		dhd_bus_dev_pm_relax(&dhd->pub);
@@ -16789,7 +16790,7 @@ void dhd_os_wake_lock_init(struct dhd_info *dhd)
 	dhd->wakelock_rx_timeout_enable = 0;
 	dhd->wakelock_ctrl_timeout_enable = 0;
 	/* wakelocks prevent a system from going into a low power state */
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	wake_lock_init(&dhd->wl_wifi, WAKE_LOCK_SUSPEND, "wlan_wake");
 	wake_lock_init(&dhd->wl_rxwake, WAKE_LOCK_SUSPEND, "wlan_rx_wake");
 	wake_lock_init(&dhd->wl_ctrlwake, WAKE_LOCK_SUSPEND, "wlan_ctrl_wake");
@@ -16802,7 +16803,7 @@ void dhd_os_wake_lock_init(struct dhd_info *dhd)
 #ifdef DHD_USE_SCAN_WAKELOCK
 	wake_lock_init(&dhd->wl_scanwake, WAKE_LOCK_SUSPEND, "wlan_scan_wake");
 #endif /* DHD_USE_SCAN_WAKELOCK */
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 #ifdef DHD_TRACE_WAKE_LOCK
 	dhd_wk_lock_trace_init(dhd);
 #endif /* DHD_TRACE_WAKE_LOCK */
@@ -16811,7 +16812,7 @@ void dhd_os_wake_lock_init(struct dhd_info *dhd)
 void dhd_os_wake_lock_destroy(struct dhd_info *dhd)
 {
 	DHD_TRACE(("%s: deinit wake_lock_counters\n", __FUNCTION__));
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	dhd->wakelock_counter = 0;
 	dhd->wakelock_rx_timeout_enable = 0;
 	dhd->wakelock_ctrl_timeout_enable = 0;
@@ -16830,7 +16831,7 @@ void dhd_os_wake_lock_destroy(struct dhd_info *dhd)
 #ifdef DHD_TRACE_WAKE_LOCK
 	dhd_wk_lock_trace_deinit(dhd);
 #endif /* DHD_TRACE_WAKE_LOCK */
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 }
 
 bool dhd_os_check_if_up(dhd_pub_t *pub)

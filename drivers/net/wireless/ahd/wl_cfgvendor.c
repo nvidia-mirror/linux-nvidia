@@ -4,6 +4,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -1536,7 +1537,7 @@ wl_cfgvendor_set_latency_mode(struct wiphy *wiphy,
 	return err;
 }
 
-#ifndef CONFIG_SOC_S5E5515
+/*#ifndef CONFIG_SOC_S5E5515
 static int
 wl_cfgvendor_set_random_mac(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int len)
@@ -1548,7 +1549,7 @@ wl_cfgvendor_set_random_mac(struct wiphy *wiphy,
 
 	return err;
 }
-#endif /* CONFIG_SOC_S5E5515 */
+#endif *//* CONFIG_SOC_S5E5515 */
 
 static int
 wl_cfgvendor_set_tx_power_scenario(struct wiphy *wiphy,

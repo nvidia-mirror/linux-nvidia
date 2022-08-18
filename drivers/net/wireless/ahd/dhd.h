@@ -7,6 +7,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -52,9 +53,9 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/types.h>
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) */
@@ -2619,7 +2620,7 @@ extern char fw_path2[MOD_PARAM_PATHLEN];
 #define VENDOR_PATH "/vendor"
 #endif /* ANDROID_PLATFORM_VERSION < 7 */
 #else
-#define VENDOR_PATH ""
+#define VENDOR_PATH "/vendor"
 #endif /* ANDROID_PLATFORM_VERSION */
 
 #if defined(ANDROID_PLATFORM_VERSION)

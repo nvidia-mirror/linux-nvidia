@@ -1,29 +1,12 @@
-# bcmdhd
+# ahd
 #
-# Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
+# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 #
-# Copyright (C) 1999-2017, Broadcom Corporation
-#
-#      Unless you and Broadcom execute a separate written software license
-# agreement governing use of this software, this software is licensed to you
-# under the terms of the GNU General Public License version 2 (the "GPL"),
-# available at http://www.broadcom.com/licenses/GPLv2.php, with the
-# following added to such license:
-#
-#      As a special exception, the copyright holders of this software give you
-# permission to link this software with independent modules, and to copy and
-# distribute the resulting executable under terms of your choice, provided that
-# you also meet, for each linked independent module, the terms and conditions of
-# the license of that module.  An independent module is a module which is not
-# derived from this software.  The special exception does not apply to any
-# modifications of the software.
-#
-#      Notwithstanding the above, under no circumstances may you combine this
-# software in any way with any other Broadcom software provided under a license
-# other than the GPL, without Broadcom's express prior written consent.
-#
-#
-# <<Broadcom-WL-IPTag/Open:>>
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
 #####################
@@ -39,7 +22,8 @@ DHDCFLAGS += -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER            \
 	-DGET_CUSTOM_MAC_ENABLE      \
 	-DSEC_ENHANCEMENT -DDHD_FW_COREDUMP -DCHIPS_CUSTOMER_HW6	\
 	-DDHD_RND_DEBUG -DDHD_DUMP_FILE_WRITE_FROM_KERNEL		\
-	-DDHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT -DWL11AX
+	-DDHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT -DWL11AX            \
+	-DENABLE_INSMOD_NO_FW_LOAD
 
 GCCVERSIONGTEQ9 := $(shell expr `$(CROSS_COMPILE)gcc -dumpversion | cut -f1 -d.` \>= 9)
 ifeq "$(GCCVERSIONGTEQ9)" "1"
@@ -108,7 +92,7 @@ endif
 #endif // endif
 
 ## OOB
-ifeq ($(CONFIG_BCMDHD_OOB_HOST_WAKE),y)
+ifeq ($(CONFIG_AHD_OOB_HOST_WAKE),y)
 	DHDCFLAGS += -DBCMPCIE_OOB_HOST_WAKE
 endif
 
@@ -247,16 +231,16 @@ DHDCFLAGS += -DDISABLE_FRAMEBURST_VSDB
 DHDCFLAGS += -DWL_WPS_SYNC -DBCMCRYPTO_COMPONENT
 
 #WPA3
-ifneq ($(CONFIG_BCMDHD_WPA3),)
+ifneq ($(CONFIG_AHD_WPA3),)
  DHDCFLAGS += -DWL_SAE
 endif
 
-ifneq ($(CONFIG_BCMDHD_PCIE),)
+ifneq ($(CONFIG_AHD_PCIE),)
 DHDCFLAGS += -DDHD_4WAYM4_FAIL_DISCONNECT
 endif
 
 #6Ghz
-ifneq ($(CONFIG_BCMDHD_6E),)
+ifneq ($(CONFIG_AHD_6E),)
  DHDCFLAGS += -DWL_6E
 endif
 
@@ -271,13 +255,13 @@ endif
 # m: module type driver
 # y: built-in type driver
 ##########################
-DRIVER_TYPE ?= $(CONFIG_BCMDHD)
+DRIVER_TYPE ?= $(CONFIG_AHD)
 
 #############################
 # Bring up WARs for CYW89570.
 # # To be removed later
 # #############################
-ifneq ($(CONFIG_WIRELESS_EXT),)
+ifneq ($(CONFIG_WIRELESS_EXT),y)
   DHDOFILES += wl_iw.o bcm_app_utils.o
   DHDCFLAGS += -DWL_WIRELESS_EXT -DWLLXIW -DUSE_IW
 endif
@@ -305,7 +289,7 @@ endif
   DHDCFLAGS += -DIPV6_NDO_SUPPORT
   DHDCFLAGS += -DIGUANA_LEGACY_CHIPS
 
-ifeq ($(CONFIG_BCMDHD_SDMMC),y)
+ifeq ($(CONFIG_AHD_SDMMC),y)
   DHDCFLAGS += -DBCMLXSDMMC -DCUSTOM_TXGLOM=1
 ifneq ($(CONFIG_HAVE_IMX8_SOC),)
   DHDCFLAGS += \
@@ -317,11 +301,11 @@ ifneq ($(CONFIG_HAVE_IMX8_SOC),)
 endif
 endif
 
-ifeq ($(CONFIG_BCMDHD_SDIOH_STD),y)
+ifeq ($(CONFIG_AHD_SDIOH_STD),y)
   DHDCFLAGS += -DBCMSDIOH_STD
 endif
 
-ifeq ($(CONFIG_BCMDHD_SDIO),y)
+ifeq ($(CONFIG_AHD_SDIO),y)
   DHDCFLAGS += -DBDC -DHW_OOB -DDHD_BCMEVENTS -DMMC_SDIO_ABORT
   DHDCFLAGS += -DBCMSDIO -DUSE_SDIOFIFO_IOVAR
   DHDCFLAGS += -DPROP_TXSTATUS -DLIMIT_BORROW
@@ -359,7 +343,7 @@ endif
 # Expand TCP tx queue to 10 times of default size
   DHDCFLAGS += -DTSQ_MULTIPLIER=10
 
-ifneq ($(CONFIG_BCMDHD_PCIE),)
+ifneq ($(CONFIG_AHD_PCIE),)
   DHDCFLAGS += -DPCIE_FULL_DONGLE -DBCMPCIE -DCUSTOM_DPC_PRIO_SETTING=-1
 # tput enhancement
   DHDCFLAGS += -DCUSTOM_AMPDU_BA_WSIZE=64
@@ -430,7 +414,7 @@ ifneq ($(filter y, $(CONFIG_BCM4354) $(CONFIG_BCM4356)),)
   DHDCFLAGS += -DSAR_SUPPORT
 # debug info
   DHDCFLAGS += -DDHD_WAKE_STATUS
-ifeq ($(CONFIG_BCMDHD_SDIO),y)
+ifeq ($(CONFIG_AHD_SDIO),y)
   DHDCFLAGS += -DBDC -DOOB_INTR_ONLY -DHW_OOB -DDHD_BCMEVENTS -DMMC_SDIO_ABORT
   DHDCFLAGS += -DBCMSDIO -DBCMLXSDMMC -DUSE_SDIOFIFO_IOVAR
   DHDCFLAGS += -DPROP_TXSTATUS
@@ -451,7 +435,7 @@ ifeq ($(CONFIG_BCMDHD_SDIO),y)
   DHDCFLAGS += -DWLFC_STATE_PREALLOC
 endif
 
-ifneq ($(CONFIG_BCMDHD_PCIE),)
+ifneq ($(CONFIG_AHD_PCIE),)
   DHDCFLAGS += -DPCIE_FULL_DONGLE -DBCMPCIE -DCUSTOM_DPC_PRIO_SETTING=-1
 # tput enhancement
   DHDCFLAGS += -DCUSTOM_AMPDU_BA_WSIZE=64
@@ -527,20 +511,20 @@ ifneq ($(CONFIG_BROADCOM_WIFI_RESERVED_MEM),)
 endif
 endif
 
-ifeq ($(CONFIG_BCMDHD_SDMMC),y)
+ifeq ($(CONFIG_AHD_SDMMC),y)
   DHDOFILES += bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o
 endif
 
-ifeq ($(CONFIG_BCMDHD_SDIO),y)
+ifeq ($(CONFIG_AHD_SDIO),y)
   DHDOFILES += bcmsdh.o bcmsdh_linux.o
   DHDOFILES += dhd_cdc.o dhd_wlfc.o dhd_sdio.o
 endif
 
-ifeq ($(CONFIG_BCMDHD_SDIOH_STD),y)
+ifeq ($(CONFIG_AHD_SDIOH_STD),y)
   DHDOFILES += bcmsdstd.o bcmsdstd_linux.o
 endif
 
-ifneq ($(CONFIG_BCMDHD_PCIE),)
+ifneq ($(CONFIG_AHD_PCIE),)
   DHDOFILES += dhd_pcie.o dhd_pcie_linux.o dhd_msgbuf.o dhd_flowring.o
   DHDOFILES += pcie_core.o
 endif
@@ -559,14 +543,19 @@ endif
 EXTRA_CFLAGS += $(DHDCFLAGS) -DDHD_DEBUG
 EXTRA_CFLAGS += -DSRCBASE=\"$(src)\"
 EXTRA_CFLAGS += -I$(src)/include/ -I$(src)/
+EXTRA_CFLAGS += -I$(srctree.nvidia)/drivers/net/wireless/ahd/
+EXTRA_CFLAGS += -I$(srctree.nvidia)/drivers/net/wireless/ahd/include
 KBUILD_CFLAGS += -I$(KDIR)/include -I$(CURDIR)
+#KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
 
-bcmdhd-objs := $(DHDOFILES)
-obj-$(DRIVER_TYPE)   += bcmdhd.o
+ifneq ($(CONFIG_ahd),m)
+  ahd-objs := $(DHDOFILES)
+  obj-$(DRIVER_TYPE)   += ahd.o
+endif
 
 all:
-	@echo "$(MAKE) --no-print-directory -C $(KDIR) M=$(CURDIR) modules"
-	@$(MAKE) --no-print-directory -C $(KDIR) M=$(CURDIR) modules
+	@echo "$(MAKE) --no-print-directory -C $(KDIR) SUBDIRS=$(CURDIR) modules"
+	@$(MAKE) --no-print-directory -C $(KDIR) SUBDIRS=$(CURDIR) modules
 
 clean:
 	rm -rf *.o *.ko *.mod.c *~ .*.cmd *.o.cmd .*.o.cmd \

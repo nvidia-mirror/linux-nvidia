@@ -4,6 +4,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -108,7 +109,7 @@ typedef struct dhd_info {
 	bool		rxthread_enabled;
 
 	/* Wakelocks */
-#if defined(CONFIG_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
+#if defined(CONFIG_AHD_PM_WAKELOCKS) || defined(CONFIG_HAS_WAKELOCK)
 	struct wake_lock wl_wifi;   /* Wifi wakelock */
 	struct wake_lock wl_rxwake; /* Wifi rx wakelock */
 	struct wake_lock wl_ctrlwake; /* Wifi ctrl wakelock */
@@ -122,7 +123,7 @@ typedef struct dhd_info {
 #ifdef DHD_USE_SCAN_WAKELOCK
 	struct wake_lock wl_scanwake;  /* Wifi scan wakelock */
 #endif /* DHD_USE_SCAN_WAKELOCK */
-#endif /* CONFIG_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
+#endif /* CONFIG_AHD_PM_WAKELOCKS || CONFIG_HAS_WAKELOCK */
 
 #if defined(OEM_ANDROID)
 	/* net_device interface lock, prevent race conditions among net_dev interface
