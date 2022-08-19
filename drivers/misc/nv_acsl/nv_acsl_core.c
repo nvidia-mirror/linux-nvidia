@@ -59,8 +59,10 @@ static bool is_free_index_avail(struct acsl_drv *drv,
 	bool wait_for_buffers = false;
 
 	if (!drv->append_init_input_buff[COMP_ID] && PORT == IN_PORT) {
+		#ifdef BUF_PRINTS
 		dev_info(dev, "Initial free buffer avail, COMP_ID:%d\n",
 			COMP_ID);
+		#endif
 		return true;
 	}
 
@@ -120,7 +122,7 @@ static int append_buf_to_csm(struct acsl_drv *drv, uint8_t PORT,
 {
 	struct csm_sm_state_t *csm_sm = drv->csm_sm;
 	struct device *dev = drv->dev;
-	status_t ret = 0;
+	status_t ret = 0, retry_count = 0;
 
 	csm_sm->acq_buf_index[PORT][COMP_ID] =
 		drv->m_rel_buf_index[PORT][COMP_ID];
@@ -128,18 +130,24 @@ static int append_buf_to_csm(struct acsl_drv *drv, uint8_t PORT,
 	if (IN_PORT == PORT) {
 		while ((ret = nvadsp_mbox_send(&drv->csm_mbox_buf_in_recv,
 			COMP_ID, NVADSP_MBOX_SMSG, 0, ACSL_TIMEOUT)) != 0) {
-			dev_warn(dev, "%s: INPUT: Warn: Mbx Send is failed ret:%d\n",
-				__func__, ret);
-			msleep(1000);
+			retry_count++;
+			if (retry_count >= ACSL_RETRY_COUNT)
+				break;
+			msleep(20);
 		}
 	} else if (OUT_PORT == PORT) {
 		while ((ret = nvadsp_mbox_send(&drv->csm_mbox_buf_out_recv,
 			COMP_ID, NVADSP_MBOX_SMSG, 0, ACSL_TIMEOUT)) != 0) {
-			dev_warn(dev, "%s: OUTPUT: Warn: Mbx Send is failed ret:%d\n",
-				__func__, ret);
-			msleep(1000);
+			retry_count++;
+			if (retry_count >= ACSL_RETRY_COUNT)
+				break;
+			msleep(20);
 		}
 	}
+
+	if (ret)
+		dev_warn(dev, "%s: PORT:%d: Warn: Mbx Send retry_count:%d\n",
+			__func__, PORT, retry_count);
 
 	log_buf_info(dev, __func__, COMP_ID, PORT, 0, 0);
 	return ret;
@@ -174,7 +182,7 @@ static void send_message(struct acsl_drv *drv, struct acsl_csm_args_t *csm_args)
 	struct csm_sm_state_t *csm_sm = drv->csm_sm;
 	struct device *dev = drv->dev;
 	union csm_message_t message;
-	status_t ret, i;
+	status_t ret, i, retry_count = 0;
 
 	message.msgq_msg.size = csm_args->size;
 
@@ -183,10 +191,15 @@ static void send_message(struct acsl_drv *drv, struct acsl_csm_args_t *csm_args)
 
 	while ((ret = msgq_queue_message(&csm_sm->recv_msgq.msgq,
 			&message.msgq_msg)) != 0) {
+		retry_count++;
+		if (retry_count >= ACSL_RETRY_COUNT)
+			break;
+		msleep(20);
+	}
+
+	if (ret)
 		dev_warn(dev, "%s: Warn: msgq is failed(ret: %d)\n",
 			__func__, ret);
-		msleep(1000);
-	}
 }
 
 /* CSM mailbox message handler */

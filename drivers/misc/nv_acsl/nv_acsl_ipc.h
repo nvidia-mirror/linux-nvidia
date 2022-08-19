@@ -21,6 +21,7 @@
 #define MAX_COMP 160   /** Max Components */
 
 #define ACSL_TIMEOUT 5000 /* 5000 ms */
+#define ACSL_RETRY_COUNT 5
 #define ADSP_CORES 4      /* Numbers of ADSP Cores */
 #define MAX_PORT_BUFF 4
 
