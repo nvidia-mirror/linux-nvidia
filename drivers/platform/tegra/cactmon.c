@@ -33,21 +33,21 @@
 /* ACTMON_*_CTRL_0 offset */
 #define ACTMON_DEV_CTRL				0x00
 /* ACTMON_*_CTRL_0 bit definitions */
-#define ACTMON_DEV_CTRL_UP_WMARK_NUM_SHIFT	26
-#define ACTMON_DEV_CTRL_UP_WMARK_NUM_MASK	(0x7 << 26)
-#define ACTMON_DEV_CTRL_DOWN_WMARK_NUM_SHIFT	21
-#define ACTMON_DEV_CTRL_DOWN_WMARK_NUM_MASK	(0x7 << 21)
-#define ACTMON_DEV_CTRL_PERIODIC_ENB		(0x1 << 13)
-#define ACTMON_DEV_CTRL_K_VAL_SHIFT		10
-#define ACTMON_DEV_CTRL_K_VAL_MASK		(0x7 << 10)
+#define ACTMON_DEV_CTRL_UP_WMARK_NUM_SHIFT	26U
+#define ACTMON_DEV_CTRL_UP_WMARK_NUM_MASK	(0x7U << 26)
+#define ACTMON_DEV_CTRL_DOWN_WMARK_NUM_SHIFT	21U
+#define ACTMON_DEV_CTRL_DOWN_WMARK_NUM_MASK	(0x7U << 21)
+#define ACTMON_DEV_CTRL_PERIODIC_ENB		(0x1U << 13)
+#define ACTMON_DEV_CTRL_K_VAL_SHIFT		10U
+#define ACTMON_DEV_CTRL_K_VAL_MASK		(0x7U << 10)
 
 /* ACTMON_*_INTR_ENABLE_0 */
 #define ACTMON_DEV_INTR_ENB			0x04
 /* ACTMON_*_INTR_ENABLE_0 bit definitions */
-#define ACTMON_DEV_INTR_UP_WMARK_ENB		(0x1 << 31)
-#define ACTMON_DEV_INTR_DOWN_WMARK_ENB		(0x1 << 30)
-#define ACTMON_DEV_INTR_AVG_UP_WMARK_ENB	(0x1 << 29)
-#define ACTMON_DEV_INTR_AVG_DOWN_WMARK_ENB	(0x1 << 28)
+#define ACTMON_DEV_INTR_UP_WMARK_ENB		(0x1U << 31)
+#define ACTMON_DEV_INTR_DOWN_WMARK_ENB		(0x1U << 30)
+#define ACTMON_DEV_INTR_AVG_UP_WMARK_ENB	(0x1U << 29)
+#define ACTMON_DEV_INTR_AVG_DOWN_WMARK_ENB	(0x1U << 28)
 
 /* ACTMON_*_INTR_STAUS_0 */
 #define ACTMON_DEV_INTR_STATUS			0x08
@@ -134,12 +134,19 @@ static void init_dev_cntrl(struct actmon_dev *dev, void __iomem *base)
 	u32 val = 0;
 
 	val |= ACTMON_DEV_CTRL_PERIODIC_ENB;
-	val |= (((dev->avg_window_log2 - 1) << ACTMON_DEV_CTRL_K_VAL_SHIFT)
+	if ((dev->avg_window_log2 < 1U) || (dev->down_wmark_window < 1U) ||
+	(dev->up_wmark_window < 1U) ||
+	(((dev->avg_window_log2 - 1U) << ACTMON_DEV_CTRL_K_VAL_SHIFT) > UINT_MAX) ||
+	(((dev->down_wmark_window - 1U) << ACTMON_DEV_CTRL_DOWN_WMARK_NUM_SHIFT) > UINT_MAX) ||
+	(((dev->up_wmark_window - 1U) << ACTMON_DEV_CTRL_UP_WMARK_NUM_SHIFT) > UINT_MAX))
+		return;
+
+	val |= (((dev->avg_window_log2 - 1U) << ACTMON_DEV_CTRL_K_VAL_SHIFT)
 		& ACTMON_DEV_CTRL_K_VAL_MASK);
-	val |= (((dev->down_wmark_window - 1) <<
+	val |= (((dev->down_wmark_window - 1U) <<
 		ACTMON_DEV_CTRL_DOWN_WMARK_NUM_SHIFT) &
 		ACTMON_DEV_CTRL_DOWN_WMARK_NUM_MASK);
-	val |=  (((dev->up_wmark_window - 1) <<
+	val |=  (((dev->up_wmark_window - 1U) <<
 		ACTMON_DEV_CTRL_UP_WMARK_NUM_SHIFT) &
 		ACTMON_DEV_CTRL_UP_WMARK_NUM_MASK);
 
@@ -219,14 +226,16 @@ static void actmon_dev_reg_ops_init(struct actmon_dev *adev)
 
 static unsigned long actmon_dev_get_max_rate(struct actmon_dev *adev)
 {
-	unsigned long rate = 0;
+	long rate = 0;
 
 	if (!adev->bwmgr_disable)
 		return tegra_bwmgr_get_max_emc_rate();
 
 	if (adev->dram_clk_handle) {
 		rate = clk_round_rate(adev->dram_clk_handle, ULONG_MAX);
-		return rate;
+		if (rate < 0)
+			return 0;
+		return (unsigned long)rate;
 	}
 
 	return 0;
@@ -275,8 +284,9 @@ static void actmon_dev_set_rate(struct actmon_dev *adev,
 
 	if (!adev->bwmgr_disable) {
 		bwclnt = (struct tegra_bwmgr_client *)adev->clnt;
-
-		tegra_bwmgr_set_emc(bwclnt, freq * 1000,
+		if ((freq * 1000UL) > ULONG_MAX)
+			return;
+		tegra_bwmgr_set_emc(bwclnt, freq * 1000UL,
 			TEGRA_BWMGR_SET_EMC_FLOOR);
 	} else {
 		icc_set_rate(adev, freq);
