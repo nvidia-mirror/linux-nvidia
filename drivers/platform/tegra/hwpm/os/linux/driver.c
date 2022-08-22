@@ -66,7 +66,7 @@ static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
 	return allow_node;
 }
 
-int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
+static int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 	hwpm_linux->device_info.chip = tegra_get_chip_id();
 	hwpm_linux->device_info.chip_revision = tegra_get_major_rev();
