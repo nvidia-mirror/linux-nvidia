@@ -32,7 +32,7 @@
 
 /* ==================[Type Definitions]===================================== */
 /* Number of registered IPs */
-#define NUM_IPS 10U
+#define NUM_IPS 12U
 
 /**
  * @brief IP IDs
@@ -49,7 +49,9 @@ IP_PSC   = 0x0005,
 IP_I2C   = 0x0006,
 IP_QSPI  = 0x0007,
 IP_SDMMC = 0x0008,
-IP_TSEC  = 0x0009
+IP_TSEC  = 0x0009,
+IP_THERM = 0x000A,
+IP_SMMU  = 0x000B
 } hsierrrpt_ipid_t;
 
 
