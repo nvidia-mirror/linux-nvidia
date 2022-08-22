@@ -24,7 +24,7 @@ static int tegra_hwpm_exec_reg_ops(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_reg_op *reg_op)
 {
 	bool found = false;
-	u32 ip_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+	u32 ip_idx = TEGRA_HWPM_IP_INACTIVE;
 	u32 inst_idx = 0U, element_idx = 0U;
 	u32 a_type = 0U;
 	u32 reg_val = 0U;

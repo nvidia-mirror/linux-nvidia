@@ -11,29 +11,109 @@
  * more details.
  */
 
-#include <soc/tegra/fuse.h>
+#include <linux/of.h>
+#include <soc/tegra/fuse-helper.h>
 
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_soc.h>
 
-bool tegra_hwpm_is_platform_simulation_impl(void)
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+#if defined(CONFIG_TEGRA_NEXT1_HWPM)
+#include <os/linux/next1_soc_utils.h>
+#endif
+#endif
+
+u32 tegra_hwpm_get_chip_id_impl(void)
 {
-	return tegra_platform_is_vdk();
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	if (of_machine_is_compatible("nvidia,tegra234")) {
+		return 0x23U;
+	}
+#ifdef CONFIG_TEGRA_NEXT1_HWPM
+		return tegra_hwpm_next1_get_chip_id_impl();
+#else
+		return 0x0U;
+#endif /* CONFIG_TEGRA_NEXT1_HWPM */
+#else
+	return (u32)tegra_get_chip_id();
+#endif /* CONFIG_TEGRA_HWPM_OOT */
 }
 
-bool tegra_hwpm_is_platform_vsp_impl(void)
+u32 tegra_hwpm_get_major_rev_impl(void)
 {
-	return tegra_platform_is_vsp();
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	if (of_machine_is_compatible("nvidia,tegra234")) {
+		return 0x4U;
+	}
+#ifdef CONFIG_TEGRA_NEXT1_HWPM
+		return tegra_hwpm_next1_get_major_rev_impl();
+#else
+		return 0x0U;
+#endif /* CONFIG_TEGRA_NEXT1_HWPM */
+#else
+	return (u32)tegra_get_major_rev();
+#endif
+}
+
+u32 tegra_hwpm_chip_get_revision_impl(void)
+{
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	return 0x0U;
+#else
+	return (u32)tegra_chip_get_revision();
+#endif
+}
+
+u32 tegra_hwpm_get_platform_impl(void)
+{
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	if (of_machine_is_compatible("nvidia,tegra234")) {
+		return PLAT_SI;
+	}
+#ifdef CONFIG_TEGRA_NEXT1_HWPM
+		return tegra_hwpm_next1_get_platform_impl();
+#else
+		return PLAT_INVALID;
+#endif /* CONFIG_TEGRA_NEXT1_HWPM */
+#else
+	return (u32)tegra_get_platform();
+#endif
 }
 
 bool tegra_hwpm_is_platform_silicon_impl(void)
 {
+#if defined(CONFIG_TEGRA_HWPM_OOT)
 	return tegra_platform_is_silicon();
+#else
+	return tegra_platform_is_silicon();
+#endif
+}
+
+bool tegra_hwpm_is_platform_simulation_impl(void)
+{
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	return tegra_hwpm_get_platform() == PLAT_PRE_SI_VDK;
+#else
+	return tegra_platform_is_vdk();
+#endif
+}
+
+bool tegra_hwpm_is_platform_vsp_impl(void)
+{
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	return tegra_hwpm_get_platform() == PLAT_PRE_SI_VSP;
+#else
+	return tegra_platform_is_vsp();
+#endif
 }
 
 bool tegra_hwpm_is_hypervisor_mode_impl(void)
 {
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	return false;
+#else
 	return is_tegra_hypervisor_mode();
+#endif
 }
 
 int tegra_hwpm_fuse_readl_impl(struct tegra_soc_hwpm *hwpm,

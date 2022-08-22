@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 nvhwpm-linux-objs += os/linux/aperture_utils.o
+nvhwpm-linux-objs += os/linux/clk_rst_utils.o
 nvhwpm-linux-objs += os/linux/driver.o
 nvhwpm-linux-objs += os/linux/io_utils.o
 nvhwpm-linux-objs += os/linux/ip_utils.o

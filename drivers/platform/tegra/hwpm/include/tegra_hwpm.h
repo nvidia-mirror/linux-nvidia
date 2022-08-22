@@ -16,7 +16,11 @@
 
 #include <tegra_hwpm_types.h>
 
-#define TEGRA_SOC_HWPM_IP_INACTIVE	~(0U)
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+
+#define TEGRA_HWPM_IP_INACTIVE	~(0U)
 
 /* These macro values should match TEGRA_SOC_HWPM_IP_STATUS_* */
 #define TEGRA_HWPM_IP_STATUS_VALID	0U

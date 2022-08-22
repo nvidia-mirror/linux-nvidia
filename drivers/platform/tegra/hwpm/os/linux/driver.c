@@ -16,11 +16,8 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/slab.h>
-#include <linux/reset.h>
-#include <linux/clk.h>
 #include <linux/dma-buf.h>
 #include <linux/debugfs.h>
-#include <soc/tegra/fuse.h>
 
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_ip.h>
@@ -28,6 +25,7 @@
 #include <tegra_hwpm_soc.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_clk_rst.h>
 #include <os/linux/debugfs.h>
 #include <os/linux/driver.h>
 
@@ -68,10 +66,10 @@ static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
 
 static int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-	hwpm_linux->device_info.chip = tegra_get_chip_id();
-	hwpm_linux->device_info.chip_revision = tegra_get_major_rev();
-	hwpm_linux->device_info.revision = tegra_chip_get_revision();
-	hwpm_linux->device_info.platform = tegra_get_platform();
+	hwpm_linux->device_info.chip = tegra_hwpm_get_chip_id();
+	hwpm_linux->device_info.chip_revision = tegra_hwpm_get_major_rev();
+	hwpm_linux->device_info.revision = tegra_hwpm_chip_get_revision();
+	hwpm_linux->device_info.platform = tegra_hwpm_get_platform();
 
 	return 0;
 }
@@ -146,37 +144,9 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 	(void) dma_set_mask_and_coherent(hwpm_linux->dev, DMA_BIT_MASK(39));
 
-	if (tegra_hwpm_is_platform_silicon()) {
-		hwpm_linux->la_clk = devm_clk_get(hwpm_linux->dev, "la");
-		if (IS_ERR(hwpm_linux->la_clk)) {
-			tegra_hwpm_err(hwpm, "Missing la clock");
-			ret = PTR_ERR(hwpm_linux->la_clk);
-			goto clock_reset_fail;
-		}
-
-		hwpm_linux->la_parent_clk =
-			devm_clk_get(hwpm_linux->dev, "parent");
-		if (IS_ERR(hwpm_linux->la_parent_clk)) {
-			tegra_hwpm_err(hwpm, "Missing la parent clk");
-			ret = PTR_ERR(hwpm_linux->la_parent_clk);
-			goto clock_reset_fail;
-		}
-
-		hwpm_linux->la_rst =
-			devm_reset_control_get(hwpm_linux->dev, "la");
-		if (IS_ERR(hwpm_linux->la_rst)) {
-			tegra_hwpm_err(hwpm, "Missing la reset");
-			ret = PTR_ERR(hwpm_linux->la_rst);
-			goto clock_reset_fail;
-		}
-
-		hwpm_linux->hwpm_rst =
-			devm_reset_control_get(hwpm_linux->dev, "hwpm");
-		if (IS_ERR(hwpm_linux->hwpm_rst)) {
-			tegra_hwpm_err(hwpm, "Missing hwpm reset");
-			ret = PTR_ERR(hwpm_linux->hwpm_rst);
-			goto clock_reset_fail;
-		}
+	ret = tegra_hwpm_clk_rst_prepare(hwpm_linux);
+	if (ret != 0) {
+		goto clock_reset_fail;
 	}
 
 	tegra_hwpm_debugfs_init(hwpm_linux);
@@ -198,10 +168,11 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	 * Currently VDK doesn't have a fmodel for SOC HWPM. Therefore, we
 	 * enable fake registers on VDK for minimal testing.
 	 */
-	if (tegra_hwpm_is_platform_simulation())
+	if (tegra_hwpm_is_platform_simulation()) {
 		hwpm->fake_registers_enabled = true;
-	else
+	} else {
 		hwpm->fake_registers_enabled = false;
+	}
 
 	platform_set_drvdata(pdev, hwpm);
 	tegra_soc_hwpm_pdev = pdev;
@@ -211,17 +182,7 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 init_chip_info_fail:
 init_sw_components_fail:
-	if (tegra_hwpm_is_platform_silicon()) {
-		if (hwpm_linux->la_clk)
-			devm_clk_put(hwpm_linux->dev, hwpm_linux->la_clk);
-		if (hwpm_linux->la_parent_clk)
-			devm_clk_put(hwpm_linux->dev,
-				hwpm_linux->la_parent_clk);
-		if (hwpm_linux->la_rst)
-			reset_control_assert(hwpm_linux->la_rst);
-		if (hwpm_linux->hwpm_rst)
-			reset_control_assert(hwpm_linux->hwpm_rst);
-	}
+	tegra_hwpm_clk_rst_release(hwpm_linux);
 clock_reset_fail:
 	device_destroy(&hwpm_linux->class, hwpm_linux->dev_t);
 device_create:
@@ -260,16 +221,7 @@ static int tegra_hwpm_remove(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	if (tegra_hwpm_is_platform_silicon()) {
-		if (hwpm_linux->la_clk)
-			devm_clk_put(hwpm_linux->dev, hwpm_linux->la_clk);
-		if (hwpm_linux->la_parent_clk)
-			devm_clk_put(hwpm_linux->dev, hwpm_linux->la_parent_clk);
-		if (hwpm_linux->la_rst)
-			reset_control_assert(hwpm_linux->la_rst);
-		if (hwpm_linux->hwpm_rst)
-			reset_control_assert(hwpm_linux->hwpm_rst);
-	}
+	tegra_hwpm_clk_rst_release(hwpm_linux);
 
 	tegra_hwpm_release_ip_register_node(hwpm);
 	tegra_hwpm_release_sw_setup(hwpm);

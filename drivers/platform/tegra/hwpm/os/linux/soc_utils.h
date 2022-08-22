@@ -16,6 +16,10 @@
 
 struct tegra_soc_hwpm;
 
+u32 tegra_hwpm_get_chip_id_impl(void);
+u32 tegra_hwpm_get_major_rev_impl(void);
+u32 tegra_hwpm_chip_get_revision_impl(void);
+u32 tegra_hwpm_get_platform_impl(void);
 bool tegra_hwpm_is_platform_simulation_impl(void);
 bool tegra_hwpm_is_platform_vsp_impl(void);
 bool tegra_hwpm_is_platform_silicon_impl(void);

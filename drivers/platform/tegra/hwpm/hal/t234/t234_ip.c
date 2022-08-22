@@ -38,7 +38,8 @@ int t234_hwpm_extract_ip_ops(struct tegra_soc_hwpm *hwpm,
 		"Extract IP ops for resource enum %d info", resource_enum);
 
 	/* Convert tegra_soc_hwpm_resource to internal enum */
-	if (!(t234_hwpm_is_resource_active(hwpm, resource_enum, &ip_idx))) {
+	if (!(hwpm->active_chip->is_resource_active(hwpm,
+		resource_enum, &ip_idx))) {
 		tegra_hwpm_dbg(hwpm, hwpm_dbg_ip_register,
 			"SOC hwpm resource %d (base 0x%llx) is unconfigured",
 			resource_enum, base_address);

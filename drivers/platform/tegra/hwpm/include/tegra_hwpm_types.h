@@ -19,6 +19,10 @@
 #include <linux/err.h>
 #include <linux/bug.h>
 #include <linux/bits.h>
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+#include <linux/bitmap.h>
+#include <linux/limits.h>
+#endif
 #endif
 
 #endif /* TEGRA_HWPM_TYPES_H */

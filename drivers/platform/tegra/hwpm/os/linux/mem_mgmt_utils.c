@@ -19,7 +19,6 @@
 #include <linux/string.h>
 #include <linux/of_address.h>
 #include <linux/dma-buf.h>
-#include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
 #include <tegra_hwpm_kmem.h>
@@ -32,6 +31,11 @@
 #include <tegra_hwpm_static_analysis.h>
 
 #include <os/linux/driver.h>
+
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+#include <linux/module.h>
+MODULE_IMPORT_NS(DMA_BUF);
+#endif
 
 static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
@@ -85,6 +89,9 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
 	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	int err = 0;
+#endif
 
 	tegra_hwpm_fn(hwpm, " ");
 
@@ -96,7 +103,7 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 
 	hwpm->mem_mgmt->mem_bytes_dma_buf =
 		dma_buf_get(tegra_hwpm_safe_cast_u64_to_s32(
-		alloc_pma_stream->mem_bytes_buf_fd));
+			alloc_pma_stream->mem_bytes_buf_fd));
 	if (IS_ERR(hwpm->mem_mgmt->mem_bytes_dma_buf)) {
 		tegra_hwpm_err(hwpm, "Unable to get mem bytes dma_buf");
 		return PTR_ERR(hwpm->mem_mgmt->mem_bytes_dma_buf);
@@ -119,6 +126,15 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	hwpm->mem_mgmt->mem_bytes_buf_va =
 		sg_dma_address(hwpm->mem_mgmt->mem_bytes_sgt->sgl);
 
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
+		(struct dma_buf_map *)hwpm->mem_mgmt->mem_bytes_kernel);
+	if (err != 0) {
+		tegra_hwpm_err(hwpm,
+			"Unable to map mem_bytes buffer into kernel VA space");
+		return -ENOMEM;
+	}
+#else
 	hwpm->mem_mgmt->mem_bytes_kernel =
 		dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf);
 	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
@@ -126,6 +142,8 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
+#endif
+
 	memset(hwpm->mem_mgmt->mem_bytes_kernel, 0, 32);
 
 	return 0;

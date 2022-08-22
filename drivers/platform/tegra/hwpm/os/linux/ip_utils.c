@@ -12,7 +12,6 @@
  */
 
 #include <linux/slab.h>
-#include <soc/tegra/fuse.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
 #include <tegra_hwpm_kmem.h>
@@ -196,7 +195,7 @@ int tegra_hwpm_complete_ip_register_impl(struct tegra_soc_hwpm *hwpm)
 static u32 tegra_hwpm_translate_soc_hwpm_ip(struct tegra_soc_hwpm *hwpm,
 	enum tegra_soc_hwpm_ip ip_enum)
 {
-	u32 ip_enum_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+	u32 ip_enum_idx = TEGRA_HWPM_IP_INACTIVE;
 
 	switch (ip_enum) {
 	case TEGRA_SOC_HWPM_IP_VI:
@@ -292,7 +291,7 @@ int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 u32 tegra_hwpm_translate_soc_hwpm_resource(struct tegra_soc_hwpm *hwpm,
 	enum tegra_soc_hwpm_resource res_enum)
 {
-	u32 res_enum_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+	u32 res_enum_idx = TEGRA_HWPM_IP_INACTIVE;
 
 	switch (res_enum) {
 	case TEGRA_SOC_HWPM_RESOURCE_VI:

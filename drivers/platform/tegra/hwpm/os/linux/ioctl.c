@@ -12,8 +12,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/clk.h>
-#include <linux/reset.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/kernel.h>
@@ -31,12 +29,11 @@
 #include <tegra_hwpm_soc.h>
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_common.h>
+#include <tegra_hwpm_clk_rst.h>
 #include <tegra_hwpm_mem_mgmt.h>
 
 #include <os/linux/driver.h>
 #include <os/linux/regops_utils.h>
-
-#define LA_CLK_RATE 625000000UL
 
 static int tegra_hwpm_get_device_info_ioctl(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_device_info *device_info)
@@ -396,48 +393,9 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 		return -EAGAIN;
 	}
 
-	if (tegra_hwpm_is_platform_silicon()) {
-		ret = reset_control_assert(hwpm_linux->hwpm_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "hwpm reset assert failed");
-			goto fail;
-		}
-		ret = reset_control_assert(hwpm_linux->la_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "la reset assert failed");
-			goto fail;
-		}
-		/* Set required parent for la_clk */
-		if (hwpm_linux->la_clk && hwpm_linux->la_parent_clk) {
-			ret = clk_set_parent(
-				hwpm_linux->la_clk, hwpm_linux->la_parent_clk);
-			if (ret < 0) {
-				tegra_hwpm_err(hwpm,
-					"la clk set parent failed");
-				goto fail;
-			}
-		}
-		/* set la_clk rate to 625 MHZ */
-		ret = clk_set_rate(hwpm_linux->la_clk, LA_CLK_RATE);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "la clock set rate failed");
-			goto fail;
-		}
-		ret = clk_prepare_enable(hwpm_linux->la_clk);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "la clock enable failed");
-			goto fail;
-		}
-		ret = reset_control_deassert(hwpm_linux->la_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "la reset deassert failed");
-			goto fail;
-		}
-		ret = reset_control_deassert(hwpm_linux->hwpm_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "hwpm reset deassert failed");
-			goto fail;
-		}
+	ret = tegra_hwpm_clk_rst_set_rate_enable(hwpm_linux);
+	if (ret != 0) {
+		goto fail;
 	}
 
 	ret = tegra_hwpm_setup_hw(hwpm);
@@ -499,11 +457,6 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	/* De-init driver on last close call only */
-	if (!atomic_dec_and_test(&hwpm_linux->usage_count.var)) {
-		return 0;
-	}
-
 	if (hwpm->device_opened == false) {
 		/* Device was not opened, do nothing */
 		return 0;
@@ -541,20 +494,16 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 		goto fail;
 	}
 
-	if (tegra_hwpm_is_platform_silicon()) {
-		ret = reset_control_assert(hwpm_linux->hwpm_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "hwpm reset assert failed");
-			err = ret;
-			goto fail;
-		}
-		ret = reset_control_assert(hwpm_linux->la_rst);
-		if (ret < 0) {
-			tegra_hwpm_err(hwpm, "la reset assert failed");
-			err = ret;
-			goto fail;
-		}
-		clk_disable_unprepare(hwpm_linux->la_clk);
+	ret = tegra_hwpm_clk_rst_disable(hwpm_linux);
+	if (ret < 0) {
+		tegra_hwpm_err(hwpm, "Failed to release clock");
+		err = ret;
+		goto fail;
+	}
+
+	/* De-init driver on last close call only */
+	if (!atomic_dec_and_test(&hwpm_linux->usage_count.var)) {
+		return 0;
 	}
 
 	hwpm->device_opened = false;

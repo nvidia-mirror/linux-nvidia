@@ -11,7 +11,13 @@ ccflags-y += -I$(srctree.nvidia)/drivers/platform/tegra/hwpm
 
 # For OOT builds, set required config flags
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
-CONFIG_TEGRA_T234_HWPM = y
+CONFIG_TEGRA_HWPM_OOT := y
+ccflags-y += -DCONFIG_TEGRA_HWPM_OOT
+
+CONFIG_TEGRA_FUSE_UPSTREAM := y
+ccflags-y += -DCONFIG_TEGRA_FUSE_UPSTREAM
+
+CONFIG_TEGRA_T234_HWPM := y
 ccflags-y += -DCONFIG_TEGRA_T234_HWPM
 NVHWPM_OBJ = m
 else

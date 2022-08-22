@@ -56,7 +56,7 @@ int tegra_hwpm_release_rtr(struct tegra_soc_hwpm *hwpm)
 int tegra_hwpm_reserve_resource(struct tegra_soc_hwpm *hwpm, u32 resource)
 {
 	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
-	u32 ip_idx = TEGRA_SOC_HWPM_IP_INACTIVE;
+	u32 ip_idx = TEGRA_HWPM_IP_INACTIVE;
 	int err = 0;
 
 	tegra_hwpm_fn(hwpm, " ");

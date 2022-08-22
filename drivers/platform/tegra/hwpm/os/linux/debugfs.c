@@ -11,7 +11,6 @@
  * more details.
  */
 
-#include <stddef.h>
 #include <linux/debugfs.h>
 
 #include <tegra_hwpm_log.h>
