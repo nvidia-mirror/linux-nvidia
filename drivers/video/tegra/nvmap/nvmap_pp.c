@@ -560,7 +560,7 @@ static struct shrinker nvmap_page_pool_shrinker = {
 	.seeks = 1,
 };
 
-static void shrink_page_pools(int *total_pages, int *available_pages)
+static void shrink_page_pools(unsigned long *total_pages, unsigned long *available_pages)
 {
 	struct shrink_control sc;
 
@@ -580,7 +580,7 @@ static int shrink_set(const char *arg, const struct kernel_param *kp)
 {
 	int cpu = smp_processor_id();
 	unsigned long long t1, t2;
-	int total_pages, available_pages;
+	unsigned long total_pages, available_pages;
 
 	param_set_int(arg, kp);
 
@@ -590,7 +590,7 @@ static int shrink_set(const char *arg, const struct kernel_param *kp)
 		shrink_page_pools(&total_pages, &available_pages);
 		t2 = cpu_clock(cpu);
 		pr_debug("shrink page pools: time=%lldns, "
-			"total_pages_released=%d, free_pages_available=%d",
+			"total_pages_released=%lu, free_pages_available=%lu",
 			t2-t1, total_pages, available_pages);
 	}
 	return 0;
