@@ -216,7 +216,7 @@ static int __init nvmap_populate_ivm_carveout(struct device *dev)
 	struct nvmap_platform_carveout *co;
 	struct of_phandle_iterator it;
 	struct tegra_hv_ivm_cookie *ivm;
-	u32 id;
+	unsigned long long id;
 	unsigned int guestid;
 
 	if (!of_phandle_iterator_init(&it, dev->of_node, "memory-region", NULL, 0)) {
@@ -243,9 +243,13 @@ static int __init nvmap_populate_ivm_carveout(struct device *dev)
 				}
 
 				id = of_read_number(prop + 1, 1);
+				if (id > UINT_MAX) {
+					ret = -EINVAL;
+					goto err;
+				}
 				ivm = tegra_hv_mempool_reserve(id);
 				if (IS_ERR_OR_NULL(ivm)) {
-					pr_err("failed to reserve IVM memory pool %d\n", id);
+					pr_err("failed to reserve IVM memory pool %llu\n", id);
 					ret = -ENOMEM;
 					goto err;
 				}
