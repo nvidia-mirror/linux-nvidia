@@ -257,7 +257,7 @@ static int __init nvmap_populate_ivm_carveout(struct device *dev)
 				co->base     = (phys_addr_t)ivm->ipa;
 				co->peer     = ivm->peer_vmid;
 				co->size     = ivm->size;
-				co->vmid     = (int)guestid;
+				co->vmid     = guestid;
 
 				if (!co->base || !co->size) {
 					ret = -EINVAL;
@@ -282,7 +282,7 @@ static int __init nvmap_populate_ivm_carveout(struct device *dev)
 
 				co->can_alloc = of_read_number(prop, 1);
 				co->is_ivm    = true;
-				sprintf(name, "ivm%02d%02d%02d", co->vmid, co->peer, co->can_alloc);
+				sprintf(name, "ivm%02u%02d%02d", co->vmid, co->peer, co->can_alloc);
 				pr_info("IVM carveout IPA:%p, size=%zu, peer vmid=%d, name=%s\n",
 					(void *)(uintptr_t)co->base, co->size, co->peer, name);
 				co->name      = name;

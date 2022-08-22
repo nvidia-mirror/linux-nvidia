@@ -3,7 +3,7 @@
  *
  * GPU heap allocator.
  *
- * Copyright (c) 2010-2021, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -43,7 +43,7 @@ struct nvmap_heap {
 	bool is_ivm;
 	bool can_alloc; /* Used only if is_ivm == true */
 	int peer; /* Used only if is_ivm == true */
-	int vm_id; /* Used only if is_ivm == true */
+	unsigned int vm_id; /* Used only if is_ivm == true */
 	struct nvmap_pm_ops pm_ops;
 #ifdef NVMAP_CONFIG_DEBUG_MAPS
 	struct rb_root device_names;
