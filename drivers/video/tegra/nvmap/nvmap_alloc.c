@@ -426,8 +426,9 @@ static int alloc_colored(u32 nr_pages,
 		 * tiles.
 		 */
 		nr_perfect = 0;
-		state.max_color_per_tile = (max_count + nr_tiles - 1)
-					   / nr_tiles;
+		state.max_color_per_tile = max_count / nr_tiles;
+		if (max_count % nr_tiles != 0)
+			(state.max_color_per_tile)++;
 	} else if (min_count == nr_tiles) {
 		/*
 		 * If pages with each color are at least the number of tiles, then all of the tiles
@@ -445,8 +446,9 @@ static int alloc_colored(u32 nr_pages,
 		 */
 		nr_perfect = min_count;
 		nr_imperfect = nr_tiles - nr_perfect;
-		state.max_color_per_tile = ((max_count - nr_perfect) + nr_imperfect - 1)
-					   / nr_imperfect;
+		state.max_color_per_tile = (max_count - nr_perfect) / nr_imperfect;
+		if ((max_count - nr_perfect) % nr_imperfect != 0)
+			(state.max_color_per_tile)++;
 	}
 	nr_imperfect = nr_tiles - nr_perfect;
 
