@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/camera/tegra_camera_platform.c
  *
- * Copyright (c) 2015-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -188,6 +188,8 @@ static int tegra_camera_isomgr_register(struct tegra_camera_info *info,
 				return -ENOMEM;
 			}
 		}
+		dev_info(info->dev, "%s vi_iso_bw=%llu, max_bw=%llu\n",
+				__func__, vi_iso_bw, info->max_bw);
 		return 0;
 	}
 #endif
@@ -244,8 +246,9 @@ static int tegra_camera_isomgr_request(
 
 #if IS_ENABLED(CONFIG_INTERCONNECT) && IS_ENABLED(CONFIG_TEGRA_T23X_GRHOST)
 	if (tegra_get_chip_id() == TEGRA234) {
+		/* VI6 does not tolerate DVFS, so we need to request max DRAM floor */
 		ret = icc_set_bw(info->icc_iso_path_handle,
-			iso_bw, (u32)info->max_bw);
+			iso_bw, UINT_MAX);
 		if (ret) {
 			dev_err(info->dev,
 			"%s: ICC failed to reserve %u KBps\n",
