@@ -896,7 +896,9 @@ static int nvpps_probe(struct platform_device *pdev)
 	}
 
 	err = of_get_gpio(np, 0);
-	if (err < 0) {
+	if (err == -EPROBE_DEFER) {
+		return err;
+	} else if (err < 0) {
 		dev_warn(&pdev->dev, "PPS GPIO not provided in DT, only Timer mode available\n");
 		pdev_data->only_timer_mode = true;
 	} else {
