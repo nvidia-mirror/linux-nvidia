@@ -415,6 +415,7 @@ static int cdi_dev_get_pwr_info(
 
 	pinfo.cam_pwr_method = info->cam_pwr_method;
 	pinfo.cam_pwr_i2c_addr = info->cam_pwr_i2c_addr;
+	memcpy(pinfo.cam_pwr_links, info->max20087.links, sizeof(u8) * MAX_POWER_LINKS_PER_BLOCK);
 
 	if (copy_to_user(arg, &pinfo, sizeof(pinfo))) {
 		dev_err(info->dev,
@@ -520,6 +521,8 @@ static int cdi_dev_probe(struct i2c_client *client,
 	struct device *pdev;
 	struct device_node *child = NULL, *child_max20087 = NULL;
 	int err;
+	int numLinks = 0;
+	int i;
 
 	dev_dbg(&client->dev, "%s: initializing link @%x-%04x\n",
 		__func__, client->adapter->nr, client->addr);
@@ -585,6 +588,28 @@ static int cdi_dev_probe(struct i2c_client *client,
 					dev_err(&client->dev, "%s: failed to read \"dat_len\"\n",
 						__func__);
 					return err;
+				}
+				/* default link mappings */
+				for (i = 0; i < MAX_POWER_LINKS_PER_BLOCK; i++) {
+					info->max20087.links[i] = i;
+				}
+				numLinks = of_property_count_elems_of_size(child_max20087, "links",
+					sizeof(u32));
+				/* Only links with MAX_POWER_LINKS_PER_BLOCK elements is valid */
+				if (numLinks == MAX_POWER_LINKS_PER_BLOCK) {
+					u32 link;
+					for (i = 0; i < numLinks; i++) {
+						err = of_property_read_u32_index(child_max20087, "links", i, &link);
+						if (err == 0) {
+							if ((link >= 0) && (link < MAX_POWER_LINKS_PER_BLOCK)) {
+								info->max20087.links[i] = (u8) link;
+							} else {
+								dev_err(&client->dev, "%s: Incorrect camera module index: %d\n",
+									__func__, link);
+								return -EINVAL;
+							}
+						}
+					}
 				}
 			}
 		}

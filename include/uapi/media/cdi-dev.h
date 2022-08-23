@@ -24,14 +24,17 @@
 
 #define DES_PWR_NVCCP    0U
 #define DES_PWR_GPIO     1U
-#define DES_PWR_NO_PWR   2U
+#define DES_PWR_NO_PWR   0xFFU
 #define CAM_PWR_NVCCP    0U
 #define CAM_PWR_MAX20087 1U
-#define CAM_PWR_NO_PWR   2U
+#define CAM_PWR_NO_PWR   0xFFU
 
-struct cdi_dev_pwr_ctrl_info {
+#define MAX_POWER_LINKS_PER_BLOCK (4U)
+
+struct __attribute__ ((__packed__)) cdi_dev_pwr_ctrl_info {
 	__s8 cam_pwr_method;
 	__s8 cam_pwr_i2c_addr;
+	__u8 cam_pwr_links[MAX_POWER_LINKS_PER_BLOCK];
 };
 
 struct __attribute__ ((__packed__)) cdi_dev_package {

@@ -16,11 +16,14 @@
 
 #include <linux/cdev.h>
 
+#define MAX_POWER_LINKS_PER_BLOCK (4U)
+
 struct max20087_priv {
 	int bus;
 	u32 addr;
 	u32 reg_len;
 	u32 dat_len;
+	u8 links[MAX_POWER_LINKS_PER_BLOCK];
 };
 
 struct cdi_dev_info {
