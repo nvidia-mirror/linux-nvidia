@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -30,6 +30,7 @@ struct isp5_slice_height {
 #define ISP5_MAX_TILE_WIDTH	U16_C(1024)
 #define ISP5_MIN_SLICE_HEIGHT	U16_C(128)
 #define ISP5_MAX_SLICE_HEIGHT	U16_C(540)
+#define ISP5_MAX_OVERFETCH      U16_C(18)
 
 static inline uint16_t isp5_min_u16(const uint16_t a, const uint16_t b)
 {
@@ -432,7 +433,7 @@ static bool isp5_find_slice_height(const uint16_t img_height,
 		slicing->slice_height = slice_height;
 		slicing->slices_in_image = slice_count;
 		slicing->vi_first_slice_height = (slice_count == 1U) ?
-						 slice_height : (slice_height + 18U);
+						 slice_height : (slice_height + ISP5_MAX_OVERFETCH);
 		ret = true;
 	}
 	return ret;
