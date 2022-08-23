@@ -22,14 +22,28 @@ int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
 {
 	int ret = 0;
 
-	hwpm->alist_map->full_alist_size = 0ULL;
-
 	tegra_hwpm_fn(hwpm, " ");
 
-	ret = tegra_hwpm_func_all_ip(hwpm, NULL, TEGRA_HWPM_GET_ALIST_SIZE);
-	if (ret != 0) {
-		tegra_hwpm_err(hwpm, "get_alist_size failed");
-		return ret;
+	if (hwpm->alist_map == NULL) {
+		/* Allocate tegra_hwpm_allowlist_map */
+		hwpm->alist_map = tegra_hwpm_kzalloc(hwpm,
+			sizeof(struct tegra_hwpm_allowlist_map));
+		if (!hwpm->alist_map) {
+			tegra_hwpm_err(NULL,
+				"Couldn't allocate allowlist map structure");
+			return -ENOMEM;
+		}
+		hwpm->alist_map->full_alist_size = 0ULL;
+	}
+
+	if (hwpm->alist_map->full_alist_size == 0) {
+		/* Full alist size is not computed yet */
+		ret = tegra_hwpm_func_all_ip(hwpm, NULL,
+				TEGRA_HWPM_GET_ALIST_SIZE);
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm, "get_alist_size failed");
+			return ret;
+		}
 	}
 
 	return 0;

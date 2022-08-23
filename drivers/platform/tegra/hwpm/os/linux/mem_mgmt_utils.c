@@ -265,7 +265,9 @@ int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm)
 		u32 *mem_bytes_kernel_u32 =
 			(u32 *)(hwpm->mem_mgmt->mem_bytes_kernel);
 		u32 sleep_msecs = 100;
-		struct tegra_hwpm_timeout timeout;
+		struct tegra_hwpm_timeout timeout = {0};
+
+		*mem_bytes_kernel_u32 = TEGRA_HWPM_MEM_BYTES_INVALID;
 
 		do {
 			ret = hwpm->active_chip->stream_mem_bytes(hwpm);
@@ -372,11 +374,6 @@ int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	if (hwpm->alist_map->full_alist_size == 0ULL) {
-		tegra_hwpm_err(hwpm, "Invalid allowlist size");
-		return -EINVAL;
-	}
-
 	if (hwpm->alist_map == NULL) {
 		/* Allocate tegra_hwpm_allowlist_map */
 		hwpm->alist_map = tegra_hwpm_kzalloc(hwpm,
@@ -386,6 +383,12 @@ int tegra_hwpm_map_update_allowlist(struct tegra_soc_hwpm *hwpm,
 				"Couldn't allocate allowlist map structure");
 			return -ENOMEM;
 		}
+	}
+
+	if (hwpm->alist_map->full_alist_size == 0ULL) {
+		tegra_hwpm_err(hwpm,
+			"Allowlist size should be computed before");
+		return -EINVAL;
 	}
 
 	alist_buf_size =
@@ -448,20 +451,20 @@ void tegra_hwpm_release_alist_map(struct tegra_soc_hwpm *hwpm)
 {
 	u64 idx = 0U;
 
-	if (hwpm->alist_map->full_alist_map) {
-		vunmap(hwpm->alist_map->full_alist_map);
-	}
-
-	for (idx = 0ULL; idx < hwpm->alist_map->num_pages; idx++) {
-		set_page_dirty(hwpm->alist_map->pages[idx]);
-		put_page(hwpm->alist_map->pages[idx]);
-	}
-
-	if (hwpm->alist_map->pages) {
-		tegra_hwpm_kfree(hwpm, hwpm->alist_map->pages);
-	}
-
 	if (hwpm->alist_map) {
+		if (hwpm->alist_map->full_alist_map) {
+			vunmap(hwpm->alist_map->full_alist_map);
+		}
+
+		for (idx = 0ULL; idx < hwpm->alist_map->num_pages; idx++) {
+			set_page_dirty(hwpm->alist_map->pages[idx]);
+			put_page(hwpm->alist_map->pages[idx]);
+		}
+
+		if (hwpm->alist_map->pages) {
+			tegra_hwpm_kfree(hwpm, hwpm->alist_map->pages);
+		}
+
 		tegra_hwpm_kfree(hwpm, hwpm->alist_map);
 	}
 }

@@ -119,7 +119,7 @@ int t234_hwpm_enable_mem_mgmt(struct tegra_soc_hwpm *hwpm)
 		return err;
 	}
 	tegra_hwpm_dbg(hwpm, hwpm_verbose,
-		"MEM_BYTES_ADDR = 0x%x", mem_bytes_addr);
+		"MEM_BYTES_ADDR = 0x%llx", mem_bytes_addr);
 
 	err = tegra_hwpm_writel(hwpm, pma_perfmux,
 		pmasys_channel_mem_block_r(0),

@@ -191,14 +191,11 @@ static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 
 	if (query_allowlist->allowlist == NULL) {
 		/* Userspace is querying allowlist size only */
-		if (hwpm->alist_map->full_alist_size == 0) {
-			/*Full alist size is not computed yet */
-			ret = tegra_hwpm_get_allowlist_size(hwpm);
-			if (ret != 0) {
-				tegra_hwpm_err(hwpm,
-					"failed to get alist_size");
-				return ret;
-			}
+		ret = tegra_hwpm_get_allowlist_size(hwpm);
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm,
+				"failed to get alist_size");
+			return ret;
 		}
 		query_allowlist->allowlist_size =
 			hwpm->alist_map->full_alist_size;
@@ -248,12 +245,11 @@ static long tegra_hwpm_ioctl(struct file *file,
 {
 	int ret = 0;
 	struct tegra_soc_hwpm *hwpm = NULL;
-	u8 *buf;
+	u8 *buf = NULL;
 
 	if ((_IOC_TYPE(cmd) != TEGRA_SOC_HWPM_IOC_MAGIC) ||
-	    (_IOC_NR(cmd) < 0) ||
-	    (_IOC_NR(cmd) >= TERGA_SOC_HWPM_NUM_IOCTLS) ||
-	    (_IOC_SIZE(cmd) > TEGRA_SOC_HWPM_MAX_ARG_SIZE)) {
+		(_IOC_NR(cmd) >= TERGA_SOC_HWPM_NUM_IOCTLS) ||
+		(_IOC_SIZE(cmd) > TEGRA_SOC_HWPM_MAX_ARG_SIZE)) {
 		tegra_hwpm_err(hwpm, "Invalid IOCTL call");
 		ret = -EINVAL;
 		goto fail;
