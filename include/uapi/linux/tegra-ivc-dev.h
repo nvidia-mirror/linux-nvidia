@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
@@ -32,7 +32,7 @@
 #ifndef __UAPI_TEGRA_IVC_DEV_H
 #define __UAPI_TEGRA_IVC_DEV_H
 
-#include <uapi/linux/ioctl.h>
+#include <linux/ioctl.h>
 
 struct nvipc_ivc_info {
 	uint32_t nframes;
@@ -56,6 +56,12 @@ struct nvipc_ivc_info {
 #define NVIPC_IVC_IOCTL_NOTIFY_REMOTE \
 	_IO(NVIPC_IVC_IOCTL_MAGIC, 2)
 
-#define NVIPC_IVC_IOCTL_NUMBER_MAX 2
+/* query vmid */
+#define NVIPC_IVC_IOCTL_GET_VMID \
+	_IOR(NVIPC_IVC_IOCTL_MAGIC, 3, uint32_t)
+
+#define NVIPC_IVC_IOCTL_NUMBER_MAX 3
+
+int ivc_cdev_get_peer_vmid(uint32_t qid, uint32_t *peer_vmid);
 
 #endif

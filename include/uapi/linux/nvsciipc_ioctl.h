@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
@@ -56,7 +56,7 @@ struct nvsciipc_config_entry {
 	char remote_ip[NVSCIIPC_MAX_IP_NAME];
 	uint32_t remote_port;
 	uint32_t local_port;
-	uint32_t reserved;
+	uint32_t peer_vmid;
 };
 
 struct nvsciipc_db {
@@ -81,6 +81,25 @@ struct nvsciipc_get_db_by_vuid {
 	uint32_t idx;
 };
 
+/* for userspace level test, debugging purpose only */
+struct nvsciipc_validate_auth_token {
+	uint32_t auth_token;
+	uint64_t local_vuid;
+};
+
+/* NvSciIpcTopoId type */
+struct nvsciipc_topoid {
+	uint32_t socid;
+	uint32_t vmid;
+};
+
+/* for userspace level test, debugging purpose only */
+struct nvsciipc_map_vuid {
+	uint64_t vuid;
+	struct nvsciipc_topoid peer_topoid;
+	uint64_t peer_vuid;
+};
+
 /* IOCTL magic number - seen available in ioctl-number.txt*/
 #define NVSCIIPC_IOCTL_MAGIC    0xC3
 
@@ -96,6 +115,17 @@ struct nvsciipc_get_db_by_vuid {
 #define NVSCIIPC_IOCTL_GET_DB_BY_VUID \
 	_IOWR(NVSCIIPC_IOCTL_MAGIC, 4, struct nvsciipc_get_db_by_vuid)
 
-#define NVSCIIPC_IOCTL_NUMBER_MAX 4
+#define NVSCIIPC_IOCTL_GET_DB_SIZE \
+	_IOR(NVSCIIPC_IOCTL_MAGIC, 5, uint32_t)
+
+/* debugging purpose only */
+#define NVSCIIPC_IOCTL_VALIDATE_AUTH_TOKEN \
+	_IOWR(NVSCIIPC_IOCTL_MAGIC, 6, struct nvsciipc_validate_auth_token)
+
+/* debugging purpose only */
+#define NVSCIIPC_IOCTL_MAP_VUID \
+	_IOWR(NVSCIIPC_IOCTL_MAGIC, 7, struct nvsciipc_map_vuid)
+
+#define NVSCIIPC_IOCTL_NUMBER_MAX 7
 
 #endif /* __NVSCIIPC_IOCTL_H__ */

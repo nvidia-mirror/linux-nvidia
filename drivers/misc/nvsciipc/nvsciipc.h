@@ -41,9 +41,22 @@ struct nvsciipc {
 	struct device *device;
 	char device_name[MAX_NAME_SIZE];
 
-	volatile int num_eps;
+	int num_eps;
 	struct nvsciipc_config_entry **db;
 	volatile bool set_db_f;
+};
+
+struct vuid_bitfield_64 {
+	uint64_t index    : 16;
+	uint64_t type     : 4;
+	uint64_t vmid     : 8;
+	uint64_t socid    : 28;
+	uint64_t reserved : 8;
+};
+
+union nvsciipc_vuid_64 {
+	uint64_t value;
+	struct vuid_bitfield_64 bit;
 };
 
 /***********************************************************************/

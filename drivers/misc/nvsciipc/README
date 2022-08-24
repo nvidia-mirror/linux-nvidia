@@ -7,21 +7,21 @@ sudo apt-get install linux-headers-`uname -r`
 check version of desktop using "uname -r" command.
 kernel version must be 5.4.0+.
 
-2) link common header files
+2) link common header files (NVIDIA internal dev only)
 export NVSCIIPC_INCLUDE=${PWD}/../../../include
 ln -s ${NVSCIIPC_INCLUDE}/linux ./
 ln -s ${NVSCIIPC_INCLUDE}/uapi ./
 
 3) build
-cd nvsciipc
 make -C /lib/modules/`uname -r`/build M=${PWD} CONFIG_TEGRA_OOT_MODULE=m modules
 
 4) install NvSciIpc KMD
 sudo make -C /lib/modules/`uname -r`/build M=${PWD} CONFIG_TEGRA_OOT_MODULE=m modules_install
+sudo depmod -a
 
 nvsciipc.ko will be installed in /lib/modules/`uname -r`/extra/nvsciipc.ko
 
-If kernel module installation is failed by missing signing key, follow steps below
+[NOTE] If kernel module installation is failed by missing signing key, follow steps below
 
 ** create x509.genkey
 echo -e "[ req ] \n\

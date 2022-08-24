@@ -25,8 +25,11 @@
 #include <uapi/linux/tegra-ivc-dev.h>
 #include "tegra_hv.h"
 
-#define ERR(...) pr_err("ivc: " __VA_ARGS__)
-#define DBG(...) pr_debug("ivc: " __VA_ARGS__)
+#define ERR(...) pr_err("ivc-cdev: " __VA_ARGS__)
+#define INFO(...) pr_info("ivc-cdev: " __VA_ARGS__)
+#define DBG(...) pr_debug("ivc-cdev: " __VA_ARGS__)
+
+#define INVALID_VMID 0xFFFFFFFF
 
 struct ivc_dev {
 	int			minor;
@@ -51,7 +54,10 @@ struct ivc_dev {
 };
 
 static dev_t ivc_dev;
-static const struct ivc_info_page *info;
+static const struct ivc_info_page *s_infop;
+/* setup_ivc() set guest id */
+static uint32_t s_guestid = INVALID_VMID;
+
 
 static irqreturn_t ivc_dev_handler(int irq, void *data)
 {
@@ -256,23 +262,31 @@ static long ivc_dev_ioctl(struct file *filp, unsigned int cmd,
 	/* validate the cmd */
 	if (_IOC_TYPE(cmd) != NVIPC_IVC_IOCTL_MAGIC) {
 		dev_err(ivcd->device, "%s: not a ivc ioctl\n", __func__);
-		return -ENOTTY;
+		ret = -ENOTTY;
+		goto exit;
 	}
 
 	if (_IOC_NR(cmd) > NVIPC_IVC_IOCTL_NUMBER_MAX) {
 		dev_err(ivcd->device, "%s: wrong ivc ioctl\n", __func__);
 		ret = -ENOTTY;
+		goto exit;
+	}
+
+	if (s_guestid == INVALID_VMID) {
+		ERR("VMID is NOT initialized yet");
+		ret = -EFAULT;
+		goto exit;
 	}
 
 	switch (cmd) {
 	case NVIPC_IVC_IOCTL_GET_INFO:
 	case NVIPC_IVC_IOCTL_GET_INFO_LEGACY:
 		ret = tegra_hv_ivc_get_info(ivcd->ivck, &ivc_area_ipa,
-					    &ivc_area_size);
+				&ivc_area_size);
 		if (ret < 0) {
 			dev_err(ivcd->device, "%s: get_info failed\n",
 				__func__);
-			return ret;
+			goto exit;
 		}
 
 		info.nframes = ivcd->qd->nframes;
@@ -298,8 +312,7 @@ static long ivc_dev_ioctl(struct file *filp, unsigned int cmd,
 			info.rx_first = (ivcd->qd->id & 1) == 0;
 
 		} else {
-			info.rx_first = (tegra_hv_get_vmid() ==
-					 ivcd->qd->peers[0]);
+			info.rx_first = (s_guestid == ivcd->qd->peers[0]);
 		}
 
 		if (cmd == NVIPC_IVC_IOCTL_GET_INFO) {
@@ -308,7 +321,7 @@ static long ivc_dev_ioctl(struct file *filp, unsigned int cmd,
 				ret = -EFAULT;
 			}
 		} else {
-		/* Added temporarily. will be removed */
+			/* Added temporarily. will be removed */
 			if (copy_to_user((void __user *) arg, &info,
 				sizeof(struct nvipc_ivc_info) - 16)) {
 				ret = -EFAULT;
@@ -321,10 +334,18 @@ static long ivc_dev_ioctl(struct file *filp, unsigned int cmd,
 		tegra_hv_ivc_notify(ivcd->ivck);
 		break;
 
+	case NVIPC_IVC_IOCTL_GET_VMID:
+		if (copy_to_user((void __user *) arg, &s_guestid,
+			sizeof(s_guestid))) {
+			ret = -EFAULT;
+		}
+		break;
+
 	default:
 		ret = -ENOTTY;
 	}
 
+exit:
 	return ret;
 }
 
@@ -386,9 +407,13 @@ static ssize_t peer_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	struct ivc_dev *ivc = dev_get_drvdata(dev);
-	int guestid = tegra_hv_get_vmid();
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", ivc->qd->peers[0] == guestid
+	if (s_guestid == INVALID_VMID) {
+		ERR("VMID is NOT initialized yet");
+		return 0;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", (ivc->qd->peers[0] == s_guestid)
 			? ivc->qd->peers[1] : ivc->qd->peers[0]);
 }
 
@@ -415,7 +440,7 @@ static struct class *ivc_class;
 
 static int __init add_ivc(int i)
 {
-	const struct tegra_hv_queue_data *qd = &ivc_info_queue_array(info)[i];
+	const struct tegra_hv_queue_data *qd = &ivc_info_queue_array(s_infop)[i];
 	struct ivc_dev *ivc = &ivc_dev_array[i];
 	int ret;
 
@@ -455,12 +480,18 @@ static int __init add_ivc(int i)
 static int __init setup_ivc(void)
 {
 	uint32_t i;
+	int32_t id;
 	int result;
 
+	if (s_infop == NULL) {
+		ERR("ivc info is not initialized");
+		return -EFAULT;
+	}
+
 	max_qid = 0;
-	for (i = 0; i < info->nr_queues; i++) {
+	for (i = 0; i < s_infop->nr_queues; i++) {
 		const struct tegra_hv_queue_data *qd =
-				&ivc_info_queue_array(info)[i];
+				&ivc_info_queue_array(s_infop)[i];
 		if (qd->id > max_qid)
 			max_qid = qd->id;
 	}
@@ -479,7 +510,7 @@ static int __init setup_ivc(void)
 	}
 	ivc_class->dev_groups = ivc_groups;
 
-	ivc_dev_array = kcalloc(info->nr_queues, sizeof(*ivc_dev_array),
+	ivc_dev_array = kcalloc(s_infop->nr_queues, sizeof(*ivc_dev_array),
 			GFP_KERNEL);
 	if (!ivc_dev_array) {
 		ERR("failed to allocate ivc_dev_array");
@@ -490,21 +521,30 @@ static int __init setup_ivc(void)
 	 * Make a second pass through the queues to instantiate the char devs
 	 * corresponding to existent queues.
 	 */
-	for (i = 0; i < info->nr_queues; i++) {
+	for (i = 0; i < s_infop->nr_queues; i++) {
 		result = add_ivc(i);
 		if (result != 0)
 			return result;
 	}
 
+	id = tegra_hv_get_vmid();
+	if (id < 0) {
+		ERR("failed to get VMID");
+		return -EFAULT;
+	}
+	s_guestid = (uint32_t)id;
+
+	INFO("guest ID: %d\n", s_guestid);
+
 	return 0;
 }
 
-static void __init cleanup_ivc(void)
+static void cleanup_ivc(void)
 {
 	uint32_t i;
 
-	if (ivc_dev_array) {
-		for (i = 0; i < info->nr_queues; i++) {
+	if (ivc_dev_array && (s_infop != NULL)) {
+		for (i = 0; i < s_infop->nr_queues; i++) {
 			struct ivc_dev *ivc = &ivc_dev_array[i];
 
 			if (ivc->device) {
@@ -532,14 +572,14 @@ static int __init ivc_init(void)
 	int result;
 
 	if (is_tegra_hypervisor_mode() == false) {
-		pr_info("ivc_init: hypervisor not present\n");
+		INFO("hypervisor not present\n");
 		/*retunring success in case of native kernel otherwise
 		  systemd-modules-load service will failed.*/
 		return 0;
 	}
 
-	info = tegra_hv_get_ivc_info();
-	if (IS_ERR(info))
+	s_infop = tegra_hv_get_ivc_info();
+	if (IS_ERR(s_infop))
 		return -ENODEV;
 
 	result = setup_ivc();
@@ -549,6 +589,50 @@ static int __init ivc_init(void)
 	return result;
 }
 
+static void __exit ivc_exit(void)
+{
+	if (is_tegra_hypervisor_mode() == false) {
+		INFO("hypervisor not present\n");
+		return;
+	}
+
+	cleanup_ivc();
+}
+
+int ivc_cdev_get_peer_vmid(uint32_t qid, uint32_t *peer_vmid)
+{
+	uint32_t i;
+	int32_t ret = -ENOENT;
+
+	if ((s_infop == NULL) || (s_guestid == INVALID_VMID)) {
+		ERR("ivc info or VMID is NOT initialized yet");
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	for (i = 0; i < s_infop->nr_queues; i++) {
+		struct ivc_dev *ivc = &ivc_dev_array[i];
+
+		if (ivc->qd->id == qid) {
+			if (ivc->qd->peers[0] == s_guestid)
+				*peer_vmid = ivc->qd->peers[1];
+			else
+				*peer_vmid = ivc->qd->peers[0];
+			ret = 0;
+			DBG("found qid %d: peer_vmid=%d\n", qid, *peer_vmid);
+			break;
+		}
+	}
+
+	if (ret != 0)
+		INFO("qid %d not found\n", qid);
+
+exit:
+	return ret;
+}
+EXPORT_SYMBOL(ivc_cdev_get_peer_vmid);
+
 module_init(ivc_init);
+module_exit(ivc_exit);
 
 MODULE_LICENSE("GPL");
