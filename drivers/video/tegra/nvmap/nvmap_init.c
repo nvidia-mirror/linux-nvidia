@@ -350,17 +350,16 @@ static inline struct page **nvmap_kvzalloc_pages(u32 count)
 
 static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 					     struct dma_coherent_mem_replica *mem,
-					     ssize_t size,
+					     size_t size,
 					     dma_addr_t *dma_handle,
 					     unsigned long attrs,
 					     unsigned long start)
 {
 	int order = get_order(size);
 	unsigned long flags;
-	int pageno, i = 0, j = 0;
-	unsigned int count;
+	unsigned int count, i = 0, j = 0;
 	unsigned int alloc_size;
-	unsigned long align;
+	unsigned long align, pageno;
 	void *addr = NULL;
 	struct page **pages = NULL;
 	int do_memset = 0;
