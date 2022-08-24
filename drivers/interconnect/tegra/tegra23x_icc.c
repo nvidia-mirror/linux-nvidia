@@ -49,24 +49,23 @@ static void classify_bw_reqs(struct icc_provider *provider,
 		case TEGRA_ICC_ISO_VI:
 			req->bwmgr_rate_req.isobw_reqs[1].id = TEGRA_ICC_VI;
 			req->bwmgr_rate_req.isobw_reqs[1].iso_bw += n->avg_bw;
+			*max_floor_kbps = max(*max_floor_kbps, n->peak_bw);
 			break;
 		case TEGRA_ICC_ISO_AUDIO:
 			req->bwmgr_rate_req.isobw_reqs[2].id = TEGRA_ICC_APE;
 			req->bwmgr_rate_req.isobw_reqs[2].iso_bw += n->avg_bw;
+			*max_floor_kbps = max(*max_floor_kbps, n->peak_bw);
 			break;
 		case TEGRA_ICC_ISO_VIFAL:
 			req->bwmgr_rate_req.isobw_reqs[3].id = TEGRA_ICC_VIFAL;
 			req->bwmgr_rate_req.isobw_reqs[3].iso_bw += n->avg_bw;
+			*max_floor_kbps = max(*max_floor_kbps, n->peak_bw);
 			break;
 		default:
 			break;
 		}
 	}
 	req->bwmgr_rate_req.num_iso_clients = NUM_ISO_CLIENT_TYPES;
-
-	/* VI cannot tolerate DVFS, request max dram floor when VI is active */
-	if (req->bwmgr_rate_req.isobw_reqs[1].iso_bw)
-		*max_floor_kbps = UINT_MAX;
 }
 
 static uint32_t get_bw(struct mrq_bwmgr_request *req,
