@@ -95,7 +95,7 @@ struct nvmap_platform_carveout {
 	struct device dev;
 	struct dma_declare_info *dma_info;
 	bool is_ivm;
-	int peer;
+	unsigned int peer;
 	unsigned int vmid;
 	int can_alloc;
 	bool enable_static_dma_map;

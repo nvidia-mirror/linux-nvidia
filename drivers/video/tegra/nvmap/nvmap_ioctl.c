@@ -728,13 +728,12 @@ int nvmap_ioctl_get_ivc_heap(struct file *filp, void __user *arg)
 
 	for (i = 0; i < dev->nr_carveouts; i++) {
 		struct nvmap_carveout_node *co_heap = &dev->heaps[i];
-		int peer;
+		unsigned int peer;
 
 		if (!(co_heap->heap_bit & NVMAP_HEAP_CARVEOUT_IVM))
 			continue;
 
-		peer = nvmap_query_heap_peer(co_heap->carveout);
-		if (peer < 0)
+		if (nvmap_query_heap_peer(co_heap->carveout, &peer) < 0)
 			return -EINVAL;
 
 		heap_mask |= BIT(peer);
@@ -754,7 +753,7 @@ int nvmap_ioctl_create_from_ivc(struct file *filp, void __user *arg)
 	int fd;
 	phys_addr_t offs;
 	size_t size = 0;
-	int peer;
+	unsigned int peer;
 	struct nvmap_heap_block *block = NULL;
 
 	/* First create a new handle and then fake carveout allocation */

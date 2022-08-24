@@ -256,7 +256,7 @@ struct nvmap_handle {
 	struct mutex lock;
 	struct list_head dmabuf_priv;
 	u64 ivm_id;
-	int peer;		/* Peer VM number */
+	unsigned int peer;	/* Peer VM number */
 	int offs;		/* Offset in IVM mem pool */
 	/*
 	 * To be set only in handle created from VA case if the handle is
@@ -532,7 +532,7 @@ void outer_cache_maint(unsigned int op, phys_addr_t paddr, size_t size);
 int nvmap_alloc_handle(struct nvmap_client *client,
 		       struct nvmap_handle *h, unsigned int heap_mask,
 		       size_t align, u8 kind,
-		       unsigned int flags, int peer);
+		       unsigned int flags, unsigned int peer);
 
 int nvmap_alloc_handle_from_va(struct nvmap_client *client,
 			       struct nvmap_handle *h,

@@ -810,7 +810,7 @@ int nvmap_alloc_handle(struct nvmap_client *client,
 		       size_t align,
 		       u8 kind,
 		       unsigned int flags,
-		       int peer)
+		       unsigned int peer)
 {
 	const unsigned int *alloc_policy;
 	size_t nr_page;

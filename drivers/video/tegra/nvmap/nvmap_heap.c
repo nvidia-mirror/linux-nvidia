@@ -89,12 +89,12 @@ struct device *dma_dev_from_handle(unsigned long type)
 	return ERR_PTR(-ENODEV);
 }
 
-int nvmap_query_heap_peer(struct nvmap_heap *heap)
+int nvmap_query_heap_peer(struct nvmap_heap *heap, unsigned int *peer)
 {
 	if (!heap || !heap->is_ivm)
 		return -EINVAL;
-
-	return heap->peer;
+	*peer = heap->peer;
+	return 0;
 }
 
 size_t nvmap_query_heap_size(struct nvmap_heap *heap)

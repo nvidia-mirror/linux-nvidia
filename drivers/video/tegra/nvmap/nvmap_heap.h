@@ -42,7 +42,7 @@ struct nvmap_heap {
 	struct device *dma_dev;
 	bool is_ivm;
 	bool can_alloc; /* Used only if is_ivm == true */
-	int peer; /* Used only if is_ivm == true */
+	unsigned int peer; /* Used only if is_ivm == true */
 	unsigned int vm_id; /* Used only if is_ivm == true */
 	struct nvmap_pm_ops pm_ops;
 #ifdef NVMAP_CONFIG_DEBUG_MAPS
@@ -73,7 +73,7 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 
 void nvmap_heap_debugfs_init(struct dentry *heap_root, struct nvmap_heap *heap);
 
-int nvmap_query_heap_peer(struct nvmap_heap *heap);
+int nvmap_query_heap_peer(struct nvmap_heap *heap, unsigned int *peer);
 size_t nvmap_query_heap_size(struct nvmap_heap *heap);
 
 #endif
