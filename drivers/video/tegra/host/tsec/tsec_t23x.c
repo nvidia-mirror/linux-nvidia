@@ -602,6 +602,7 @@ static void tsec_poweron_handler(struct work_struct *work)
 	struct tsec_t23x_device *tsec_dev;
 	struct nvhost_device_data *pdata;
 	const struct firmware *tsec_fw_desc;
+	int ret;
 
 	tsec_dev = container_of(to_delayed_work(work), struct tsec_t23x_device,
 			    poweron_work);
@@ -614,7 +615,11 @@ static void tsec_poweron_handler(struct work_struct *work)
 			"tsec fw req success in %d ms\n",
 			tsec_dev->fwreq_duration_ms);
 		release_firmware(tsec_fw_desc);
-		nvhost_module_busy(tsec_dev->pdev);
+		ret = nvhost_module_busy(tsec_dev->pdev);
+		if (ret != 0)
+			dev_dbg(&(tsec_dev->pdev->dev),
+				"nvhost_module_busy returned with error: %d\n",
+				ret);
 	} else if (tsec_dev->fwreq_duration_ms < tsec_dev->fwreq_fail_threshold_ms) {
 		dev_info(&(tsec_dev->pdev->dev),
 			"retry tsec fw req, total retry duration %d ms\n",
