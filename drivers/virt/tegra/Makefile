@@ -8,4 +8,5 @@ obj-$(CONFIG_TEGRA_HV_MANAGER)		+= tegra_hv.o
 obj-$(CONFIG_TEGRA_HV_SYSFS)		+= hvc_sysfs.o
 obj-$(CONFIG_TEGRA_HV_IVC_CDEV)		+= ivc-cdev.o
 obj-$(CONFIG_TEGRA_HV_MEMPOOL_CDEV)	+= userspace_ivc_mempool.o
+obj-$(CONFIG_TEGRA_HV_VCPU_YIELD)	+= tegra_hv_vcpu_yield.o
 

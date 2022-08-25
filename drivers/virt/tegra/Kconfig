@@ -48,3 +48,10 @@ config	TEGRA_VIRTUALIZATION
 	  Select y to enable virtualization features on the tegra platforms
 	  that support it.
 
+config TEGRA_HV_VCPU_YIELD
+	tristate "Nvidia Tegra hypervisor vcpu yield"
+	depends on TEGRA_HV_MANAGER
+	help
+	  Nvidia Tegra hypervisor vcpu yield provides support to yield vcpu for
+	  a specific time to a low priority VM running on the same physical core
+
