@@ -38,8 +38,15 @@
 #include <crypto/akcipher.h>
 #include <crypto/aead.h>
 #include <crypto/internal/skcipher.h>
+#include <crypto/internal/rng.h>
+#include <crypto/internal/hash.h>
+#include <crypto/internal/aead.h>
+#include <crypto/sha.h>
+#include <crypto/sha3.h>
 #include <uapi/misc/tegra-nvvse-cryptodev.h>
 #include <asm/barrier.h>
+
+#include "tegra-hv-vse.h"
 
 #define NBUFS				2
 #define XBUFSIZE			8
@@ -193,6 +200,7 @@ static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
 		struct tegra_nvvse_sha_init_ctl *init_ctl)
 {
 	struct crypto_sha_state *sha_state = &ctx->sha_state;
+	struct tegra_virtual_se_sha_context *sha_ctx;
 	struct crypto_ahash *tfm;
 	struct ahash_request *req;
 	const char *driver_name;
@@ -213,6 +221,9 @@ static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
 		ret = PTR_ERR(tfm);
 		goto out;
 	}
+
+	sha_ctx = crypto_ahash_ctx(tfm);
+	sha_ctx->node_id = ctx->node_id;
 
 	driver_name = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));;
 	if (driver_name == NULL) {
@@ -427,6 +438,7 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 	const char *driver_name;
 	struct ahash_request *req;
 	struct tnvvse_crypto_completion sha_complete;
+	struct tegra_virtual_se_aes_cmac_context *cmac_ctx;
 	unsigned long *xbuf[XBUFSIZE];
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	struct tnvvse_cmac_req_data priv_data;
@@ -445,6 +457,9 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 		pr_err("%s(): Failed to allocate ahash for cmac-vse(aes): %d\n", __func__, ret);
 		goto free_result;
 	}
+
+	cmac_ctx = crypto_ahash_ctx(tfm);
+	cmac_ctx->node_id = ctx->node_id;
 
 	driver_name = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
 	if (driver_name == NULL) {
@@ -569,6 +584,7 @@ static int tnvvse_crypto_aes_gmac_init(struct tnvvse_crypto_ctx *ctx,
 		struct tegra_nvvse_aes_gmac_init_ctl *gmac_init_ctl)
 {
 	struct crypto_sha_state *sha_state = &ctx->sha_state;
+	struct tegra_virtual_se_aes_gmac_context *gmac_ctx;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	struct crypto_ahash *tfm;
 	struct ahash_request *req;
@@ -584,6 +600,9 @@ static int tnvvse_crypto_aes_gmac_init(struct tnvvse_crypto_ctx *ctx,
 		ret = PTR_ERR(tfm);
 		goto out;
 	}
+
+	gmac_ctx = crypto_ahash_ctx(tfm);
+	gmac_ctx->node_id = ctx->node_id;
 
 	driver_name = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
 	if (driver_name == NULL) {
@@ -644,6 +663,7 @@ static int tnvvse_crypto_aes_gmac_sign_verify_init(struct tnvvse_crypto_ctx *ctx
 		struct tegra_nvvse_aes_gmac_sign_verify_ctl *gmac_sign_verify_ctl)
 {
 	struct crypto_sha_state *sha_state = &ctx->sha_state;
+	struct tegra_virtual_se_aes_gmac_context *gmac_ctx;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	struct crypto_ahash *tfm;
 	struct ahash_request *req;
@@ -658,6 +678,9 @@ static int tnvvse_crypto_aes_gmac_sign_verify_init(struct tnvvse_crypto_ctx *ctx
 		ret = PTR_ERR(tfm);
 		goto out;
 	}
+
+	gmac_ctx = crypto_ahash_ctx(tfm);
+	gmac_ctx->node_id = ctx->node_id;
 
 	driver_name = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
 	if (driver_name == NULL) {
@@ -875,6 +898,7 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	int ret = 0, size = 0;
 	unsigned long total = 0;
 	struct tnvvse_crypto_completion tcrypt_complete;
+	struct tegra_virtual_se_aes_context *aes_ctx;
 	char aes_algo[5][15] = {"cbc-vse(aes)", "ecb-vse(aes)", "ctr-vse(aes)"};
 	const char *driver_name;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
@@ -899,6 +923,9 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 		ret = PTR_ERR(tfm);
 		goto out;
 	}
+
+	aes_ctx = crypto_skcipher_ctx(tfm);
+	aes_ctx->node_id = ctx->node_id;
 
 	req = skcipher_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1142,6 +1169,7 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 	uint32_t in_sz, out_sz, aad_length, data_length, tag_length;
 	uint32_t i, idx, offset, data_length_copied, data_length_remaining, tag_length_copied;
 	struct tnvvse_crypto_completion tcrypt_complete;
+	struct tegra_virtual_se_aes_context *aes_ctx;
 	const char *driver_name;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	uint8_t iv[TEGRA_NVVSE_AES_GCM_IV_LEN];
@@ -1170,6 +1198,9 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 		ret = PTR_ERR(tfm);
 		goto out;
 	}
+
+	aes_ctx = crypto_aead_ctx(tfm);
+	aes_ctx->node_id = ctx->node_id;
 
 	req = aead_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1500,6 +1531,7 @@ out:
 static int tnvvse_crypto_get_aes_drng(struct tnvvse_crypto_ctx *ctx,
 		struct tegra_nvvse_aes_drng_ctl *aes_drng_ctl)
 {
+	struct tegra_virtual_se_rng_context *rng_ctx;
 	struct crypto_rng *rng;
 	int ret = -ENOMEM;
 
@@ -1509,6 +1541,9 @@ static int tnvvse_crypto_get_aes_drng(struct tnvvse_crypto_ctx *ctx,
 		pr_err("(%s(): Failed to allocate crypto for rng_dbg, %d\n", __func__, ret);
 		goto out;
 	}
+
+	rng_ctx = crypto_rng_ctx(rng);
+	rng_ctx->node_id = ctx->node_id;
 
 	memset(ctx->rng_buff, 0, ctx->max_rng_buff);
 	ret = crypto_rng_get_bytes(rng, ctx->rng_buff, aes_drng_ctl->data_length);

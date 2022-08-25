@@ -341,6 +341,7 @@ F:	include/trace/events/tegra_rtcpu.h
 
 SECURITY
 M:	Mallikarjun Kasoju <mkasoju@nvidia.com>
+M:	Manish Bhardwaj <mbhardwaj@nvidia.com>
 L:	Tegra_kernel_security@exchange.nvidia.com
 B:	Mobile_Security
 S:	Supported
