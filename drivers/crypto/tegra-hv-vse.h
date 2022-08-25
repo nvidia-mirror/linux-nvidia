@@ -11,6 +11,13 @@ struct tegra_vse_soc_info {
 	bool gcm_decrypt_supported;
 };
 
+struct crypto_dev_to_ivc_map {
+	uint32_t ivc_id;
+	uint32_t se_engine;
+	uint32_t node_id;
+	struct tegra_hv_ivc_cookie *ivck;
+};
+
 struct tegra_virtual_se_dev {
 	struct device *dev;
 	struct mutex mtx;
@@ -27,6 +34,7 @@ struct tegra_virtual_se_dev {
 	struct hwrng *hwrng;
 #endif /* CONFIG_HW_RANDOM */
 	struct platform_device *host1x_pdev;
+	struct crypto_dev_to_ivc_map *crypto_to_ivc_map;
 };
 
 /* Security Engine random number generator context */

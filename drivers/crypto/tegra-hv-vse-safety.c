@@ -141,6 +141,14 @@
 
 #define TEGRA_VIRTUAL_SE_ERR_MAC_INVALID	11
 
+#define MAX_NUMBER_MISC_DEVICES         40U
+#define TEGRA_IVC_ID_OFFSET_DTS 0
+#define TEGRA_SE_ENGINE_ID_OFFSET_DTS 1
+#define TEGRA_CRYPTO_DEV_ID_OFFSET_DTS 2
+#define TEGRA_IVCCFG_ARRAY_LEN 6
+
+static struct crypto_dev_to_ivc_map g_crypto_to_ivc_map[MAX_NUMBER_MISC_DEVICES];
+
 static struct task_struct *tegra_vse_task;
 static bool vse_thread_start;
 
@@ -4186,9 +4194,22 @@ static int se_get_nvhost_dev(struct tegra_virtual_se_dev *se_dev)
 	return 0;
 }
 
+static bool tegra_ivc_check_entry(struct tegra_virtual_se_dev *se_dev, uint32_t ivc_id)
+{
+	uint32_t cnt;
+
+	for (cnt = 0; cnt < MAX_NUMBER_MISC_DEVICES; cnt++) {
+		if (g_crypto_to_ivc_map[cnt].ivc_id == ivc_id)
+			return true;
+	}
+	return false;
+}
+
 static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 {
 	struct tegra_virtual_se_dev *se_dev = NULL;
+	struct crypto_dev_to_ivc_map *crypto_dev = NULL;
+	struct device_node *np;
 	int err = 0;
 	int i;
 	unsigned int ivc_id;
@@ -4196,6 +4217,7 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	unsigned int engine_id;
 	const struct of_device_id *match;
 	struct tegra_vse_soc_info *pdata = NULL;
+	uint32_t ivc_cnt, cnt, node_id;
 
 	se_dev = devm_kzalloc(&pdev->dev,
 				sizeof(struct tegra_virtual_se_dev),
@@ -4210,13 +4232,72 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 		goto exit;
 	}
 
+	np = pdev->dev.of_node;
 	se_dev->dev = &pdev->dev;
-	err = of_property_read_u32(pdev->dev.of_node, "se-engine-id",
+	err = of_property_read_u32(np, "se-engine-id",
 				&engine_id);
 	if (err) {
 		dev_err(&pdev->dev, "se-engine-id property not present\n");
 		err = -ENODEV;
 		goto exit;
+	}
+
+	/* read ivccfg from dts */
+	err = of_property_read_u32_index(np, "nvidia,ivccfg_cnt", 0, &ivc_cnt);
+	if (err) {
+		pr_err("Error: failed to read ivc_cnt. err %u\n", err);
+		err = -ENODEV;
+		goto exit;
+	}
+
+	for (cnt = 0; cnt < ivc_cnt; cnt++) {
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+						 + TEGRA_CRYPTO_DEV_ID_OFFSET_DTS, &node_id);
+		if (err || node_id > MAX_NUMBER_MISC_DEVICES) {
+			pr_err("Error: invalid node_id. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		crypto_dev = &g_crypto_to_ivc_map[node_id];
+
+		if (crypto_dev->ivc_id == 0) {
+			crypto_dev->node_id = node_id;
+		} else {
+			pr_err("Error: resouce already allocated for node_id %u\n", node_id);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+							+ TEGRA_IVC_ID_OFFSET_DTS, &ivc_id);
+		if (err) {
+			pr_err("Error: failed to read ivc_id. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		if (tegra_ivc_check_entry(se_dev, ivc_id) == false) {
+			crypto_dev->ivc_id = ivc_id;
+		} else {
+			pr_err("Error: array entry already exit for ivc_id %u\n", ivc_id);
+			err = -ENODEV;
+			goto exit;
+		}
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+					 + TEGRA_SE_ENGINE_ID_OFFSET_DTS, &crypto_dev->se_engine);
+		if (err) {
+			pr_err("Error: failed to read se_engine. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		if (engine_id != crypto_dev->se_engine) {
+			pr_err("Error: se engine mistach for ivc_id %u\n", crypto_dev->ivc_id);
+			err = -ENODEV;
+			goto exit;
+		}
 	}
 
 	if (pdev->dev.of_node) {
