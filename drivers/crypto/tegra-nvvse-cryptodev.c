@@ -108,6 +108,7 @@ struct tnvvse_crypto_ctx {
 	char				*rng_buff;
 	uint32_t			max_rng_buff;
 	char				*sha_result;
+	uint32_t			node_id;
 };
 
 enum tnvvse_gmac_request_type {
@@ -1533,6 +1534,8 @@ out:
 static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 {
 	struct tnvvse_crypto_ctx *ctx;
+	char root_path_buf[512];
+	const char *root_path, *str;
 	int ret = 0;
 
 	ctx = kzalloc(sizeof(struct tnvvse_crypto_ctx), GFP_KERNEL);
@@ -1556,10 +1559,27 @@ static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 		goto free_rng_buf;
 	}
 
+	/* get the node id from file name */
+	root_path = dentry_path_raw(filp->f_path.dentry, root_path_buf, sizeof(root_path_buf));
+	str = strrchr(root_path, '-');
+	if (str == NULL) {
+		pr_err("%s: invalid dev node name\n", __func__);
+		ret = -EINVAL;
+		goto free_sha_buf;
+	}
+
+	if (kstrtou32(str+1, 10, &ctx->node_id)) {
+		pr_err("%s: invalid crypto dev instance passed\n", __func__);
+		ret = -EINVAL;
+		goto free_sha_buf;
+	}
+
 	filp->private_data = ctx;
 
 	return ret;
 
+free_sha_buf:
+	kfree(ctx->sha_result);
 free_rng_buf:
 	kfree(ctx->rng_buff);
 free_mutex:
@@ -1801,8 +1821,7 @@ static int __init tnvvse_crypto_device_init(void)
 			ret = snprintf((char *)misc->name, MISC_DEVICE_NAME_LEN,
 								"tegra-nvvse-crypto-%u", cnt);
 			if (ret >= MISC_DEVICE_NAME_LEN) {
-				pr_err("%s: misc dev name buffer overflown for misc dev %u\n",
-										__func__, cnt);
+				pr_err("%s: buffer overflown for misc dev %u\n", __func__, cnt);
 				ret = -EINVAL;
 				goto fail;
 			}
@@ -1810,8 +1829,7 @@ static int __init tnvvse_crypto_device_init(void)
 
 		ret = misc_register(misc);
 		if (ret != 0) {
-			pr_err("%s: misc dev %u registeration failed with err %d\n",
-									__func__, cnt, ret);
+			pr_err("%s: misc dev %u registeration failed err %d\n", __func__, cnt, ret);
 			goto fail;
 		}
 		g_misc_devices[cnt] = misc;
