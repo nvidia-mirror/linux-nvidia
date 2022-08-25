@@ -500,7 +500,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 
 	if (mem && cpu_addr >= mem_addr &&
 	    cpu_addr - mem_addr < mem->size << PAGE_SHIFT) {
-		int page = (cpu_addr - mem_addr) >> PAGE_SHIFT;
+		unsigned int page = (cpu_addr - mem_addr) >> PAGE_SHIFT;
 		unsigned long flags;
 		unsigned int count;
 
