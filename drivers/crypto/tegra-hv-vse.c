@@ -4,7 +4,7 @@
  *
  * Support for Tegra Virtual Security Engine hardware crypto algorithms.
  *
- * Copyright (c) 2016-2021, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2016-2022, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1930,7 +1930,7 @@ end:
 	return err;
 }
 
-void tegra_hv_vse_prpare_cmd(struct tegra_virtual_se_dev *se_dev,
+static void tegra_hv_vse_prpare_cmd(struct tegra_virtual_se_dev *se_dev,
 	struct tegra_virtual_se_ivc_tx_msg_t *ivc_tx,
 	struct tegra_virtual_se_aes_req_context *req_ctx,
 	struct tegra_virtual_se_aes_context *aes_ctx,

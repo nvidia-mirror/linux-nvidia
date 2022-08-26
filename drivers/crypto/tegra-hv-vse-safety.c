@@ -1573,7 +1573,7 @@ static void tegra_hv_vse_safety_sha_cra_exit(struct crypto_tfm *tfm)
 {
 }
 
-void tegra_hv_vse_safety_prepare_cmd(struct tegra_virtual_se_dev *se_dev,
+static void tegra_hv_vse_safety_prepare_cmd(struct tegra_virtual_se_dev *se_dev,
 	struct tegra_virtual_se_ivc_tx_msg_t *ivc_tx,
 	struct tegra_virtual_se_aes_req_context *req_ctx,
 	struct tegra_virtual_se_aes_context *aes_ctx,
@@ -3382,7 +3382,7 @@ static void tegra_hv_vse_aes_gmac_deinit(struct ahash_request *req)
 	gmac_ctx->req_context_initialized = false;
 }
 
-int tegra_vse_aes_gmac_sv_check_params(struct ahash_request *req)
+static int tegra_vse_aes_gmac_sv_check_params(struct ahash_request *req)
 {
 	struct tegra_virtual_se_dev *se_dev = g_virtual_se_dev[VIRTUAL_SE_AES0];
 	int err = 0;
