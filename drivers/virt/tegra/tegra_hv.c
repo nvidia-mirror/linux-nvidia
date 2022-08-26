@@ -28,11 +28,7 @@
 #include <linux/of_irq.h>
 
 #include <linux/version.h>
-#if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
-#include <soc/tegra/chip-id.h>
-#else
 #include <soc/tegra/fuse.h>
-#endif
 #include <linux/tegra-ivc.h>
 
 #include <soc/tegra/virt/syscalls.h>
@@ -652,7 +648,7 @@ static int ivc_dump(struct hv_ivc *ivc)
 }
 
 struct tegra_hv_ivc_cookie *tegra_hv_ivc_reserve(struct device_node *dn,
-		int id, const struct tegra_hv_ivc_ops *ops)
+		uint32_t id, const struct tegra_hv_ivc_ops *ops)
 {
 	const struct tegra_hv_data *hvd = get_hvd();
 	struct hv_ivc *ivc;
@@ -774,7 +770,7 @@ int tegra_hv_ivc_unreserve(struct tegra_hv_ivc_cookie *ivck)
 EXPORT_SYMBOL(tegra_hv_ivc_unreserve);
 
 int tegra_hv_ivc_write(struct tegra_hv_ivc_cookie *ivck, const void *buf,
-		int size)
+		size_t size)
 {
 	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
 
@@ -783,7 +779,7 @@ int tegra_hv_ivc_write(struct tegra_hv_ivc_cookie *ivck, const void *buf,
 EXPORT_SYMBOL(tegra_hv_ivc_write);
 
 int tegra_hv_ivc_write_user(struct tegra_hv_ivc_cookie *ivck, const void __user *buf,
-		int size)
+		size_t size)
 {
 	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
 
@@ -791,7 +787,7 @@ int tegra_hv_ivc_write_user(struct tegra_hv_ivc_cookie *ivck, const void __user 
 }
 EXPORT_SYMBOL(tegra_hv_ivc_write_user);
 
-int tegra_hv_ivc_read(struct tegra_hv_ivc_cookie *ivck, void *buf, int size)
+int tegra_hv_ivc_read(struct tegra_hv_ivc_cookie *ivck, void *buf, size_t size)
 {
 	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
 
@@ -799,7 +795,7 @@ int tegra_hv_ivc_read(struct tegra_hv_ivc_cookie *ivck, void *buf, int size)
 }
 EXPORT_SYMBOL(tegra_hv_ivc_read);
 
-int tegra_hv_ivc_read_user(struct tegra_hv_ivc_cookie *ivck, void __user *buf, int size)
+int tegra_hv_ivc_read_user(struct tegra_hv_ivc_cookie *ivck, void __user *buf, size_t size)
 {
 	struct ivc *ivc = &cookie_to_ivc_dev(ivck)->ivc;
 
