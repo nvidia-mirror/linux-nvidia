@@ -16,7 +16,7 @@
 
 
 /* Timeout in milliseconds */
-#define TIMEOUT		1000
+#define TIMEOUT		5U
 
 #define IOVA_UNI_CODE   0xFE0D
 

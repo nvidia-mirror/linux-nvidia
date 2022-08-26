@@ -16,7 +16,7 @@
 #include <linux/mutex.h>
 
 /* Timeout in milliseconds */
-#define TIMEOUT		1000
+#define TIMEOUT		5U
 
 /* 32bit data Length */
 #define MAX_LEN	4
