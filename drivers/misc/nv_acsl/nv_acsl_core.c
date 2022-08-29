@@ -217,7 +217,13 @@ static status_t csm_buff_out_msg_handler(uint32_t msg, void *data)
 /*  Deinit csm app and close mailboxes */
 void csm_app_deinit(struct acsl_drv *drv)
 {
-	uint8_t i, j;
+	uint8_t i, j, ret;
+	struct device *dev = drv->dev;
+
+	ret = wait_for_nvadsp_app_complete_timeout(drv->csm_app_info,
+		msecs_to_jiffies(ACSL_TIMEOUT));
+	if (ret <= 0)
+		dev_err(dev, "csm app deinit timed out %d\n", ret);
 
 	nvadsp_mbox_close(&drv->csm_mbox_send);
 	nvadsp_mbox_close(&drv->csm_mbox_recv);
@@ -232,6 +238,7 @@ void csm_app_deinit(struct acsl_drv *drv)
 			complete_all(&drv->buff_complete[i][j]);
 		}
 	}
+	nvadsp_app_deinit(drv->csm_app_info);
 	nvadsp_app_unload(drv->csm_app_handle);
 }
 
@@ -254,20 +261,26 @@ status_t csm_app_init(struct acsl_drv *drv)
 
 	drv->csm_app_handle = nvadsp_app_load("csm_sm", "csm_sm.elf");
 	if (!drv->csm_app_handle) {
+		dev_err(dev, "nvadsp_app_load: failed\n");
 		ret = -ENODEV;
 		goto error;
 	}
 
 	drv->csm_app_info = nvadsp_app_init(drv->csm_app_handle, NULL);
-	if (!drv->csm_app_info)
+	if (!drv->csm_app_info) {
+		dev_err(dev, "nvadsp_app_init: failed\n");
 		goto error;
+	}
 
 	ret = nvadsp_app_start(drv->csm_app_info);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "nvadsp_app_start: failed\n");
 		goto error;
+	}
 
 	csm_sm = (struct csm_sm_state_t *)drv->csm_app_info->mem.shared;
 	if (!csm_sm) {
+		dev_err(dev, "csm_sm: is NULL\n");
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -450,5 +463,5 @@ status_t acsl_open(struct acsl_drv *drv, struct acsl_csm_args_t *csm_args)
 
 status_t acsl_close(struct acsl_drv *drv)
 {
-	return acsl_csm_cmd_send(drv, CSM_DEINIT_CMD, 0, false, false);
+	return acsl_csm_cmd_send(drv, CSM_DEINIT_CMD, 0, true, true);
 }
