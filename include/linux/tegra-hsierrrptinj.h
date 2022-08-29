@@ -51,7 +51,10 @@ IP_QSPI  = 0x0007,
 IP_SDMMC = 0x0008,
 IP_TSEC  = 0x0009,
 IP_THERM = 0x000A,
-IP_SMMU  = 0x000B
+IP_SMMU  = 0x000B,
+
+IP_FSI   = 0x00FE,
+IP_HSM   = 0x00FF
 } hsierrrpt_ipid_t;
 
 

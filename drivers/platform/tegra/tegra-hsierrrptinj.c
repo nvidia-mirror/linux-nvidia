@@ -56,6 +56,7 @@
 
 /* Error code for reporting errors to FSI */
 #define HSM_ERROR 0x55
+#define FSI_SW_ERROR 0xAA
 
 /* EC Index for reporting errors to FSI */
 #define EC_INDEX 0xFFFFFFFF
@@ -176,7 +177,7 @@ int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
 EXPORT_SYMBOL(hsierrrpt_dereg_cb);
 
 /* Report errors to FSI */
-static int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
+static int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame, int ip_id)
 {
 	int ret = -EINVAL;
 
@@ -188,7 +189,12 @@ static int hsierrrpt_report_to_fsi(struct epl_error_report_frame err_rpt_frame)
 		return -ENODEV;
 	}
 
-	error_report.type = HSM_ERROR;
+	if (ip_id == IP_HSM)
+		error_report.type = HSM_ERROR;
+	else if (ip_id == IP_FSI)
+		error_report.type = FSI_SW_ERROR;
+	else
+		return -EINVAL;
 	error_report.error_code = err_rpt_frame.error_code;
 	error_report.reporter_id = err_rpt_frame.reporter_id;
 	error_report.ec_index = EC_INDEX;
@@ -287,8 +293,8 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char __user *buf, si
 	 * Directly send error reports for such IPs to the FSI.
 	 */
 	if (ip_id >= NUM_IPS) {
-		ret = hsierrrpt_report_to_fsi(error_report);
-		pr_debug("tegra-hsierrrptinj: Reported error to FSI\n");
+		ret = hsierrrpt_report_to_fsi(error_report, ip_id);
+		pr_debug("tegra-hsierrrptinj: Reporting error to FSI\n");
 		goto done;
 	}
 
