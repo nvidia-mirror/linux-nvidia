@@ -131,7 +131,7 @@ allocate_link_status_mem(struct pci_client_t *ctx)
 }
 
 /* Free edma rx desc_iova that originally mapped from bar0 */
-void
+static void
 free_edma_rx_desc_iova(struct pci_client_t *ctx)
 {
 
