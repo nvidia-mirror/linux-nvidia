@@ -204,6 +204,7 @@ static int ipc_write(u32 head, u8 *pSrc, u32 num_bytes, u32 port)
 #endif
 }
 
+#ifdef TSEC_RM_ON_DCE
 static int ipc_read(u32 tail, u8 *pdst, u32 num_bytes, u32 port)
 {
 #ifdef DO_IPC_OVER_GSC_CO
@@ -212,7 +213,7 @@ static int ipc_read(u32 tail, u8 *pdst, u32 num_bytes, u32 port)
 	return emem_transfer(tail, pdst, num_bytes, port, true);
 #endif
 }
-
+#endif
 
 #ifdef DO_IPC_OVER_GSC_CO
 #define TSEC_BOOT_POLL_TIME_US     (100000)
@@ -234,6 +235,7 @@ static u32 tsec_get_boot_flag(void)
 	}
 }
 
+#ifdef TSEC_RM_ON_DCE
 static void tsec_reset_boot_flag(void)
 {
 	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
@@ -243,6 +245,7 @@ static void tsec_reset_boot_flag(void)
 	else
 		bootInfo->bootFlag = 0;
 }
+#endif
 #endif
 
 static void invoke_init_cb(void *unused)
@@ -263,6 +266,9 @@ static void invoke_init_cb(void *unused)
 
 void tsec_drain_msg(bool invoke_cb)
 {
+#ifndef TSEC_RM_ON_DCE
+	return;
+#else
 	int i;
 	u32 tail = 0;
 	u32 head = 0;
@@ -279,10 +285,6 @@ void tsec_drain_msg(bool invoke_cb)
 	callback_func_t cb_func;
 	void *cb_ctx;
 	u8 tsec_msg[MAX_MSG_SIZE];
-
-#ifndef TSEC_RM_ON_DCE
-	return;
-#endif
 
 	msgq_head_base = tsec_msgq_head_r(TSEC_MSG_QUEUE_PORT);
 	msgq_tail_base = tsec_msgq_tail_r(TSEC_MSG_QUEUE_PORT);
@@ -430,6 +432,8 @@ FAIL:
 
 EXIT:
 	return;
+
+#endif /* TSEC_RM_ON_DCE */
 }
 
 #ifdef DO_IPC_OVER_GSC_CO
