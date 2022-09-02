@@ -66,6 +66,11 @@
  */
 #define NVVSE_MAX_ALLOCATED_SHA_RESULT_BUFF_SIZE	256U
 
+
+#define MAX_NUMBER_MISC_DEVICES		40U
+#define MISC_DEVICE_NAME_LEN		32U
+static struct miscdevice *g_misc_devices[MAX_NUMBER_MISC_DEVICES];
+
 /* SHA Algorithm Names */
 static const char *sha_alg_names[] = {
 	"sha256-vse",
@@ -1769,13 +1774,76 @@ static const struct file_operations tnvvse_crypto_fops = {
 	.unlocked_ioctl		= tnvvse_crypto_dev_ioctl,
 };
 
-static struct miscdevice tnvvse_crypto_device = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "tegra-nvvse-crypto",
-	.fops = &tnvvse_crypto_fops,
-};
+static int __init tnvvse_crypto_device_init(void)
+{
+	uint32_t cnt, ctr;
+	int ret = 0;
+	struct miscdevice *misc;
 
-module_misc_device(tnvvse_crypto_device);
+	for (cnt = 0; cnt < MAX_NUMBER_MISC_DEVICES; cnt++) {
+
+		/* Dynamic initialisation of misc device */
+		misc = kzalloc(sizeof(struct miscdevice), GFP_KERNEL);
+		if (misc == NULL) {
+			ret = -ENOMEM;
+			goto fail;
+		} else {
+
+			misc->minor = MISC_DYNAMIC_MINOR;
+			misc->fops = &tnvvse_crypto_fops;
+
+			misc->name = kzalloc(MISC_DEVICE_NAME_LEN, GFP_KERNEL);
+			if (misc->name == NULL) {
+				ret = -ENOMEM;
+				goto fail;
+			}
+
+			ret = snprintf((char *)misc->name, MISC_DEVICE_NAME_LEN,
+								"tegra-nvvse-crypto-%u", cnt);
+			if (ret >= MISC_DEVICE_NAME_LEN) {
+				pr_err("%s: misc dev name buffer overflown for misc dev %u\n",
+										__func__, cnt);
+				ret = -EINVAL;
+				goto fail;
+			}
+		}
+
+		ret = misc_register(misc);
+		if (ret != 0) {
+			pr_err("%s: misc dev %u registeration failed with err %d\n",
+									__func__, cnt, ret);
+			goto fail;
+		}
+		g_misc_devices[cnt] = misc;
+	}
+
+	return ret;
+
+fail:
+	for (ctr = 0; ctr < cnt; ctr++) {
+		misc_deregister(g_misc_devices[ctr]);
+		kfree(g_misc_devices[ctr]->name);
+		kfree(g_misc_devices[ctr]);
+		g_misc_devices[ctr] = NULL;
+	}
+	return ret;
+}
+module_init(tnvvse_crypto_device_init);
+
+static void __exit tnvvse_crypto_device_exit(void)
+{
+	uint32_t ctr;
+
+	for (ctr = 0; ctr < MAX_NUMBER_MISC_DEVICES; ctr++) {
+		if (g_misc_devices[ctr] != NULL) {
+			misc_deregister(g_misc_devices[ctr]);
+			kfree(g_misc_devices[ctr]->name);
+			kfree(g_misc_devices[ctr]);
+			g_misc_devices[ctr] = NULL;
+		}
+	}
+}
+module_exit(tnvvse_crypto_device_exit);
 
 MODULE_DESCRIPTION("Tegra NVVSE Crypto device driver.");
 MODULE_AUTHOR("NVIDIA Corporation");
