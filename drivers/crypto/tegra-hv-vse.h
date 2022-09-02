@@ -16,6 +16,9 @@ struct crypto_dev_to_ivc_map {
 	uint32_t se_engine;
 	uint32_t node_id;
 	struct tegra_hv_ivc_cookie *ivck;
+	struct completion tegra_vse_complete;
+	struct task_struct *tegra_vse_task;
+	bool vse_thread_start;
 };
 
 struct tegra_virtual_se_dev {
