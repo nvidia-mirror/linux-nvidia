@@ -29,7 +29,6 @@ struct tegra_virtual_se_dev {
 	/* Engine suspend state */
 	atomic_t se_suspended;
 	struct tegra_vse_soc_info *chipdata;
-	atomic_t mempoolbuf_in_use;
 #if defined(CONFIG_HW_RANDOM)
 	/* Integration with hwrng framework */
 	struct hwrng *hwrng;

@@ -149,6 +149,9 @@
 
 static struct crypto_dev_to_ivc_map g_crypto_to_ivc_map[MAX_NUMBER_MISC_DEVICES];
 
+static bool gcm_supports_dma;
+struct device *gpcdma_dev;
+
 /* Security Engine Linked List */
 struct tegra_virtual_se_ll {
 	dma_addr_t addr; /* DMA buffer address */
@@ -417,8 +420,6 @@ enum tegra_virtual_se_aes_iv_type {
 	AES_IV_REG
 };
 
-static struct tegra_hv_ivm_cookie *g_ivmk;
-static void *mempool_buf;
 static struct tegra_virtual_se_dev *g_virtual_se_dev[VIRTUAL_MAX_SE_ENGINE_NUM];
 
 static int tegra_hv_vse_safety_send_ivc(
@@ -2769,14 +2770,6 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	dma_addr_t src_buf_addr;
 	dma_addr_t tag_buf_addr;
 
-	/* Return error if mempool is being used for another operation */
-	if (atomic_read(&se_dev->mempoolbuf_in_use)) {
-		dev_err(se_dev->dev, "%s: mempool is in use\n", __func__);
-		err = -EPERM;
-		goto exit;
-	}
-	atomic_set(&se_dev->mempoolbuf_in_use, true);
-
 	err = tegra_vse_aes_gcm_check_params(req, encrypt);
 	if (err != 0)
 		goto free_exit;
@@ -2808,9 +2801,18 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 				goto free_exit;
 			}
 		} else {
-			src_buf = mempool_buf;
-			/* For GCM decrypt buffer address represents offset */
-			src_buf_addr = (dma_addr_t)0UL;
+			if (gpcdma_dev != NULL) {
+				src_buf = dma_alloc_coherent(gpcdma_dev, cryptlen,
+							&src_buf_addr, GFP_KERNEL);
+				if (!src_buf) {
+					err = -ENOMEM;
+					goto free_exit;
+				}
+			} else {
+				dev_err(se_dev->dev, "gpcdma pdev not initialized\n");
+				err = -ENODATA;
+				goto free_exit;
+			}
 		}
 		/* copy src from sgs to buffer*/
 		sg_pcopy_to_buffer(req->src, (u32)sg_nents(req->src),
@@ -2972,8 +2974,6 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 		src_buf, cryptlen, req->assoclen);
 
 free_exit:
-	atomic_set(&se_dev->mempoolbuf_in_use, false);
-
 	if (ivc_req_msg)
 		devm_kfree(se_dev->dev, ivc_req_msg);
 
@@ -2984,15 +2984,20 @@ free_exit:
 		dma_free_coherent(se_dev->dev, aes_ctx->authsize, tag_buf,
 				tag_buf_addr);
 
-	if (src_buf && encrypt)
-		dma_free_coherent(se_dev->dev, cryptlen, src_buf,
-				src_buf_addr);
+	if (encrypt) {
+		if (src_buf)
+			dma_free_coherent(se_dev->dev, cryptlen, src_buf,
+					src_buf_addr);
+	} else {
+		if (src_buf && gpcdma_dev != NULL)
+			dma_free_coherent(gpcdma_dev, cryptlen, src_buf,
+					src_buf_addr);
+	}
 
 	if (aad_buf)
 		dma_free_coherent(se_dev->dev, req->assoclen, aad_buf,
 				aad_buf_addr);
 
-exit:
 	return err;
 }
 
@@ -4167,11 +4172,16 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	int err = 0;
 	int i;
 	unsigned int ivc_id;
-	unsigned int mempool_id;
 	unsigned int engine_id;
 	const struct of_device_id *match;
 	struct tegra_vse_soc_info *pdata = NULL;
 	uint32_t ivc_cnt, cnt, node_id;
+
+	gcm_supports_dma = of_property_read_bool(pdev->dev.of_node, "nvidia,gcm-dma-support");
+	if (gcm_supports_dma) {
+		gpcdma_dev = &pdev->dev;
+		return 0;
+	}
 
 	se_dev = devm_kzalloc(&pdev->dev,
 				sizeof(struct tegra_virtual_se_dev),
@@ -4299,33 +4309,6 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	}
 
 	se_dev->chipdata = pdata;
-
-	if ((se_dev->chipdata->gcm_decrypt_supported) &&
-			(!g_ivmk) &&
-			((engine_id == VIRTUAL_SE_AES0) || (engine_id == VIRTUAL_SE_AES1))) {
-		err = of_property_read_u32(pdev->dev.of_node, "mempool_id", &mempool_id);
-		if (err) {
-			dev_err(&pdev->dev, "mempool_id property not present\n");
-			err = -ENODEV;
-			goto exit;
-		}
-
-		dev_info(se_dev->dev, "Virtual SE IVM channel number: %d", mempool_id);
-		g_ivmk = tegra_hv_mempool_reserve(mempool_id);
-		if (IS_ERR_OR_NULL(g_ivmk)) {
-			dev_err(&pdev->dev, "Failed to reserve IVM channel %d\n", mempool_id);
-			err = -ENODEV;
-			goto exit;
-		}
-
-		mempool_buf = devm_memremap(&pdev->dev, g_ivmk->ipa, g_ivmk->size, MEMREMAP_WB);
-		if (IS_ERR_OR_NULL(mempool_buf)) {
-			dev_err(&pdev->dev, "Failed to map mempool area %d\n", mempool_id);
-			err = -ENOMEM;
-			goto exit;
-		}
-		atomic_set(&se_dev->mempoolbuf_in_use, false);
-	}
 
 	g_virtual_se_dev[engine_id] = se_dev;
 
