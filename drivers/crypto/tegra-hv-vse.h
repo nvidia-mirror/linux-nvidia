@@ -19,17 +19,15 @@ struct crypto_dev_to_ivc_map {
 	struct completion tegra_vse_complete;
 	struct task_struct *tegra_vse_task;
 	bool vse_thread_start;
+	struct mutex se_ivc_lock;
 };
 
 struct tegra_virtual_se_dev {
 	struct device *dev;
-	struct mutex mtx;
 	/* Engine id */
 	unsigned int engine_id;
 	/* Engine suspend state */
 	atomic_t se_suspended;
-	/* Mutex lock for SE server */
-	struct mutex server_lock;
 	struct tegra_vse_soc_info *chipdata;
 	atomic_t mempoolbuf_in_use;
 #if defined(CONFIG_HW_RANDOM)
