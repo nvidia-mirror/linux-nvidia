@@ -542,11 +542,7 @@ static int tegra_hv_vse_safety_prepare_ivc_linked_list(
 			goto exit;
 		}
 		sg_count++;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
-		len = min(src_sg->length, (size_t)total_len);
-#else
 		len = min(src_sg->length, total_len);
-#endif
 		addr = sg_dma_address(src_sg);
 		addr_offset = 0;
 		while (len >= TEGRA_VIRTUAL_SE_MAX_BUFFER_SIZE) {
@@ -656,9 +652,7 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 	psha->op_hash.msg_left_length[1] = 0;
 	psha->op_hash.msg_left_length[2] = 0;
 	psha->op_hash.msg_left_length[3] = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 	psha->op_hash.hash_length = req->dst_size;
-#endif
 	if (islast) {
 		psha->op_hash.msg_total_length[0] = total_count & 0xFFFFFFFF;
 		psha->op_hash.msg_total_length[1] = total_count >> 32;
@@ -1236,17 +1230,13 @@ static int tegra_hv_vse_safety_sha_init(struct ahash_request *req)
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1344BIT;
 		req_ctx->intermediate_digest_size = SHA3_STATE_SIZE;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		req_ctx->digest_size = req->dst_size;
-#endif
 	} else if (strcmp(crypto_ahash_alg_name(tfm), "shake256-vse") == 0) {
 		req_ctx->mode = VIRTUAL_SE_OP_MODE_SHAKE256;
 		req_ctx->blk_size =
 			TEGRA_VIRTUAL_SE_SHA_HASH_BLOCK_SIZE_1088BIT;
 		req_ctx->intermediate_digest_size = SHA3_STATE_SIZE;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		req_ctx->digest_size = req->dst_size;
-#endif
 	} else {
 		dev_err(se_dev->dev, "Invalid SHA Mode\n");
 		return -EINVAL;
@@ -1259,16 +1249,12 @@ static int tegra_hv_vse_safety_sha_init(struct ahash_request *req)
 		return -ENOMEM;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 	if ((req_ctx->mode == VIRTUAL_SE_OP_MODE_SHAKE128) ||
 			(req_ctx->mode == VIRTUAL_SE_OP_MODE_SHAKE256)) {
 		dst_len = req->dst_size;
 	} else {
 		dst_len = req_ctx->intermediate_digest_size;
 	}
-#else
-	dst_len = req_ctx->intermediate_digest_size;
-#endif
 
 	req_ctx->hash_result = dma_alloc_coherent(
 			se_dev->dev, dst_len,
