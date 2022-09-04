@@ -18,9 +18,13 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <uapi/linux/tegra_hv_vcpu_yield_ioctl.h>
+#include <linux/interrupt.h>
+#include <linux/tegra-ivc.h>
+
 
 #define MAX_YIELD_VM_COUNT 10
 #define MAX_VCPU_YIELD_TIMEOUT_US 100000
+#define MAX_IVC_READ_FLUSH 10
 
 #define DRV_NAME	"tegra_hv_vcpu_yield"
 
@@ -30,6 +34,7 @@ struct vcpu_yield_dev {
 	struct cdev cdev;
 	struct device *device;
 	struct mutex mutex_lock;
+	struct tegra_hv_ivc_cookie *ivck;
 	u32 ivc;
 	int vcpu;
 	int low_prio_vmid;
@@ -52,14 +57,37 @@ static enum hrtimer_restart timer_callback_func(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
+static irqreturn_t tegra_hv_vcpu_yield_ivc_irq(int irq, void *dev_id)
+{
+	struct vcpu_yield_dev *vcpu_yield = dev_id;
+
+	/* handle IVC state changes */
+	tegra_hv_ivc_channel_notified(vcpu_yield->ivck);
+
+	return IRQ_HANDLED;
+}
+
 static long vcpu_yield_func(void *data)
 {
 	ktime_t timeout;
 	struct vcpu_yield_dev *vcpu_yield = (struct vcpu_yield_dev *)data;
+	int read_flush_count = 0;
+	bool ivc_rcvd = false;
 
 	timeout = ktime_set(0, (NSEC_PER_USEC * vcpu_yield->timeout_us));
 
-	while (timeout > 0) {
+	do {
+		if (tegra_hv_ivc_read_advance(vcpu_yield->ivck))
+			break;
+		read_flush_count++;
+	} while (read_flush_count < MAX_IVC_READ_FLUSH);
+
+	if (read_flush_count == MAX_IVC_READ_FLUSH) {
+		pr_err("ivc read flush max tries exceeded\n");
+		return -EBUSY;
+	}
+
+	while ((timeout > 0) && (ivc_rcvd == false)) {
 
 		preempt_disable();
 		stop_critical_timings();
@@ -73,6 +101,12 @@ static long vcpu_yield_func(void *data)
 		timeout = hrtimer_get_remaining(&vcpu_yield->yield_timer);
 
 		hrtimer_cancel(&vcpu_yield->yield_timer);
+
+		/* check for ivc read data and if so low prio vm is done
+		 * set flag to true to exit the loop
+		 */
+		if (tegra_hv_ivc_can_read(vcpu_yield->ivck))
+			ivc_rcvd = true;
 
 		local_irq_enable();
 		start_critical_timings();
@@ -208,7 +242,16 @@ static int tegra_hv_vcpu_yield_remove(struct platform_device *pdev)
 				cdev_del(&vcpu_yield->cdev);
 				device_del(vcpu_yield->device);
 			}
+
+			devm_free_irq(vcpu_yield->device, vcpu_yield->ivck->irq,
+				vcpu_yield);
+
 			device_destroy(vcpu_yield_class, vcpu_yield->dev);
+
+			if (vcpu_yield->ivck) {
+				tegra_hv_ivc_unreserve(vcpu_yield->ivck);
+				vcpu_yield->ivck = NULL;
+			}
 		}
 		kfree(vcpu_yield_dev_list);
 	}
@@ -243,6 +286,8 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	int *ivc_list = NULL;
 	int *vcpu_list = NULL;
 	struct class *vcpu_yield_class;
+	struct tegra_hv_ivc_cookie *ivck;
+	struct cpumask cpumask;
 
 	vmid_list = kcalloc(MAX_YIELD_VM_COUNT, sizeof(int), GFP_KERNEL);
 	if (vmid_list == NULL) {
@@ -366,6 +411,34 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 		}
 
 		mutex_init(&vcpu_yield->mutex_lock);
+
+		ivck = tegra_hv_ivc_reserve(NULL, vcpu_yield->ivc, NULL);
+		if (IS_ERR_OR_NULL(ivck)) {
+			pr_err("%s: Failed to reserve IVC %d\n", __func__,	vcpu_yield->ivc);
+			vcpu_yield->ivck = NULL;
+			result = -ENODEV;
+			goto out;
+		}
+
+		vcpu_yield->ivck = ivck;
+
+		pr_debug("%s: IVC %d: irq=%d, peer_vmid=%d, nframes=%d, frame_size=%d\n",
+			__func__, vcpu_yield->ivc, ivck->irq, ivck->peer_vmid,
+			ivck->nframes, ivck->frame_size);
+
+		result = devm_request_irq(vcpu_yield->device, ivck->irq,
+				tegra_hv_vcpu_yield_ivc_irq, 0,
+				dev_name(vcpu_yield->device), vcpu_yield);
+		if (result < 0) {
+			pr_err("%s: Failed to request irq %d, %d\n", __func__, ivck->irq, result);
+			goto out;
+		}
+
+		cpumask_clear(&cpumask);
+		cpumask_set_cpu(vcpu_yield->vcpu, &cpumask);
+		irq_set_affinity_hint(ivck->irq, &cpumask);
+
+		tegra_hv_ivc_channel_reset(ivck);
 	}
 
 out:
