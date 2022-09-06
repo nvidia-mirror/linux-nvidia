@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2017-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,19 +20,20 @@
 #include <linux/kernel.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/limits.h>
 
 struct camrtc_clk_group {
 	struct device *device;
-	int nclocks;
-	struct clk **clocks;
 	struct {
 		struct clk *slow;
 		struct clk *fast;
 	} parents;
+	u32 nclocks;
 	struct {
+		struct clk *clk;
 		u32 slow;
 		u32 fast;
-	} *rates;
+	} clocks[];
 };
 
 static void camrtc_clk_group_release(struct device *dev, void *res)
@@ -41,8 +42,8 @@ static void camrtc_clk_group_release(struct device *dev, void *res)
 	int i;
 
 	for (i = 0; i < grp->nclocks; i++) {
-		if (grp->clocks[i])
-			clk_put(grp->clocks[i]);
+		if (grp->clocks[i].clk)
+			clk_put(grp->clocks[i].clk);
 	}
 
 	if (grp->parents.slow)
@@ -88,7 +89,7 @@ struct camrtc_clk_group *camrtc_clk_group_get(
 	int nclocks;
 	int nrates;
 	int nparents;
-	int index;
+	u32 index;
 	int ret;
 
 	if (!dev || !dev->of_node)
@@ -97,11 +98,14 @@ struct camrtc_clk_group *camrtc_clk_group_get(
 	np = dev->of_node;
 
 	nclocks = of_property_count_strings(np, "clock-names");
-	if (nclocks < 0)
+	if (nclocks < 0 || nclocks > (S32_MAX / sizeof(grp->clocks[0])))
 		return ERR_PTR(-ENOENT);
 
 	/* This has pairs of u32s: slow and fast rate for each clock */
 	nrates = of_property_count_u64_elems(np, "nvidia,clock-rates");
+	/* of_property_count_elems_of_size() already complains about this */
+	if (nrates < 0)
+		nrates = 0;
 
 	nparents = of_count_phandle_with_args(np, "nvidia,clock-parents",
 			"#clock-cells");
@@ -111,18 +115,15 @@ struct camrtc_clk_group *camrtc_clk_group_get(
 
 	grp = devres_alloc(camrtc_clk_group_release,
 			sizeof(*grp) +
-			nclocks * sizeof(grp->clocks[0]) +
-			nclocks * sizeof(grp->rates[0]),
+			nclocks * sizeof(grp->clocks[0]),
 			GFP_KERNEL);
 	if (!grp)
 		return ERR_PTR(-ENOMEM);
 
 	grp->nclocks = nclocks;
 	grp->device = dev;
-	grp->clocks = (struct clk **)(grp + 1);
-	grp->rates = (void *)(grp->clocks + nclocks);
 
-	for (index = 0; index < grp->nclocks; index++) {
+	for (index = 0; index < nclocks; index++) {
 		struct clk *clk;
 
 		clk = of_clk_get(np, index);
@@ -131,16 +132,16 @@ struct camrtc_clk_group *camrtc_clk_group_get(
 			goto error;
 		}
 
-		grp->clocks[index] = clk;
+		grp->clocks[index].clk = clk;
 
 		if (index >= nrates)
 			continue;
 
 		if (of_property_read_u32_index(np, "nvidia,clock-rates",
-					2 * index, &grp->rates[index].slow))
+					2 * index, &grp->clocks[index].slow))
 			dev_warn(dev, "clock-rates property not found\n");
 		if (of_property_read_u32_index(np, "nvidia,clock-rates",
-					2 * index + 1, &grp->rates[index].fast))
+					2 * index + 1, &grp->clocks[index].fast))
 			dev_warn(dev, "clock-rates property not found\n");
 	}
 
@@ -185,7 +186,7 @@ int camrtc_clk_group_enable(const struct camrtc_clk_group *grp)
 		return -ENODEV;
 
 	for (index = 0; index < grp->nclocks; index++) {
-		err = clk_prepare_enable(grp->clocks[index]);
+		err = clk_prepare_enable(grp->clocks[index].clk);
 		if (err) {
 			camrtc_clk_group_error(grp, "enable", index, err);
 			return err;
@@ -204,9 +205,21 @@ void camrtc_clk_group_disable(const struct camrtc_clk_group *grp)
 		return;
 
 	for (index = 0; index < grp->nclocks; index++)
-		clk_disable_unprepare(grp->clocks[index]);
+		clk_disable_unprepare(grp->clocks[index].clk);
 }
 EXPORT_SYMBOL_GPL(camrtc_clk_group_disable);
+
+static void camrtc_clk_group_set_parent(const struct camrtc_clk_group *grp,
+		struct clk *parent)
+{
+	int index;
+
+	if (IS_ERR_OR_NULL(parent))
+		return;
+
+	for (index = 0; index < grp->nclocks; index++)
+		clk_set_parent(grp->clocks[index].clk, parent);
+}
 
 int camrtc_clk_group_adjust_slow(const struct camrtc_clk_group *grp)
 {
@@ -216,17 +229,13 @@ int camrtc_clk_group_adjust_slow(const struct camrtc_clk_group *grp)
 		return -ENODEV;
 
 	for (index = 0; index < grp->nclocks; index++) {
-		u32 slow = grp->rates[index].slow;
+		u32 slow = grp->clocks[index].slow;
 
 		if (slow != 0)
-			clk_set_rate(grp->clocks[index], slow);
+			clk_set_rate(grp->clocks[index].clk, slow);
 	}
 
-	if (grp->parents.slow != NULL) {
-		for (index = 0; index < grp->nclocks; index++)
-			clk_set_parent(grp->clocks[index],
-				grp->parents.slow);
-	}
+	camrtc_clk_group_set_parent(grp, grp->parents.slow);
 
 	return 0;
 }
@@ -239,17 +248,13 @@ int camrtc_clk_group_adjust_fast(const struct camrtc_clk_group *grp)
 	if (IS_ERR_OR_NULL(grp))
 		return -ENODEV;
 
-	if (grp->parents.fast != NULL) {
-		for (index = 0; index < grp->nclocks; index++)
-			clk_set_parent(grp->clocks[index],
-				grp->parents.fast);
-	}
+	camrtc_clk_group_set_parent(grp, grp->parents.fast);
 
 	for (index = 0; index < grp->nclocks; index++) {
-		u32 fast = grp->rates[index].fast;
+		u32 fast = grp->clocks[index].fast;
 
 		if (fast != 0)
-			clk_set_rate(grp->clocks[index], fast);
+			clk_set_rate(grp->clocks[index].clk, fast);
 	}
 
 	return 0;
