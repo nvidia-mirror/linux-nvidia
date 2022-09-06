@@ -72,7 +72,7 @@ static void __init early_tcu_write(struct console *console,
 	}
 }
 
-int __init early_tegra_combined_uart_setup(struct earlycon_device *device,
+static int __init early_tegra_combined_uart_setup(struct earlycon_device *device,
 						const char *options)
 {
 	if (!(device->port.membase))
