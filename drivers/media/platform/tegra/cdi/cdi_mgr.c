@@ -1263,19 +1263,61 @@ static char *cdi_mgr_devnode(struct device *dev, umode_t *mode)
 
 static int cdi_mgr_suspend(struct device *dev)
 {
-	/* Nothing required for cdi-mgr suspend*/
+	unsigned int reg_addr;
+	int rc;
+	struct cdi_mgr_priv *cdi_mgr;
+
+	cdi_mgr = (struct cdi_mgr_priv *)dev_get_drvdata(dev);
+
+	if (cdi_mgr->tca9539.enable) {
+		reg_addr = CDI_MGR_TCA9539_BASE_REG_ADDR;
+		while (reg_addr < CDI_MGR_TCA9539_REGISTER_COUNT) {
+			rc = tca9539_raw_rd(cdi_mgr, reg_addr,
+				&cdi_mgr->pre_suspend_tca9539_regvals[reg_addr]);
+			if (rc != 0) {
+				dev_err(dev, "%s: tca9539_raw_rd failed reading reg[0x%x]\n",
+					__func__, reg_addr);
+				return -EIO;
+			}
+
+			++reg_addr;
+		}
+	}
+
 	return 0;
 }
 
 static int cdi_mgr_resume(struct device *dev)
 {
 	struct pwm_device *pwm;
+	struct cdi_mgr_priv *cdi_mgr;
+	unsigned int reg_addr;
+	int rc;
+
 	/* Reconfigure PWM as done during boot time */
 	if (of_property_read_bool(dev->of_node, "pwms")) {
 		pwm = devm_pwm_get(dev, NULL);
 		if (!IS_ERR(pwm))
 			dev_info(dev, "%s Resume successful\n", __func__);
 	}
+
+	cdi_mgr = (struct cdi_mgr_priv *)dev_get_drvdata(dev);
+
+	if (cdi_mgr->tca9539.enable) {
+		reg_addr = CDI_MGR_TCA9539_BASE_REG_ADDR;
+		while (reg_addr < CDI_MGR_TCA9539_REGISTER_COUNT) {
+			rc = tca9539_raw_wr(cdi_mgr, reg_addr,
+				cdi_mgr->pre_suspend_tca9539_regvals[reg_addr]);
+			if (rc != 0) {
+				dev_err(dev, "%s: tca9539_raw_wr failed setting reg[0x%x] = 0x%x\n",
+					__func__, reg_addr,
+					cdi_mgr->pre_suspend_tca9539_regvals[reg_addr]);
+				return -EIO;
+			}
+			++reg_addr;
+		}
+	}
+
 	return 0;
 }
 

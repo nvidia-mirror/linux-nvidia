@@ -19,6 +19,9 @@
 #include <media/cdi-mgr.h>
 
 #define CDI_MGR_STOP_GPIO_INTR_EVENT_WAIT	(~(0u))
+#define CDI_MGR_TCA9539_REGISTER_COUNT      (8)
+#define CDI_MGR_TCA9539_BASE_REG_ADDR       (0x00)
+
 enum cam_gpio_direction {
 	CAM_DEVBLK_GPIO_UNSUSED = 0,
 	CAM_DEVBLK_GPIO_INPUT_INTERRUPT,
@@ -79,6 +82,7 @@ struct cdi_mgr_priv {
 	bool stop_err_irq_wait;
 	u8 cim_ver; /* 1 - P3714 A01, 2 - P3714 A02 */
 	u32 cim_frsync[3]; /* FRSYNC source selection for each muxer */
+	u8 pre_suspend_tca9539_regvals[CDI_MGR_TCA9539_REGISTER_COUNT];
 };
 
 int cdi_mgr_power_up(struct cdi_mgr_priv *cdi_mgr, unsigned long arg);
