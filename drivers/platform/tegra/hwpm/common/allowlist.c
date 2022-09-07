@@ -18,10 +18,8 @@
 #include <tegra_hwpm_mem_mgmt.h>
 #include <tegra_hwpm_static_analysis.h>
 
-int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
+int tegra_hwpm_alloc_alist_map(struct tegra_soc_hwpm *hwpm)
 {
-	int ret = 0;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (hwpm->alist_map == NULL) {
@@ -29,12 +27,19 @@ int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
 		hwpm->alist_map = tegra_hwpm_kzalloc(hwpm,
 			sizeof(struct tegra_hwpm_allowlist_map));
 		if (!hwpm->alist_map) {
-			tegra_hwpm_err(NULL,
-				"Couldn't allocate allowlist map structure");
 			return -ENOMEM;
 		}
 		hwpm->alist_map->full_alist_size = 0ULL;
 	}
+
+	return 0;
+}
+
+int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm)
+{
+	int ret = 0;
+
+	tegra_hwpm_fn(hwpm, " ");
 
 	if (hwpm->alist_map->full_alist_size == 0) {
 		/* Full alist size is not computed yet */

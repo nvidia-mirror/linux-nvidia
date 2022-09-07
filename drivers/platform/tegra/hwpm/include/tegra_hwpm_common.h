@@ -60,6 +60,7 @@ int tegra_hwpm_finalize_chip_info(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, bool disable);
 
+int tegra_hwpm_alloc_alist_map(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_combine_alist(struct tegra_soc_hwpm *hwpm, u64 *alist);
 

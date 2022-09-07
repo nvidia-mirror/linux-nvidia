@@ -112,7 +112,6 @@ int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm)
 
 	/* Initialize SW state */
 	hwpm->bind_completed = false;
-	hwpm->alist_map->full_alist_size = 0;
 
 	return 0;
 }

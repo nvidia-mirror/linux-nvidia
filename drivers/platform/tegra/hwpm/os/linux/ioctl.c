@@ -186,12 +186,20 @@ static int tegra_hwpm_query_allowlist_ioctl(struct tegra_soc_hwpm *hwpm,
 		return -EPERM;
 	}
 
+	if (hwpm->alist_map == NULL) {
+		ret = tegra_hwpm_alloc_alist_map(hwpm);
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm,
+				"Couldn't allocate allowlist map structure");
+			return ret;
+		}
+	}
+
 	if (query_allowlist->allowlist == NULL) {
 		/* Userspace is querying allowlist size only */
 		ret = tegra_hwpm_get_allowlist_size(hwpm);
 		if (ret != 0) {
-			tegra_hwpm_err(hwpm,
-				"failed to get alist_size");
+			tegra_hwpm_err(hwpm, "failed to get alist_size");
 			return ret;
 		}
 		query_allowlist->allowlist_size =
