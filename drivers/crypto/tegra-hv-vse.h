@@ -24,10 +24,17 @@ struct crypto_dev_to_ivc_map {
 
 struct tegra_virtual_se_dev {
 	struct device *dev;
+#ifndef CRYPTO_MULTI_IVC_SUPPORT
+	struct mutex mtx;
+#endif
 	/* Engine id */
 	unsigned int engine_id;
 	/* Engine suspend state */
 	atomic_t se_suspended;
+#ifndef CRYPTO_MULTI_IVC_SUPPORT
+	/* Mutex lock for SE server */
+	struct mutex server_lock;
+#endif
 	struct tegra_vse_soc_info *chipdata;
 #if defined(CONFIG_HW_RANDOM)
 	/* Integration with hwrng framework */
