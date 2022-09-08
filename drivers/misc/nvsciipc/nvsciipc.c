@@ -670,12 +670,6 @@ static int nvsciipc_probe(struct platform_device *pdev)
 	ctx->dev = &(pdev->dev);
 	platform_set_drvdata(pdev, ctx);
 
-	ret = alloc_chrdev_region(&(ctx->dev_t), 0, 1, MODULE_NAME);
-	if (ret != 0) {
-		ERR("alloc_chrdev_region() failed\n");
-		goto error;
-	}
-
 	ctx->nvsciipc_class = class_create(THIS_MODULE, MODULE_NAME);
 	if (IS_ERR(ctx->nvsciipc_class)) {
 		ERR("failed to create class: %ld\n",
@@ -684,9 +678,16 @@ static int nvsciipc_probe(struct platform_device *pdev)
 		goto error;
 	}
 
+	ret = alloc_chrdev_region(&(ctx->dev_t), 0, 1, MODULE_NAME);
+	if (ret != 0) {
+		ERR("alloc_chrdev_region() failed\n");
+		goto error;
+	}
+
 	ctx->dev_t = MKDEV(MAJOR(ctx->dev_t), 0);
 	cdev_init(&ctx->cdev, &nvsciipc_fops);
 	ctx->cdev.owner = THIS_MODULE;
+
 	ret = cdev_add(&(ctx->cdev), ctx->dev_t, 1);
 	if (ret != 0) {
 		ERR("cdev_add() failed\n");
@@ -701,7 +702,7 @@ static int nvsciipc_probe(struct platform_device *pdev)
 
 	ctx->device = device_create(ctx->nvsciipc_class, NULL,
 			ctx->dev_t, ctx,
-			ctx->device_name);
+			ctx->device_name, 0);
 	if (IS_ERR(ctx->device)) {
 		ret = PTR_ERR(ctx->device);
 		ERR("device_create() failed\n");
@@ -739,15 +740,12 @@ static void nvsciipc_cleanup(struct nvsciipc *ctx)
 
 	nvsciipc_free_db(ctx);
 
+	if (ctx->nvsciipc_class && ctx->dev_t)
+		device_destroy(ctx->nvsciipc_class, ctx->dev_t);
+
 	if (ctx->device != NULL) {
 		cdev_del(&ctx->cdev);
-		device_del(ctx->device);
 		ctx->device = NULL;
-	}
-
-	if (ctx->nvsciipc_class) {
-		class_destroy(ctx->nvsciipc_class);
-		ctx->nvsciipc_class = NULL;
 	}
 
 	if (ctx->dev_t) {
@@ -755,6 +753,12 @@ static void nvsciipc_cleanup(struct nvsciipc *ctx)
 		ctx->dev_t = 0;
 	}
 
+	if (ctx->nvsciipc_class) {
+		class_destroy(ctx->nvsciipc_class);
+		ctx->nvsciipc_class = NULL;
+	}
+
+	devm_kfree(ctx->dev, ctx);
 	ctx = NULL;
 }
 
@@ -762,12 +766,16 @@ static int nvsciipc_remove(struct platform_device *pdev)
 {
 	struct nvsciipc *ctx = NULL;
 
-	if (pdev == NULL)
+	if (pdev == NULL) {
+		ERR("%s: pdev is NULL\n", __func__);
 		goto exit;
+	}
 
 	ctx = (struct nvsciipc *)platform_get_drvdata(pdev);
-	if (ctx == NULL)
+	if (ctx == NULL) {
+		ERR("%s: ctx is NULL\n", __func__);
 		goto exit;
+	}
 
 	nvsciipc_cleanup(ctx);
 
@@ -790,12 +798,15 @@ static int __init nvsciipc_module_init(void)
 	int ret;
 
 	ret = platform_driver_register(&nvsciipc_driver);
-	if (ret)
+	if (ret) {
+		ERR("%s: platform_driver_register: %d\n", __func__, ret);
 		return ret;
+	}
 
 	nvsciipc_pdev = platform_device_register_simple(MODULE_NAME, -1,
 							NULL, 0);
 	if (IS_ERR(nvsciipc_pdev)) {
+		ERR("%s: platform_device_register_simple\n", __func__);
 		platform_driver_unregister(&nvsciipc_driver);
 		return PTR_ERR(nvsciipc_pdev);
 	}
@@ -805,7 +816,10 @@ static int __init nvsciipc_module_init(void)
 
 static void __exit nvsciipc_module_deinit(void)
 {
+	// calls nvsciipc_remove internally
 	platform_device_unregister(nvsciipc_pdev);
+
+	platform_driver_unregister(&nvsciipc_driver);
 }
 
 module_init(nvsciipc_module_init);
