@@ -336,9 +336,6 @@ static int cam_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 	uint8_t ctrl_type = 0;
 	int ctrl_val = 0;
 
-	if (!priv)
-		return -EINVAL;
-
 	client = priv->i2c_client;
 
 	if (priv->power.state == SWITCH_OFF)
@@ -364,9 +361,6 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 	    container_of(ctrl->handler, struct cam, ctrl_handler);
 	int err = 0;
 	struct i2c_client *client;
-
-	if (!priv)
-		return -EINVAL;
 
 	client = priv->i2c_client;
 
@@ -2363,7 +2357,8 @@ static int mcu_bload_update_fw(struct i2c_client *client)
 	/* exclude NULL character at end of string */
 	unsigned long hex_file_size = ARRAY_SIZE(g_mcu_fw_buf) - 1;
 	unsigned char wbuf[MAX_BUF_LEN];
-	int i = 0, recindex = 0, ret = 0;
+	unsigned int i = 0, recindex = 0;
+	int ret = 0;
 
 	for (i = 0; i < hex_file_size; i++) {
 		if ((recindex == 0) && (g_mcu_fw_buf[i] == ':')) {

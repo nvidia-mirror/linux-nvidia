@@ -590,7 +590,7 @@ static int imx477_set_mode(struct tegracam_device *tc_dev)
 {
 	struct imx477 *priv = (struct imx477 *)tegracam_get_privdata(tc_dev);
 	struct camera_common_data *s_data = tc_dev->s_data;
-
+	unsigned int mode_index = 0;
 	int err = 0;
 
 	dev_dbg(tc_dev->dev, "%s:\n", __func__);
@@ -599,7 +599,8 @@ static int imx477_set_mode(struct tegracam_device *tc_dev)
 	if (err)
 		return err;
 
-	err = imx477_write_table(priv, mode_table[s_data->mode]);
+	mode_index = s_data->mode;
+	err = imx477_write_table(priv, mode_table[mode_index]);
 	if (err)
 		return err;
 
