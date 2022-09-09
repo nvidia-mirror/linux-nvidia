@@ -47,7 +47,7 @@
 
 #ifdef CONFIG_PM_SLEEP
 #define NETLINK_USERSPACE_PM	30
-#define MAX_USER_CLIENT		32
+#define MAX_USER_CLIENT		64
 static struct sock *nl_sk;
 static struct completion netlink_complete;
 static spinlock_t netlink_lock;
