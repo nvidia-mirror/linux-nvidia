@@ -138,9 +138,6 @@ struct max_gmsl_dp_ser_priv {
 	u8 dprx_link_rate;
 	struct mutex mutex;
 	struct regmap *regmap;
-	struct work_struct work;
-	struct delayed_work delay_work;
-	struct workqueue_struct *wq;
 	int ser_errb;
 	unsigned int ser_irq;
 	bool enable_mst;
@@ -292,19 +289,6 @@ static bool max_gmsl_dp_ser_check_dups(u32 *ids)
 	return true;
 }
 
-static int max_gmsl_read_lock(struct max_gmsl_dp_ser_priv *priv,
-			      u32 reg_addr, u32 mask,
-			      u32 expected_value)
-{
-	u8 reg_data;
-
-	reg_data = max_gmsl_dp_ser_read(priv, reg_addr);
-	if ((reg_data & mask) == expected_value)
-		return 0;
-
-	return -1;
-}
-
 static void max_gmsl_detect_internal_crc_error(struct max_gmsl_dp_ser_priv *priv,
 				 struct device *dev)
 {
@@ -371,77 +355,6 @@ static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 	max_gmsl_detect_remote_error(priv, dev);
 
 	return IRQ_HANDLED;
-}
-
-static void tegra_poll_gmsl_training_lock(struct work_struct *work)
-{
-	struct delayed_work *dwork = container_of(work,
-					struct delayed_work, work);
-	struct max_gmsl_dp_ser_priv *priv = container_of(dwork,
-					struct max_gmsl_dp_ser_priv, delay_work);
-	int ret = 0;
-
-	ret = max_gmsl_read_lock(priv, MAX_GMSL_DP_SER_CTRL3,
-				 MAX_GMSL_DP_SER_CTRL3_LOCK_MASK,
-				 MAX_GMSL_DP_SER_CTRL3_LOCK_VAL);
-	if (ret < 0) {
-		dev_dbg(&priv->client->dev, "GMSL Lock is not set\n");
-		goto reschedule;
-	}
-
-	if (priv->link_a_is_enabled) {
-		ret = max_gmsl_read_lock(priv, MAX_GMSL_DP_SER_LCTRL2_A,
-					 MAX_GMSL_DP_SER_LCTRL2_LOCK_MASK,
-					 MAX_GMSL_DP_SER_LCTRL2_LOCK_VAL);
-		if (ret < 0) {
-			dev_dbg(&priv->client->dev, "GMSL Lock set failed for Link A\n");
-			goto reschedule;
-		}
-	}
-
-	if (priv->link_b_is_enabled) {
-		ret = max_gmsl_read_lock(priv, MAX_GMSL_DP_SER_LCTRL2_B,
-					 MAX_GMSL_DP_SER_LCTRL2_LOCK_MASK,
-					 MAX_GMSL_DP_SER_LCTRL2_LOCK_VAL);
-		if (ret < 0) {
-			dev_dbg(&priv->client->dev, "GMSL Lock set failed for Link B\n");
-			goto reschedule;
-		}
-	}
-
-	ret = max_gmsl_read_lock(priv, MAX_GMSL_DP_SER_DPRX_TRAIN,
-				 MAX_GMSL_DP_SER_DPRX_TRAIN_STATE_MASK,
-				 MAX_GMSL_DP_SER_DPRX_TRAIN_STATE_VAL);
-	if (ret < 0) {
-		dev_dbg(&priv->client->dev,
-			"DP Link tranining hasn't completed\n");
-		goto reschedule;
-	}
-
-	/* enable internal CRC after link training */
-	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_X,
-			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
-	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Y,
-			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
-	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Z,
-			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
-	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_U,
-			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
-
-	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_X,
-			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
-	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_Y,
-			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
-	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_Z,
-			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
-	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_U,
-			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
-
-	return;
-
-reschedule:
-	queue_delayed_work(priv->wq,
-			   &priv->delay_work, msecs_to_jiffies(500));
 }
 
 static int max_gmsl_dp_ser_init(struct device *dev)
@@ -521,9 +434,6 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LINK_ENABLE,
 			       MAX_GMSL_DP_SER_LINK_ENABLE_MASK, 0x1);
 
-	queue_delayed_work(priv->wq, &priv->delay_work,
-			   msecs_to_jiffies(500));
-
 	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
 	if (ret < 0) {
 		dev_err(dev, "%s: INTR9 register read failed\n", __func__);
@@ -543,6 +453,26 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR8,
 			       MAX_GMSL_DP_SER_INTR8_MASK,
 			       MAX_GMSL_DP_SER_INTR8_VAL);
+
+	/* enable internal CRC after link training */
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_X,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Y,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_Z,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_U,
+			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+
+	/* enable video output */
+	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_X,
+			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
+	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_Y,
+			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
+	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_Z,
+			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
+	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_U,
+			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
 
 	return ret;
 }
@@ -721,9 +651,6 @@ static int max_gmsl_dp_ser_probe(struct i2c_client *client)
 		dev_err(dev, "%s: error parsing device tree\n", __func__);
 		return -EFAULT;
 	}
-
-	priv->wq = alloc_workqueue("tegra_poll_gmsl_training_lock", WQ_HIGHPRI, 0);
-	INIT_DELAYED_WORK(&priv->delay_work, tegra_poll_gmsl_training_lock);
 
 	ret = max_gmsl_dp_ser_init(&client->dev);
 	if (ret < 0) {
