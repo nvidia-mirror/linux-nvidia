@@ -118,13 +118,13 @@ int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id);
 
 #else
 
-inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data)
+static inline int hsierrrpt_reg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id, hsierrrpt_inj cb_func, void *aux_data)
 {
 	pr_info("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
 	return 0;
 }
 
-inline int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
+static inline int hsierrrpt_dereg_cb(hsierrrpt_ipid_t ip_id, unsigned int instance_id)
 {
 	pr_info("tegra-hsierrrptinj: CONFIG_TEGRA_HSIERRRPTINJ not enabled\n");
 	return 0;
