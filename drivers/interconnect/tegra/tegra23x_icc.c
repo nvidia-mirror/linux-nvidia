@@ -47,6 +47,63 @@ static int bwmgr_int_mrq_request(struct tegra_icc_provider *tp,
 	return ret;
 }
 
+static int tegra23x_cap_set(struct tegra_icc_provider *tp,
+	unsigned long cap_kbps)
+{
+	int ret = 0;
+	int clk_fwk_ret, bpmp_ret;
+	unsigned long cap_req;
+	long round_rate_ret;
+	struct mrq_bwmgr_int_request bwmgr_req = {0};
+	struct mrq_bwmgr_int_response bwmgr_resp = {0};
+
+	/* Determine what the rounded rate should be */
+	if (cap_kbps) {
+		clk_fwk_ret = clk_set_max_rate(tp->dram_clk, UINT_MAX);
+		if (clk_fwk_ret) {
+			pr_err("clk_set_max_rate failed %d\n", clk_fwk_ret);
+			return clk_fwk_ret;
+		}
+
+		cap_req = cap_kbps;
+		cap_req = emc_bw_to_freq(cap_req);
+		cap_req = (UINT_MAX / 1000) <= cap_req ? UINT_MAX / 1000 : cap_req;
+		round_rate_ret = clk_round_rate(tp->dram_clk, cap_req * 1000);
+		if (round_rate_ret < 0) {
+			pr_err("clk_round_rate fail %ld\n", round_rate_ret);
+			cap_req = UINT_MAX;
+		} else {
+			cap_req = (unsigned long) round_rate_ret;
+		}
+	} else {
+		cap_req = UINT_MAX;
+	}
+
+	/* Issue cap-set requests to clk-fwk and bpmp */
+	clk_fwk_ret = clk_set_max_rate(tp->dram_clk, cap_req);
+	if (clk_fwk_ret)
+		pr_err("clk_set_max_rate fail %d\n", ret);
+
+	bwmgr_req.cmd = CMD_BWMGR_INT_CAP_SET;
+	bwmgr_req.bwmgr_cap_set_req.rate = cap_req;
+	bpmp_ret = bwmgr_int_mrq_request(tp, TEGRA_ICC_NVPMODEL,
+		&bwmgr_req, &bwmgr_resp);
+	if (bpmp_ret)
+		pr_err("BPMP cap_set MRQ fail %d\n", ret);
+
+	/* If either failed, set ret flag and set both to UINT_MAX */
+	if (bpmp_ret || clk_fwk_ret) {
+		ret = -BPMP_EINVAL;
+		clk_fwk_ret = clk_set_max_rate(tp->dram_clk, UINT_MAX);
+		bwmgr_req.cmd = CMD_BWMGR_INT_CAP_SET;
+		bwmgr_req.bwmgr_cap_set_req.rate = UINT_MAX;
+		bpmp_ret = bwmgr_int_mrq_request(tp, TEGRA_ICC_NVPMODEL,
+			&bwmgr_req, &bwmgr_resp);
+	}
+
+	return ret;
+}
+
 static int tegra23x_icc_set(struct icc_node *src, struct icc_node *dst)
 {
 	struct icc_provider *provider = src->provider;
@@ -59,7 +116,7 @@ static int tegra23x_icc_set(struct icc_node *src, struct icc_node *dst)
 
 	/* nvpmodel emc cap request */
 	if (src->id == TEGRA_ICC_NVPMODEL) {
-		ret = 0;
+		ret = tegra23x_cap_set(tp, src->peak_bw);
 	} else {
 		struct mrq_bwmgr_int_request bwmgr_req = {0};
 		struct mrq_bwmgr_int_response bwmgr_resp = {0};
