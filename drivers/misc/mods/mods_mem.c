@@ -2246,17 +2246,24 @@ static void clear_contiguous_cache(struct mods_client *client,
 {
 	u64 end = virt_start + size;
 	u64 cur;
-	u32 d_line_shift = 4; /* Fallback for kernel 5.9 or older */
 	u64 d_size;
+	static u32 d_line_shift;
 
-#ifdef MODS_HAS_ARM64_READ_FTR_REG
-	{
+	if (!d_line_shift) {
+#if KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
 		const u64 ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
-
-		d_line_shift = cpuid_feature_extract_unsigned_field(ctr_el0,
-							CTR_DMINLINE_SHIFT);
-	}
+#if KERNEL_VERSION(6, 0, 0) <= MODS_KERNEL_VERSION
+		const int field = CTR_EL0_DminLine_SHIFT;
+#else
+		const int field = CTR_DMINLINE_SHIFT;
 #endif
+
+		d_line_shift =
+			cpuid_feature_extract_unsigned_field(ctr_el0, field);
+#else
+		d_line_shift = 4; /* Fallback for kernel 5.9 or older */
+#endif
+	}
 
 	d_size = (u64)4 << d_line_shift;
 	cur = virt_start & ~(d_size - 1);

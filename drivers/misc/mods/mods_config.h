@@ -100,10 +100,6 @@
 #       define MODS_PCIE_FLR_HAS_ERR
 #endif
 
-#if defined(CONFIG_ARM64) && KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
-#       define MODS_HAS_ARM64_READ_FTR_REG 1
-#endif
-
 #if KERNEL_VERSION(5, 17, 0) <= MODS_KERNEL_VERSION
 #       define MODS_HAS_ACPI_FETCH 1
 #endif
