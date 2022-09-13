@@ -44,7 +44,7 @@ static LIST_HEAD(sid_override_list);
 struct tegra_mc_sid_override {
 	struct list_head list;
 	void __iomem *addr;
-	unsigned long sid;
+	int sid;
 };
 
 struct tegra_mc_sid {
