@@ -57,7 +57,7 @@ struct edma_chan {
 };
 
 struct edma_prv {
-	int irq;
+	u32 irq;
 	char *irq_name;
 	bool is_remote_dma;
 	uint16_t msi_data;
@@ -74,7 +74,7 @@ struct edma_prv {
 };
 
 /** TODO: Define osi_ll_init strcuture and make this as OSI */
-static inline void edma_ll_ch_init(void __iomem *edma_base, uint32_t ch,
+static inline void edma_ll_ch_init(void __iomem *edma_base, uint8_t ch,
 					 dma_addr_t ll_phy_addr, bool rw_type,
 					 bool is_remote_dma)
 {
@@ -223,7 +223,7 @@ static inline void edma_hw_deinit(void *cookie, bool rw_type)
 }
 
 /** From OSI */
-static inline u32 get_dma_idx_from_llp(struct edma_prv *prv, u32 chan, struct edma_chan *ch,
+static inline u32 get_dma_idx_from_llp(struct edma_prv *prv, u8 chan, struct edma_chan *ch,
 				       u32 type)
 {
 	u64 cur_iova;
@@ -246,12 +246,18 @@ static inline u32 get_dma_idx_from_llp(struct edma_prv *prv, u32 chan, struct ed
 		cur_iova = dma_channel_rd(prv->edma_base, chan, llp_low_off[type]);
 		cur_iova |= (tmp_iova << 32);
 	}
-	/* Compute DMA desc index */
-	block_idx = ((cur_iova - ch->dma_iova) / sizeof(struct edma_dblock));
-	idx_in_block = (cur_iova & (sizeof(struct edma_dblock) - 1)) /
-		       sizeof(struct edma_hw_desc);
 
-	cur_idx = (block_idx * 2) + idx_in_block;
+	if ((cur_iova >= ch->dma_iova) && ((cur_iova - ch->dma_iova) < ch->edma_desc_size)) {
+		/* Compute DMA desc index */
+		block_idx = ((cur_iova - ch->dma_iova) / sizeof(struct edma_dblock));
+		idx_in_block = (cur_iova & (sizeof(struct edma_dblock) - 1)) /
+			       sizeof(struct edma_hw_desc);
+		cur_idx = (u32)(((block_idx * 2UL) + idx_in_block) & UINT_MAX);
+	} else {
+		ch->st = EDMA_XFER_ABORT;
+		/* Set Read index to ensure all callbacks gets error return */
+		cur_idx = (ch->r_idx - 1U) % ch->desc_sz;
+	}
 
 	return cur_idx % (ch->desc_sz);
 }
@@ -286,7 +292,7 @@ static inline void process_ch_irq(struct edma_prv *prv, u32 chan, struct edma_ch
 {
 	u32 idx;
 
-	idx = get_dma_idx_from_llp(prv, chan, ch, type);
+	idx = get_dma_idx_from_llp(prv, (u8)(chan & 0xFF), ch, type);
 
 	if (ch->type == EDMA_CHAN_XFER_SYNC) {
 		if (ch->busy) {
@@ -314,7 +320,7 @@ process_abort:
 static irqreturn_t edma_irq(int irq, void *cookie)
 {
 	/* Disable irq before wake thread handler */
-	disable_irq_nosync(irq);
+	disable_irq_nosync((u32)(irq & INT_MAX));
 
 	return IRQ_WAKE_THREAD;
 }
@@ -364,8 +370,8 @@ static irqreturn_t edma_irq_handler(int irq, void *cookie)
 				process_ch_irq(prv, bit, ch, i);
 
 				edma_ch_init(prv, ch);
-				edma_ll_ch_init(prv->edma_base, bit, ch->dma_iova, (i == 0),
-						prv->is_remote_dma);
+				edma_ll_ch_init(prv->edma_base, (u8)(bit & 0xFF), ch->dma_iova,
+						(i == 0), prv->is_remote_dma);
 			}
 
 			edma_hw_init(prv, !!i);
@@ -382,7 +388,7 @@ static irqreturn_t edma_irq_handler(int irq, void *cookie)
 	}
 
 	/* Must enable before exit */
-	enable_irq(irq);
+	enable_irq((u32)(irq & INT_MAX));
 	return IRQ_HANDLED;
 }
 
@@ -390,7 +396,7 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 {
 	struct edma_prv *prv;
 	struct resource *dma_res;
-	int32_t ret, i, j;
+	int32_t ret, i, j, l_irq = 0;
 	struct edma_chan *ch = NULL;
 	struct edma_chan *chan[2];
 	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
@@ -455,11 +461,13 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 			goto put_dev;
 		}
 
-		prv->irq = platform_get_irq_byname(pdev, "intr");
-		if (prv->irq <= 0) {
+		l_irq = platform_get_irq_byname(pdev, "intr");
+		if (l_irq <= 0) {
 			dev_err(prv->dev, "failed to get intr interrupt\n");
 			goto put_dev;
-		};
+		} else {
+			prv->irq = (u32)l_irq;
+		}
 	} else {
 		pr_err("Neither device node nor edma remote available");
 		goto free_priv;
@@ -505,7 +513,7 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 			if (edma_ch_init(prv, ch) < 0)
 				goto free_dma_desc;
 
-			edma_ll_ch_init(prv->edma_base, i, ch->dma_iova, (j == 0),
+			edma_ll_ch_init(prv->edma_base, (u8)(i & 0xFF), ch->dma_iova, (j == 0),
 					prv->is_remote_dma);
 		}
 	}
@@ -574,19 +582,21 @@ edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 {
 	struct edma_prv *prv = (struct edma_prv *)cookie;
 	struct edma_chan *ch;
-	struct edma_hw_desc *dma_ll_virt;
+	struct edma_hw_desc *dma_ll_virt = NULL;
 	struct edma_dblock *db;
-	int i, ret;
+	int i;
 	u64 total_sz = 0;
 	edma_xfer_status_t st = EDMA_XFER_SUCCESS;
-	u32 avail;
+	u32 avail, to_ms;
 	struct tegra_pcie_edma_xfer_info *ring;
 	u32 int_status_off[2] = {DMA_WRITE_INT_STATUS_OFF, DMA_READ_INT_STATUS_OFF};
 	u32 doorbell_off[2] = {DMA_WRITE_DOORBELL_OFF, DMA_READ_DOORBELL_OFF};
 	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
 	bool pcs;
+	long ret, to_jif;
 
 	if (!prv || !tx_info || tx_info->nents == 0 || !tx_info->desc ||
+	    (tx_info->type < EDMA_XFER_WRITE || tx_info->type > EDMA_XFER_READ) ||
 	    tx_info->channel_num >= mode_cnt[tx_info->type])
 		return EDMA_XFER_FAIL_INVAL_INPUTS;
 
@@ -669,8 +679,11 @@ edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 	dma_common_wr(prv->edma_base, tx_info->channel_num, doorbell_off[tx_info->type]);
 
 	if (ch->type == EDMA_CHAN_XFER_SYNC) {
-		ret = wait_event_timeout(ch->wq, !ch->busy,
-					 msecs_to_jiffies((uint32_t)(GET_SYNC_TIMEOUT(total_sz))));
+		total_sz = GET_SYNC_TIMEOUT(total_sz);
+		to_ms = (total_sz > UINT_MAX) ? UINT_MAX : (u32)(total_sz & UINT_MAX);
+		to_jif = msecs_to_jiffies(to_ms) > LONG_MAX ?
+						LONG_MAX : msecs_to_jiffies(to_ms) & LONG_MAX;
+		ret = wait_event_timeout(ch->wq, !ch->busy, to_jif);
 		if (ret == 0) {
 			/* dummy print to avoid misra-c voilations */
 			dev_dbg(prv->dev, "read back pcs: %d\n", pcs);
