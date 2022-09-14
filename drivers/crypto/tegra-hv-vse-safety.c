@@ -5236,6 +5236,14 @@ static void tegra_hv_vse_safety_shutdown(struct platform_device *pdev)
 	struct tegra_virtual_se_dev *se_dev = platform_get_drvdata(pdev);
 	uint32_t cnt;
 
+	/* skip checking pending request for the node with "nvidia,gcm-dma-support"
+	 * which only used to allocate buffer for gpcdma
+	 * for other vse nodes which doesn't have "nvidia,gcm-dma-support",
+	 * it will still check pending request.
+	 */
+	if (gcm_supports_dma)
+		return;
+
 	/* Set engine to suspend state */
 	atomic_set(&se_dev->se_suspended, 1);
 
@@ -5285,6 +5293,16 @@ static int tegra_hv_vse_safety_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_virtual_se_dev *se_dev = platform_get_drvdata(pdev);
+
+#ifdef CRYPTO_MULTI_IVC_SUPPORT
+	/* skip checking pending request for the node with "nvidia,gcm-dma-support"
+	 * which only used to allocate buffer for gpcdma
+	 * for other vse nodes which doesn't have "nvidia,gcm-dma-support",
+	 * it will still set engine suspend state to 1.
+	 */
+	if (gcm_supports_dma)
+		return 0;
+#endif
 
 	/* Set engine to suspend state to 1 to make it as false */
 	atomic_set(&se_dev->se_suspended, 0);
