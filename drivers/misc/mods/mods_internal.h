@@ -21,13 +21,14 @@
 #ifndef _MODS_INTERNAL_H_
 #define _MODS_INTERNAL_H_
 
-#include <linux/version.h>
+#include <linux/fb.h>
 #include <linux/list.h>
-#include <linux/pci.h>
-#include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
-#include <linux/fb.h>
+#include <linux/pci.h>
+#include <linux/scatterlist.h>
+#include <linux/slab.h>
+#include <linux/version.h>
 
 #include "mods_config.h"
 #include "mods.h"
@@ -72,7 +73,7 @@ struct en_dev_entry {
 };
 
 struct mem_type {
-	u64 dma_addr;
+	u64 phys_addr;
 	u64 size;
 	u8  type;
 };
@@ -129,82 +130,75 @@ struct mods_vm_private_data {
 	atomic_t            usage_count;
 };
 
-/* PCI Resource mapping private data*/
-struct MODS_PCI_RES_MAP_INFO {
-	struct pci_dev  *dev;          /* pci_dev the mapping was on */
-	u64              page_count;   /* number of pages for the mapping */
-	u64              va;           /* va address of the mapping */
-	struct list_head list;
-};
-
-#define DMA_BITS 57
-
-struct MODS_PHYS_CHUNK {
-	u64          dma_addr:DMA_BITS; /* phys addr (or machine addr on XEN) */
-	u8           order:5;           /* 1<<order = number of contig pages  */
-	u8           wc:1;              /* 1=cache is wc or uc, 0=cache is wb */
-	u8           mapped:1;          /* dev_addr is valid                  */
-	u64          dev_addr;          /* DMA map addr for default device    */
-	struct page *p_page;
-};
-
+/* Free WC or UC chunk, which can be reused */
 struct MODS_FREE_PHYS_CHUNK {
 	struct list_head list;
 	struct page     *p_page;
 	int              numa_node;
 	u8               order;
-	u8               cache_type:2;
-	u8               dma32:1;
+	u8               cache_type : 2;
+	u8               dma32      : 1;
 };
 
+/* DMA mapping into a PCI or non-PCI device */
 struct MODS_DMA_MAP {
-	struct list_head list;
-	struct pci_dev  *dev;          /* pci_dev these mappings are for */
-	u64              dev_addr[1];  /* each entry corresponds to phys chunk
-					* in the pages array at the same index
+	struct list_head   list;
+	struct pci_dev    *pcidev;     /* PCI device these mappings are for.
+					* Can be NULL if the device the memory
+					* was mapped to is not a PCI device.
+					*/
+	struct device     *dev;        /* device these mappings are for */
+	struct scatterlist sg[1];      /* each entry corresponds to phys chunk
+					* in sg array in MODS_MEM_INFO at the
+					* same index
 					*/
 };
 
 /* system memory allocation tracking */
 struct MODS_MEM_INFO {
-	u32             num_pages;      /* number of allocated pages */
-	u32             num_chunks;     /* max number of contig chunks */
-	int             numa_node;      /* numa node for the allocation */
-	u8              cache_type : 2; /* MODS_ALLOC_* */
-	u8              contig     : 1; /* true/false */
-	u8              dma32      : 1; /* true/false */
-	u8              force_numa : 1; /* true/false */
-	u8              iommu_mapped: 1;/* true/false*/
-	u8              smmudev_idx;    /* smmu dev idex*/
-	struct pci_dev *dev;            /* (optional) pci_dev this allocation
-					 * is for.
-					 */
+	struct list_head list;
 
 	/* List of DMA mappings for devices other than the default
-	 * device specified by the dev field above.
+	 * PCI device specified by the dev field.
 	 */
 	struct list_head dma_map_list;
 
-	struct list_head list;
+	u32 num_pages;      /* total number of allocated pages */
+	u32 num_chunks;     /* number of allocated contig chunks */
+	int numa_node;      /* numa node for the allocation */
+	u8  cache_type : 2; /* MODS_ALLOC_* */
+	u8  dma32      : 1; /* true/false */
+	u8  force_numa : 1; /* true/false */
 
-	struct sg_table *sgt;   /* scatterlist for dma mapping */
-
-	/* information about allocated pages */
-	struct MODS_PHYS_CHUNK pages[1];
+	struct pci_dev     *dev;         /* (optional) pci_dev this allocation
+					  * is for.
+					  */
+	unsigned long      *wc_bitmap;   /* marks which chunks use WC/UC */
+	struct scatterlist *sg;          /* current list of chunks */
+	struct scatterlist  contig_sg;   /* contiguous merged chunk */
+	struct scatterlist  alloc_sg[1]; /* allocated memory chunks, each chunk
+					  * consists of 2^n contiguous pages
+					  */
 };
+
+static inline u32 get_num_chunks(const struct MODS_MEM_INFO *p_mem_info)
+{
+	if (unlikely(p_mem_info->sg == &p_mem_info->contig_sg))
+		return 1;
+
+	return p_mem_info->num_chunks;
+}
 
 /* map memory tracking */
 struct SYS_MAP_MEMORY {
+	struct list_head list;
+
 	/* used for offset lookup, NULL for device memory */
 	struct MODS_MEM_INFO *p_mem_info;
 
-	u64 dma_addr;	    /* first physical address of given mapping,
-			     * machine address on Xen
-			     */
-	u64 virtual_addr;   /* virtual address of given mapping */
-	u64 mapping_length; /* tells how many bytes were mapped */
-
-	struct list_head   list;
+	phys_addr_t   phys_addr;
+	unsigned long virtual_addr;
+	unsigned long mapping_length; /* how many bytes were mapped */
 };
 
 struct mods_smmu_dev {
@@ -357,26 +351,6 @@ struct mods_priv {
 #define MODS_PGPROT_UC pgprot_noncached
 #define MODS_PGPROT_WC pgprot_writecombine
 
-/* Xen adds a translation layer between the physical address
- * and real system memory address space.
- *
- * To illustrate if a PC has 2 GBs of RAM and each VM is given 1GB, then:
- * for guest OS in domain 0, physical address = machine address;
- * for guest OS in domain 1, physical address x = machine address 1GB+x
- *
- * In reality even domain's 0 physical address is not equal to machine
- * address and the mappings are not continuous.
- */
-
-#if defined(CONFIG_XEN) && !defined(CONFIG_PARAVIRT) && \
-	  !defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
-	#define MODS_PHYS_TO_DMA(phys_addr) phys_to_machine(phys_addr)
-	#define MODS_DMA_TO_PHYS(dma_addr)  machine_to_phys(dma_addr)
-#else
-	#define MODS_PHYS_TO_DMA(phys_addr) (phys_addr)
-	#define MODS_DMA_TO_PHYS(dma_addr)  (dma_addr)
-#endif
-
 /* ACPI */
 #ifdef MODS_HAS_NEW_ACPI_WALK
 #define MODS_ACPI_WALK_NAMESPACE(type, start_object, max_depth, user_function, \
@@ -390,6 +364,12 @@ struct mods_priv {
 #define MODS_ACPI_HANDLE(dev) ACPI_HANDLE(dev)
 #else
 #define MODS_ACPI_HANDLE(dev) DEVICE_ACPI_HANDLE(dev)
+#endif
+
+#if KERNEL_VERSION(3, 10, 0) <= MODS_KERNEL_VERSION
+#	define MODS_SG_UNMARK_END(sg) sg_unmark_end(sg)
+#else
+#	define MODS_SG_UNMARK_END(sg) ({(sg)->page_link &= ~2; })
 #endif
 
 /* ************************************************************************* */
