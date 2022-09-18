@@ -1,0 +1,31 @@
+* Tegra Hypervisor VCPU Yield(tegra-hv-vcpu-yield)
+
+Provides support for high priority Linux VM to yield Virtual CPU to a low
+priority VM.
+Linux VM which is of higher priority and sharing a Physical CPU with a lower
+priority VM can yield the CPU(yield Virtual CPU corresponding to the Physical
+CPU where the low priority VM runs) for a specific timeout period so that the
+low priority VM can make progress.
+ioctl is used to trigger the Virtual CPU yield with specific duration for the
+yield.
+ivc is used by low priority VM to notify the Linux VM that it is done using
+CPU before the specified yield timeout expires.
+
+Required properties:
+- compatible: Should be "nvidia,tegra-hv-vcpu-yield".
+- low_prio_vmid: list of low priority VM id's for which CPU need to be yielded
+- yield_vcpu: Virtual CPU core corresponding to each of the low priority VM in
+		low_prio_vmid that is shared with Linux VM
+- ivc: IVC channel corresponding to each of the low priority VM in low_prio_vmid
+		that is used by low priority VM to notify Linux VM that it is
+		done using the CPU
+
+
+Example:
+	tegra_hv_vcpu_yield {
+		compatible = "nvidia,tegra-hv-vcpu-yield";
+		yield_vcpu = <2>;
+		low_prio_vmid = <2>;
+		ivc = <10>;
+		status = "okay";
+	};
