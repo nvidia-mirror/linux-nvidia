@@ -1526,8 +1526,11 @@ static int nct1008_remove(struct i2c_client *client)
 	data->stop_workqueue = 1;
 	mutex_unlock(&data->mutex);
 
-	cancel_work_sync(&data->work);
-	free_irq(data->client->irq, data);
+	if (client->irq > 0) {
+		cancel_work_sync(&data->work);
+		free_irq(data->client->irq, data);
+	}
+
 	sysfs_remove_group(&client->dev.kobj, &nct1008_attr_group);
 	nct1008_power_control(data, false);
 
@@ -1547,10 +1550,10 @@ static void nct1008_shutdown(struct i2c_client *client)
 	data->stop_workqueue = 1;
 	mutex_unlock(&data->mutex);
 
-	cancel_work_sync(&data->work);
-
-	if (client->irq)
+	if (client->irq > 0) {
+		cancel_work_sync(&data->work);
 		disable_irq(client->irq);
+	}
 
 	if (data->sensors[LOC].thz) {
 		if (client->dev.of_node)
@@ -1583,8 +1586,12 @@ static int nct1008_suspend(struct device *dev)
 	mutex_lock(&data->mutex);
 	data->stop_workqueue = 1;
 	mutex_unlock(&data->mutex);
-	cancel_work_sync(&data->work);
-	disable_irq(client->irq);
+
+	if (client->irq > 0) {
+		cancel_work_sync(&data->work);
+		disable_irq(client->irq);
+	}
+
 	err = nct1008_disable(client);
 	nct1008_power_control(data, false);
 
