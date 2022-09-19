@@ -209,7 +209,6 @@ static long tegra_hv_vcpu_yield_ioctl(struct file *filp, unsigned int cmd,
 		ret = -EINVAL;
 	}
 
-
 out:
 	return ret;
 }
@@ -282,6 +281,7 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	struct vcpu_yield_dev *vcpu_yield, *vcpu_yield_dev_list;
 	struct vcpu_yield_plat_dev *vcpu_yield_pdev;
 	struct device_node *np = pdev->dev.of_node;
+	int *dt_array_mem = NULL;
 	int *vmid_list = NULL;
 	int *ivc_list = NULL;
 	int *vcpu_list = NULL;
@@ -289,26 +289,16 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	struct tegra_hv_ivc_cookie *ivck;
 	struct cpumask cpumask;
 
-	vmid_list = kcalloc(MAX_YIELD_VM_COUNT, sizeof(int), GFP_KERNEL);
-	if (vmid_list == NULL) {
-		pr_err("kcalloc failed for vmid_list\n");
+	dt_array_mem = kcalloc(3, MAX_YIELD_VM_COUNT * sizeof(int), GFP_KERNEL);
+	if (dt_array_mem == NULL) {
+		pr_err("kcalloc failed for dt_array_mem\n");
 		result = -ENOMEM;
 		goto out;
 	}
 
-	ivc_list = kcalloc(MAX_YIELD_VM_COUNT, sizeof(int), GFP_KERNEL);
-	if (ivc_list == NULL) {
-		pr_err("kcalloc failed for ivc_list\n");
-		result = -ENOMEM;
-		goto out;
-	}
-
-	vcpu_list = kcalloc(MAX_YIELD_VM_COUNT, sizeof(int), GFP_KERNEL);
-	if (vcpu_list == NULL) {
-		pr_err("kcalloc failed for vcpu_list\n");
-		result = -ENOMEM;
-		goto out;
-	}
+	vmid_list = dt_array_mem;
+	ivc_list = &dt_array_mem[MAX_YIELD_VM_COUNT];
+	vcpu_list = &dt_array_mem[2 * MAX_YIELD_VM_COUNT];
 
 	vmid_count = of_property_read_variable_u32_array(np, "low_prio_vmid",
 			vmid_list, 1, MAX_YIELD_VM_COUNT);
@@ -442,16 +432,13 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	}
 
 out:
-	kfree(vmid_list);
-	kfree(ivc_list);
-	kfree(vcpu_list);
+	kfree(dt_array_mem);
 
 	if (result)
 		tegra_hv_vcpu_yield_remove(pdev);
 
 	return result;
 }
-
 
 static const struct of_device_id tegra_hv_vcpu_yield_match[] = {
 	{ .compatible = "nvidia,tegra-hv-vcpu-yield", },
@@ -469,7 +456,6 @@ static struct platform_driver tegra_hv_vcpu_yield_driver = {
 	.remove = tegra_hv_vcpu_yield_remove,
 };
 module_platform_driver(tegra_hv_vcpu_yield_driver);
-
 
 MODULE_DESCRIPTION("Timed VCPU Yield driver");
 MODULE_AUTHOR("Suresh Venkatachalam <skathirampat@nvidia.com>");
