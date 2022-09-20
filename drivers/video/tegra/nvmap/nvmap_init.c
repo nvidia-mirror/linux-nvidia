@@ -359,14 +359,20 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	unsigned long flags;
 	unsigned int count, i = 0, j = 0;
 	unsigned int alloc_size;
-	unsigned long align, pageno;
+	unsigned long align, pageno, page_count;
 	void *addr = NULL;
 	struct page **pages = NULL;
 	int do_memset = 0;
 	int *bitmap_nos = NULL;
 
-	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs))
-		count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
+		page_count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+		if (page_count > UINT_MAX) {
+			dev_err(dev, "Page count more than max value\n");
+			return NULL;
+		}
+		count = (unsigned int)page_count;
+	}
 	else
 		count = 1 << order;
 
