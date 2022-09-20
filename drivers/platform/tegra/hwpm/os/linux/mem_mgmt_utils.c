@@ -19,6 +19,7 @@
 #include <linux/string.h>
 #include <linux/of_address.h>
 #include <linux/dma-buf.h>
+#include <linux/version.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
 #include <tegra_hwpm_kmem.h>
@@ -128,7 +129,11 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 
 #if defined(CONFIG_TEGRA_HWPM_OOT)
 	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+		(struct iosys_map *)hwpm->mem_mgmt->mem_bytes_kernel);
+#else
 		(struct dma_buf_map *)hwpm->mem_mgmt->mem_bytes_kernel);
+#endif
 	if (err != 0) {
 		tegra_hwpm_err(hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
