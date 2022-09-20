@@ -2,7 +2,7 @@
 /*
  * PCIe EDMA Library Framework
  *
- * Copyright (C) 2021-2022 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2021-2023 NVIDIA Corporation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -281,8 +281,9 @@ static inline void process_r_idx(struct edma_chan *ch, edma_xfer_status_t st, u3
 		dma_ll_virt->ctrl_reg.ctrl_e.rie = 0;
 		if (ch->type == EDMA_CHAN_XFER_ASYNC && ring->complete) {
 			ring->complete(ring->priv, st, NULL);
-			/* Clear ring callback */
+			/* Clear ring callback and priv variables */
 			ring->complete = NULL;
+			ring->priv = NULL;
 		}
 	}
 }
@@ -592,7 +593,7 @@ edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 	u32 int_status_off[2] = {DMA_WRITE_INT_STATUS_OFF, DMA_READ_INT_STATUS_OFF};
 	u32 doorbell_off[2] = {DMA_WRITE_DOORBELL_OFF, DMA_READ_DOORBELL_OFF};
 	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
-	bool pcs;
+	bool pcs, final_pcs = false;
 	long ret, to_jif;
 
 	if (!prv || !tx_info || tx_info->nents == 0 || !tx_info->desc ||
@@ -645,9 +646,11 @@ edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 		if (i == tx_info->nents - 1) {
 			dma_ll_virt->ctrl_reg.ctrl_e.lie = 1;
 			dma_ll_virt->ctrl_reg.ctrl_e.rie = !!prv->is_remote_dma;
+			final_pcs = ch->pcs;
+		} else {
+			/* CB should be updated last in the descriptor */
+			dma_ll_virt->ctrl_reg.ctrl_e.cb = ch->pcs;
 		}
-		/* CB should be updated last in the descriptor */
-		dma_ll_virt->ctrl_reg.ctrl_e.cb = ch->pcs;
 		ch->db_pos = !ch->db_pos;
 		avail = ch->w_idx;
 		ch->w_idx++;
@@ -665,16 +668,28 @@ edma_xfer_status_t tegra_pcie_edma_submit_xfer(void *cookie,
 	}
 
 	ring = &ch->ring[avail];
-	ring->complete = tx_info->complete;
 	ring->priv = tx_info->priv;
-	ring->nents = tx_info->nents;
-	ring->desc = tx_info->desc;
+	ring->complete = tx_info->complete;
 
-	/* Read back CB to avoid OOO in case of remote dma. */
-	pcs = dma_ll_virt->ctrl_reg.ctrl_e.cb;
+	/* Update CB post SW ring update to order callback and transfer updates */
+	dma_ll_virt->ctrl_reg.ctrl_e.cb = final_pcs;
 
 	/* desc write should not go OOO wrt DMA DB ring */
 	wmb();
+	/* use smb_wmb to synchronize across cores */
+	smp_wmb();
+
+	/* Read back CB and check with CCS to ensure that descriptor update is reflected. */
+	pcs = dma_ll_virt->ctrl_reg.ctrl_e.cb;
+
+	if (pcs != (dma_channel_rd(prv->edma_base, tx_info->channel_num, DMA_CH_CONTROL1_OFF_WRCH) &
+		    OSI_BIT(8)))
+		dev_dbg(prv->dev, "read pcs != CCS failed. But expected sometimes: %d\n", pcs);
+
+	/* Ensure that all reads and writes are ordered */
+	mb();
+	/* Ensure that all reads and writes are ordered */
+	smp_mb();
 
 	dma_common_wr(prv->edma_base, tx_info->channel_num, doorbell_off[tx_info->type]);
 
