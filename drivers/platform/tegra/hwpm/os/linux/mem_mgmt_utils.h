@@ -15,6 +15,9 @@
 #define TEGRA_HWPM_OS_LINUX_MEM_MGMT_UTILS_H
 
 #include <linux/types.h>
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+#include <linux/dma-buf-map.h>
+#endif
 
 /* This macro is copy of TEGRA_SOC_HWPM_MEM_BYTES_INVALID */
 #define TEGRA_HWPM_MEM_BYTES_INVALID	0xffffffff
@@ -38,6 +41,9 @@ struct tegra_hwpm_mem_mgmt {
 	struct dma_buf_attachment *mem_bytes_attach;
 	u64 mem_bytes_buf_va;
 	void *mem_bytes_kernel;
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	struct dma_buf_map mem_bytes_map;
+#endif
 };
 
 struct tegra_hwpm_allowlist_map {
