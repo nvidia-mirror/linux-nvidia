@@ -901,4 +901,7 @@ void *nvmap_dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size);
 void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
 					 dma_addr_t device_addr, size_t size);
+
+extern void __dma_flush_area(const void *cpu_va, size_t size);
+extern void __dma_map_area(const void *cpu_va, size_t size, int dir);
 #endif /* __VIDEO_TEGRA_NVMAP_NVMAP_H */
