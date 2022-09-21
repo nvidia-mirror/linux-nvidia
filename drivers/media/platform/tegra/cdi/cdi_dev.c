@@ -601,7 +601,7 @@ static int cdi_dev_probe(struct i2c_client *client,
 					for (i = 0; i < numLinks; i++) {
 						err = of_property_read_u32_index(child_max20087, "links", i, &link);
 						if (err == 0) {
-							if ((link >= 0) && (link < MAX_POWER_LINKS_PER_BLOCK)) {
+							if (link < MAX_POWER_LINKS_PER_BLOCK) {
 								info->max20087.links[i] = (u8) link;
 							} else {
 								dev_err(&client->dev, "%s: Incorrect camera module index: %d\n",
