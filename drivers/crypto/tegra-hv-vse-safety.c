@@ -610,8 +610,8 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 {
 	struct tegra_virtual_se_ivc_tx_msg_t *ivc_tx = NULL;
 	struct tegra_virtual_se_ivc_hdr_t *ivc_hdr = NULL;
-	struct tegra_virtual_se_sha_context *sha_ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
-	struct tegra_hv_ivc_cookie *pivck = g_crypto_to_ivc_map[sha_ctx->node_id].ivck;
+	struct tegra_virtual_se_sha_context *sha_ctx;
+	struct tegra_hv_ivc_cookie *pivck;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_virtual_se_req_context *req_ctx;
 	struct tegra_vse_tag *priv_data_ptr;
@@ -620,9 +620,12 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 	u64 total_count = 0, msg_len = 0;
 
 	if (!req) {
-		dev_err(se_dev->dev, "SHA request not valid\n");
+		pr_err("%s: SHA request not valid\n", __func__);
 		return -EINVAL;
 	}
+
+	sha_ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
+	pivck = g_crypto_to_ivc_map[sha_ctx->node_id].ivck;
 
 	if (!ivc_req_msg) {
 		dev_err(se_dev->dev,
@@ -1295,7 +1298,7 @@ static void tegra_hv_vse_safety_sha_req_deinit(struct ahash_request *req)
 static int tegra_hv_vse_safety_sha_update(struct ahash_request *req)
 {
 	struct tegra_virtual_se_dev *se_dev = g_virtual_se_dev[VIRTUAL_SE_SHA];
-	struct tegra_virtual_se_req_context *req_ctx = ahash_request_ctx(req);
+	struct tegra_virtual_se_req_context *req_ctx;
 	int ret = 0;
 
 	if (!req) {
@@ -1324,7 +1327,7 @@ static int tegra_hv_vse_safety_sha_update(struct ahash_request *req)
 static int tegra_hv_vse_safety_sha_finup(struct ahash_request *req)
 {
 	struct tegra_virtual_se_dev *se_dev = g_virtual_se_dev[VIRTUAL_SE_SHA];
-	struct tegra_virtual_se_req_context *req_ctx = ahash_request_ctx(req);
+	struct tegra_virtual_se_req_context *req_ctx;
 	int ret = 0;
 
 	if (!req) {
@@ -1355,7 +1358,7 @@ static int tegra_hv_vse_safety_sha_finup(struct ahash_request *req)
 static int tegra_hv_vse_safety_sha_final(struct ahash_request *req)
 {
 	struct tegra_virtual_se_dev *se_dev = g_virtual_se_dev[VIRTUAL_SE_SHA];
-	struct tegra_virtual_se_req_context *req_ctx = ahash_request_ctx(req);
+	struct tegra_virtual_se_req_context *req_ctx;
 	int ret = 0;
 
 	if (!req) {
@@ -1692,8 +1695,7 @@ static int tegra_hv_vse_safety_aes_cbc_encrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
@@ -1706,6 +1708,7 @@ static int tegra_hv_vse_safety_aes_cbc_encrypt(struct skcipher_request *req)
 		pr_err("%s: Unable to determine if random IV generation is needed\n", __func__);
 		return -EINVAL;
 	}
+	aes_ctx = crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = true;
@@ -1723,13 +1726,13 @@ static int tegra_hv_vse_safety_aes_cbc_decrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
 		return -EINVAL;
 	}
+	aes_ctx = crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = false;
@@ -1747,13 +1750,13 @@ static int tegra_hv_vse_safety_aes_ecb_encrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
 		return -EINVAL;
 	}
+	aes_ctx = crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = true;
@@ -1771,13 +1774,13 @@ static int tegra_hv_vse_safety_aes_ecb_decrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
 		return -EINVAL;
 	}
+	aes_ctx	= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = false;
@@ -1795,8 +1798,7 @@ static int tegra_hv_vse_safety_aes_ctr_encrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
@@ -1809,6 +1811,7 @@ static int tegra_hv_vse_safety_aes_ctr_encrypt(struct skcipher_request *req)
 		pr_err("%s: Unable to determine if random IV generation is needed\n", __func__);
 		return -EINVAL;
 	}
+	aes_ctx = crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = true;
@@ -1826,13 +1829,13 @@ static int tegra_hv_vse_safety_aes_ctr_decrypt(struct skcipher_request *req)
 {
 	int err = 0;
 	struct tegra_virtual_se_aes_req_context *req_ctx = NULL;
-	struct tegra_virtual_se_aes_context *aes_ctx
-				= crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
+	struct tegra_virtual_se_aes_context *aes_ctx;
 
 	if (!req) {
 		pr_err("NULL req received by %s", __func__);
 		return -EINVAL;
 	}
+	aes_ctx = crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	req_ctx = skcipher_request_ctx(req);
 
 	req_ctx->encrypt = false;
@@ -3013,16 +3016,20 @@ free_exit:
 
 static int tegra_vse_aes_gcm_encrypt(struct aead_request *req)
 {
-	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
-	struct tegra_virtual_se_aes_context *aes_ctx = crypto_aead_ctx(tfm);
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[aes_ctx->node_id].se_engine];
+	struct crypto_aead *tfm;
+	struct tegra_virtual_se_aes_context *aes_ctx;
+	struct tegra_virtual_se_dev *se_dev;
 	int err = 0;
 
 	if (!req) {
-		dev_err(se_dev->dev, "%s: req is invalid\n", __func__);
+		pr_err("%s: req is invalid\n", __func__);
 		return -EINVAL;
 	}
+
+	tfm = crypto_aead_reqtfm(req);
+	aes_ctx = crypto_aead_ctx(tfm);
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[aes_ctx->node_id].se_engine];
+
 	if (unlikely(!req->iv)) {
 		/* If IV is not set we cannot determine whether
 		 * random IV generation is required.
@@ -3040,16 +3047,19 @@ static int tegra_vse_aes_gcm_encrypt(struct aead_request *req)
 
 static int tegra_vse_aes_gcm_decrypt(struct aead_request *req)
 {
-	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
-	struct tegra_virtual_se_aes_context *aes_ctx = crypto_aead_ctx(tfm);
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[aes_ctx->node_id].se_engine];
+	struct crypto_aead *tfm;
+	struct tegra_virtual_se_aes_context *aes_ctx;
+	struct tegra_virtual_se_dev *se_dev;
 	int err = 0;
 
 	if (!req) {
-		dev_err(se_dev->dev, "%s: req is invalid\n", __func__);
+		pr_err("%s: req is invalid\n", __func__);
 		return -EINVAL;
 	}
+
+	tfm = crypto_aead_reqtfm(req);
+	aes_ctx = crypto_aead_ctx(tfm);
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[aes_ctx->node_id].se_engine];
 
 	err = tegra_vse_aes_gcm_enc_dec(req, false);
 	if (err)
