@@ -10,7 +10,7 @@
  * with a userspace daemon linked against ivc library code, i.e. it  is not
  * a stand-alone driver.
  *
- * Copyright (C) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2016-2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -27,21 +27,13 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/version.h>
-#if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
-#include <soc/tegra/chip-id.h>
-#else
 #include <soc/tegra/fuse.h>
-#endif
 #include <linux/tegra-ivc.h>
 #include <linux/tegra-ivc-instance.h>
 #include <uapi/linux/nvhvivc_mempool_ioctl.h>
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
-#include <asm/uaccess.h>
-#else
 #include <linux/uaccess.h>
-#endif
 
 #include "tegra_hv.h"
 

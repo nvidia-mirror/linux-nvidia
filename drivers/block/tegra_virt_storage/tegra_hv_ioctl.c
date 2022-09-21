@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -132,13 +132,7 @@ int vblk_submit_ioctl_req(struct block_device *bdev,
 	if (err)
 		goto free_ioctl_req;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
 	rq = blk_get_request(vblkdev->queue, REQ_OP_DRV_IN, BLK_MQ_REQ_NOWAIT);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
-	rq = blk_get_request(vblkdev->queue, REQ_OP_DRV_IN, GFP_KERNEL);
-#else
-	rq = blk_get_request(vblkdev->queue, READ, GFP_KERNEL);
-#endif
 	if (IS_ERR_OR_NULL(rq)) {
 		dev_err(vblkdev->device,
 			"Failed to get handle to a request!\n");
@@ -146,23 +140,10 @@ int vblk_submit_ioctl_req(struct block_device *bdev,
 		goto free_ioctl_req;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
 	rq->completion_data = (void *)ioctl_req;
-#else
-	rq->special = (void *)ioctl_req;
-#endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
 	blk_execute_rq(vblkdev->queue, vblkdev->gd, rq, 0);
 	blk_put_request(rq);
-#else
-	rq->cmd_type = REQ_TYPE_DRV_PRIV;
-	err = blk_execute_rq(vblkdev->queue, vblkdev->gd, rq, 0);
-	blk_put_request(rq);
-
-	if (err)
-		goto free_ioctl_req;
-#endif
 
 	switch (cmd) {
 	case SG_IO:
