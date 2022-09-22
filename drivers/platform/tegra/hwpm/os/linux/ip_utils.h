@@ -22,9 +22,9 @@ struct tegra_soc_hwpm_resource_info;
 int tegra_hwpm_complete_ip_register_impl(struct tegra_soc_hwpm *hwpm);
 u32 tegra_hwpm_translate_soc_hwpm_resource(struct tegra_soc_hwpm *hwpm,
 	enum tegra_soc_hwpm_resource res_enum);
-int tegra_hwpm_get_floorsweep_info(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_obtain_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_ip_floorsweep_info *fs_info);
-int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_obtain_resource_info(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_resource_info *rsrc_info);
 void tegra_hwpm_release_ip_register_node(struct tegra_soc_hwpm *hwpm);
 

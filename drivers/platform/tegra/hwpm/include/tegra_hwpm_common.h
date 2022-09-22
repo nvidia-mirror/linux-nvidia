@@ -41,12 +41,13 @@ bool tegra_hwpm_aperture_for_address(struct tegra_soc_hwpm *hwpm,
 	u64 find_addr, u32 *ip_idx, u32 *inst_idx, u32 *element_idx,
 	enum tegra_hwpm_element_type *element_type);
 
+int tegra_hwpm_perfmux_disable(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *perfmux);
+int tegra_hwpm_reserve_rtr(struct tegra_soc_hwpm *hwpm);
+int tegra_hwpm_release_rtr(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_reserve_resource(struct tegra_soc_hwpm *hwpm, u32 resource);
 int tegra_hwpm_release_resources(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_bind_resources(struct tegra_soc_hwpm *hwpm);
-
-int tegra_hwpm_reserve_rtr(struct tegra_soc_hwpm *hwpm);
-int tegra_hwpm_release_rtr(struct tegra_soc_hwpm *hwpm);
 
 int tegra_hwpm_element_reserve(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *perfmon);
@@ -56,6 +57,10 @@ int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
 int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
 	struct tegra_hwpm_ip_ops *ip_ops,
 	u64 base_address, u32 ip_idx, bool available);
+int tegra_hwpm_get_fs_info(struct tegra_soc_hwpm *hwpm,
+	u32 ip_enum, u64 *fs_mask, u8 *ip_status);
+int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
+	u32 resource_enum, u8 *status);
 int tegra_hwpm_finalize_chip_info(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, bool disable);
@@ -63,6 +68,14 @@ int tegra_hwpm_ip_handle_power_mgmt(struct tegra_soc_hwpm *hwpm,
 int tegra_hwpm_alloc_alist_map(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_get_allowlist_size(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_combine_alist(struct tegra_soc_hwpm *hwpm, u64 *alist);
+size_t tegra_hwpm_get_alist_buf_size(struct tegra_soc_hwpm *hwpm);
+int tegra_hwpm_zero_alist_regs(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture);
+int tegra_hwpm_copy_alist(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 *full_alist,
+	u64 *full_alist_idx);
+bool tegra_hwpm_check_alist(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 phys_addr);
 
 int tegra_hwpm_setup_hw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm);

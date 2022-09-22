@@ -15,6 +15,7 @@
 #include <tegra_hwpm_kmem.h>
 #include <tegra_hwpm_log.h>
 #include <tegra_hwpm.h>
+
 #include <hal/t234/t234_init.h>
 #include <hal/t234/t234_internal.h>
 
@@ -31,8 +32,8 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 	.extract_ip_ops = t234_hwpm_extract_ip_ops,
 	.force_enable_ips = t234_hwpm_force_enable_ips,
 	.validate_current_config = t234_hwpm_validate_current_config,
-	.get_fs_info = t234_hwpm_get_fs_info,
-	.get_resource_info = t234_hwpm_get_resource_info,
+	.get_fs_info = tegra_hwpm_get_fs_info,
+	.get_resource_info = tegra_hwpm_get_resource_info,
 
 	.init_prod_values = t234_hwpm_init_prod_values,
 	.disable_cg = t234_hwpm_disable_cg,
@@ -43,7 +44,7 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 
 	.perfmon_enable = t234_hwpm_perfmon_enable,
 	.perfmon_disable = t234_hwpm_perfmon_disable,
-	.perfmux_disable = t234_hwpm_perfmux_disable,
+	.perfmux_disable = tegra_hwpm_perfmux_disable,
 	.disable_triggers = t234_hwpm_disable_triggers,
 
 	.disable_mem_mgmt = t234_hwpm_disable_mem_mgmt,
@@ -55,10 +56,10 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 	.get_mem_bytes_put_ptr = t234_hwpm_get_mem_bytes_put_ptr,
 	.membuf_overflow_status = t234_hwpm_membuf_overflow_status,
 
-	.get_alist_buf_size = t234_hwpm_get_alist_buf_size,
-	.zero_alist_regs = t234_hwpm_zero_alist_regs,
-	.copy_alist = t234_hwpm_copy_alist,
-	.check_alist = t234_hwpm_check_alist,
+	.get_alist_buf_size = tegra_hwpm_get_alist_buf_size,
+	.zero_alist_regs = tegra_hwpm_zero_alist_regs,
+	.copy_alist = tegra_hwpm_copy_alist,
+	.check_alist = tegra_hwpm_check_alist,
 };
 
 static bool t234_hwpm_validate_hals(struct tegra_soc_hwpm *hwpm)

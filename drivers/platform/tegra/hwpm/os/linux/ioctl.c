@@ -76,7 +76,7 @@ static int tegra_hwpm_get_floorsweep_info_ioctl(struct tegra_soc_hwpm *hwpm,
 		return -EINVAL;
 	}
 
-	return tegra_hwpm_get_floorsweep_info(hwpm, fs_info);
+	return tegra_hwpm_obtain_floorsweep_info(hwpm, fs_info);
 }
 
 static int tegra_hwpm_get_resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
@@ -90,7 +90,7 @@ static int tegra_hwpm_get_resource_info_ioctl(struct tegra_soc_hwpm *hwpm,
 		return -EINVAL;
 	}
 
-	return tegra_hwpm_get_resource_info(hwpm, rsrc_info);
+	return tegra_hwpm_obtain_resource_info(hwpm, rsrc_info);
 }
 
 static int tegra_hwpm_reserve_resource_ioctl(struct tegra_soc_hwpm *hwpm,

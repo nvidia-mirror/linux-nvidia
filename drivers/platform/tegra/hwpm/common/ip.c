@@ -186,6 +186,78 @@ fail:
 	return ret;
 }
 
+int tegra_hwpm_get_fs_info(struct tegra_soc_hwpm *hwpm,
+	u32 ip_enum, u64 *fs_mask, u8 *ip_status)
+{
+	u32 ip_idx = 0U, inst_idx = 0U, element_mask_shift = 0U;
+	u64 floorsweep = 0ULL;
+	struct tegra_soc_hwpm_chip *active_chip = NULL;
+	struct hwpm_ip *chip_ip = NULL;
+	struct hwpm_ip_inst *ip_inst = NULL;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+	/* Convert tegra_soc_hwpm_ip enum to internal ip index */
+	if (hwpm->active_chip->is_ip_active(hwpm, ip_enum, &ip_idx)) {
+		active_chip = hwpm->active_chip;
+		chip_ip = active_chip->chip_ips[ip_idx];
+		if (!(chip_ip->override_enable) && chip_ip->inst_fs_mask) {
+			for (inst_idx = 0U; inst_idx < chip_ip->num_instances;
+				inst_idx++) {
+				ip_inst = &chip_ip->ip_inst_static_array[
+					inst_idx];
+				element_mask_shift = (inst_idx == 0U ? 0U :
+					ip_inst->num_core_elements_per_inst);
+
+				if (ip_inst->hw_inst_mask &
+					chip_ip->inst_fs_mask) {
+					floorsweep |= ((u64)
+						ip_inst->element_fs_mask <<
+							element_mask_shift);
+				}
+			}
+			*fs_mask = floorsweep;
+			*ip_status = TEGRA_HWPM_IP_STATUS_VALID;
+
+			return 0;
+		}
+	}
+
+	tegra_hwpm_dbg(hwpm, hwpm_dbg_floorsweep_info,
+		"SOC hwpm IP %d is unavailable", ip_enum);
+
+	*ip_status = TEGRA_HWPM_IP_STATUS_INVALID;
+	*fs_mask = 0ULL;
+
+	return 0;
+}
+
+int tegra_hwpm_get_resource_info(struct tegra_soc_hwpm *hwpm,
+	u32 resource_enum, u8 *status)
+{
+	u32 ip_idx = 0U;
+	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
+	struct hwpm_ip *chip_ip = NULL;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+	/* Convert tegra_soc_hwpm_resource to internal enum */
+	if (hwpm->active_chip->is_resource_active(hwpm, resource_enum, &ip_idx)) {
+		chip_ip = active_chip->chip_ips[ip_idx];
+
+		if (!(chip_ip->override_enable)) {
+			*status = tegra_hwpm_safe_cast_u32_to_u8(
+				chip_ip->resource_status);
+			return 0;
+		}
+	}
+
+	*status = tegra_hwpm_safe_cast_u32_to_u8(
+		TEGRA_HWPM_RESOURCE_STATUS_INVALID);
+
+	return 0;
+}
+
 /*
  * There are 3 ways to get info about available IPs
  * 1. IP register to HWPM driver

@@ -51,14 +51,6 @@ int t234_hwpm_perfmon_enable(struct tegra_soc_hwpm *hwpm,
 	return 0;
 }
 
-int t234_hwpm_perfmux_disable(struct tegra_soc_hwpm *hwpm,
-	struct hwpm_ip_aperture *perfmux)
-{
-	tegra_hwpm_fn(hwpm, " ");
-
-	return 0;
-}
-
 int t234_hwpm_perfmon_disable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon)
 {

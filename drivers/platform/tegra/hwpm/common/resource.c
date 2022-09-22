@@ -16,6 +16,14 @@
 #include <tegra_hwpm_common.h>
 #include <tegra_hwpm_static_analysis.h>
 
+int tegra_hwpm_perfmux_disable(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *perfmux)
+{
+	tegra_hwpm_fn(hwpm, " ");
+
+	return 0;
+}
+
 int tegra_hwpm_reserve_rtr(struct tegra_soc_hwpm *hwpm)
 {
 	int err = 0;
