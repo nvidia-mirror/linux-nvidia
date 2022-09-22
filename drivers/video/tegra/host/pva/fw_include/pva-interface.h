@@ -171,7 +171,6 @@ typedef uint8_t pva_cmds_t;
 #define CMD_FLUSH 11U
 #define CMD_SW_BIST 19U
 #define CMD_ABORT_QUEUE 20U
-#define CMD_SET_STATUS_BUFFER 21U
 #define CMD_NEXT 22U /* Must be last */
 
 /*
@@ -203,11 +202,6 @@ typedef uint8_t pva_status_cmds_t;
  */
 #define PVA_SUB_CMD_ID_MSB                  (15U)
 #define PVA_SUB_CMD_ID_LSB                  (8U)
-/*
- * Defenitions used in CMD_SET_STATUS_BUFFER
- */
-#define PVA_CMD_STATUS_BUFFER_LENGTH_MSB   (27U)
-#define PVA_CMD_STATUS_BUFFER_LENGTH_LSB   (16U)
 
 /*
  * Macro used to indicate the most significant
@@ -457,25 +451,5 @@ static inline uint32_t pva_cmd_abort_task(struct pva_cmd_s *const cmd,
 	cmd->cmd_field[0] = flags | PVA_SET_COMMAND(CMD_ABORT_QUEUE) |
 		       PVA_SET_SUBCOMMAND(queue_id);
 	return 1U;
-}
-
-/*
- * CMD_SET_STATUS_BUFFER
- */
-static inline uint32_t pva_cmd_set_status_buffer(struct pva_cmd_s *const cmd,
-						 const uint64_t addr,
-						 const uint32_t size,
-						 const uint32_t flags)
-{
-	cmd->cmd_field[0] =
-		flags | PVA_SET_COMMAND(CMD_SET_STATUS_BUFFER) |
-		PVA_INSERT(PVA_EXTRACT64(addr, PVA_EXTRACT_ADDR_HIGHER_8BITS_MSB,
-					PVA_EXTRACT_ADDR_HIGHER_8BITS_LSB, uint32_t),
-					PVA_ADDR_HIGHER_8BITS_MSB, PVA_ADDR_HIGHER_8BITS_LSB) |
-		PVA_INSERT(size, PVA_CMD_STATUS_BUFFER_LENGTH_MSB,
-		PVA_CMD_STATUS_BUFFER_LENGTH_LSB);
-	cmd->cmd_field[1] = PVA_LOW32(addr);
-
-	return 2U;
 }
 #endif

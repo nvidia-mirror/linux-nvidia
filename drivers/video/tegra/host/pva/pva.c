@@ -261,33 +261,6 @@ static void pva_free_task_status_buffer(struct pva *pva)
 			  pva->priv_circular_array.pa);
 }
 
-
-int nvpva_set_task_status_buffer(struct pva *pva)
-{
-	struct pva_cmd_s cmd = {};
-	struct pva_cmd_status_regs status = {};
-	uint32_t flags = PVA_CMD_INT_ON_ERR | PVA_CMD_INT_ON_COMPLETE;
-	uint32_t nregs = 0U;
-	int32_t err = 0;
-
-	/* clear for debugging */
-	(void)memset(pva->priv_circular_array.va, 0,
-		     pva->priv_circular_array.size);
-
-	nregs = pva_cmd_set_status_buffer(&cmd, pva->priv_circular_array.pa,
-					  MAX_PVA_TASK_COUNT, flags);
-
-	err = pva_mailbox_send_cmd_sync_locked(pva, &cmd, nregs, &status);
-	if (err || (status.error != (uint32_t)PVA_ERR_NO_ERROR)) {
-		pr_err("pva: failed to configure task status info buffer: %d, %d",
-		       err, status.error);
-		return -EINVAL;
-	}
-
-	return 0;
-
-}
-
 /* Default buffer size (256 kbytes) used for ucode trace log*/
 #define PVA_PRIV2_TRACE_LOG_BUFFER_SIZE 0x40000
 
@@ -413,7 +386,8 @@ static int pva_init_fw(struct platform_device *pdev)
 	nvpva_dbg_fn(pva, "PVA boot returned: %d", err);
 
 	pva_reset_task_status_buffer(pva);
-	err = nvpva_set_task_status_buffer(pva);
+	(void)memset(pva->priv_circular_array.va, 0,
+		     pva->priv_circular_array.size);
 wait_timeout:
 	return err;
 }
