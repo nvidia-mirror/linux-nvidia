@@ -104,8 +104,7 @@ NvSciError NvSciIpcEndpointValidateAuthTokenLinuxCurrent(
 			continue;
 
 		/* compare node name itself only (w/o directory) */
-		if (!strncmp(filp->f_path.dentry->d_name.name, node,
-			sizeof(node))) {
+		if (!strncmp(filp->f_path.dentry->d_name.name, node, ret)) {
 			*localUserVuid = ctx->db[i]->vuid;
 			break;
 		}
