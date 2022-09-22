@@ -2384,11 +2384,10 @@ static int tegra_hv_vse_safety_cmac_setkey(struct crypto_ahash *tfm, const u8 *k
 {
 	struct tegra_virtual_se_aes_cmac_context *ctx =
 			crypto_tfm_ctx(crypto_ahash_tfm(tfm));
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
+	struct tegra_virtual_se_dev *se_dev;
 	struct tegra_virtual_se_ivc_hdr_t *ivc_hdr;
 	struct tegra_virtual_se_ivc_tx_msg_t *ivc_tx;
-	struct tegra_hv_ivc_cookie *pivck = g_crypto_to_ivc_map[ctx->node_id].ivck;
+	struct tegra_hv_ivc_cookie *pivck;
 	struct tegra_virtual_se_ivc_msg_t *ivc_req_msg;
 	struct tegra_vse_priv_data *priv = NULL;
 	struct tegra_vse_tag *priv_data_ptr;
@@ -2399,6 +2398,9 @@ static int tegra_hv_vse_safety_cmac_setkey(struct crypto_ahash *tfm, const u8 *k
 
 	if (!ctx)
 		return -EINVAL;
+
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
+	pivck = g_crypto_to_ivc_map[ctx->node_id].ivck;
 
 	if ((keylen != 16) && (keylen != 32)) {
 		dev_err(se_dev->dev, "%s: Unsupported key length: %d", __func__, keylen);
@@ -2485,8 +2487,7 @@ static int tegra_hv_vse_safety_aes_setkey(struct crypto_skcipher *tfm,
 	const u8 *key, u32 keylen)
 {
 	struct tegra_virtual_se_aes_context *ctx = crypto_skcipher_ctx(tfm);
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
+	struct tegra_virtual_se_dev *se_dev;
 	s8 label[TEGRA_VIRTUAL_SE_AES_MAX_KEY_SIZE];
 	u32 slot;
 	int err = 0;
@@ -2494,6 +2495,8 @@ static int tegra_hv_vse_safety_aes_setkey(struct crypto_skcipher *tfm,
 
 	if (!ctx)
 		return -EINVAL;
+
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
 
 	if ((keylen != 16) && (keylen != 32)) {
 		dev_err(se_dev->dev, "%s: Unsupported key length: %d", __func__, keylen);
@@ -2649,8 +2652,7 @@ static int tegra_vse_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key,
 {
 	/* copied from normal aes keyset, will remove if no modification needed*/
 	struct tegra_virtual_se_aes_context *ctx = crypto_aead_ctx(tfm);
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
+	struct tegra_virtual_se_dev *se_dev;
 	s8 label[TEGRA_VIRTUAL_SE_AES_MAX_KEY_SIZE];
 	u32 slot;
 	int err = 0;
@@ -2658,6 +2660,8 @@ static int tegra_vse_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key,
 
 	if (!ctx)
 		return -EINVAL;
+
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
 
 	if ((keylen != 16) && (keylen != 32)) {
 		dev_err(se_dev->dev, "%s: Unsupported key length: %d", __func__, keylen);
@@ -3085,18 +3089,19 @@ static int tegra_hv_vse_aes_gmac_setkey(struct crypto_ahash *tfm, const u8 *key,
 		unsigned int keylen)
 {
 	struct tegra_virtual_se_aes_gmac_context *ctx = crypto_ahash_ctx(tfm);
-	struct tegra_virtual_se_dev *se_dev =
-				g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
+	struct tegra_virtual_se_dev *se_dev;
 	s8 label[TEGRA_VIRTUAL_SE_AES_KEYSLOT_LABEL_SIZE];
 	u32 slot;
 	int err = 0;
 	bool is_keyslot_label;
 
 	if (!ctx) {
-		dev_err(se_dev->dev, "%s: gmac ctx invalid", __func__);
+		pr_err("%s: gmac ctx invalid", __func__);
 		err = -EINVAL;
 		goto exit;
 	}
+
+	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[ctx->node_id].se_engine];
 
 	if ((keylen != 16) && (keylen != 32)) {
 		dev_err(se_dev->dev, "%s: Unsupported key length: %d", __func__, keylen);
