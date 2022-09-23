@@ -651,7 +651,7 @@ void arm_smmu_debugfs_add_master(struct device *dev,
 	debugfs_create_file("streamids", 0444, dent, master,
 							&smmu_master_fops);
 	debugfs_create_u8("cbndx", 0444, dent, cbndx);
-	err = sprintf(name, "cb%03d", *cbndx);
+	err = sprintf(name, "cb%03u", *cbndx);
 	if (err < 0) {
 		pr_err("%s: %d: sprintf failed to write\n", __func__, __LINE__);
 		debugfs_remove_recursive(master->dent);
