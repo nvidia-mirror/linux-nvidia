@@ -14,7 +14,7 @@
 /* Control data for VCPU Yield Start ioctl */
 struct vcpu_yield_start_ctl {
 	/* max time in micro seconds for which vcpu will be yielded */
-	unsigned int timeout_us;
+	uint32_t timeout_us;
 };
 
 #define VCPU_YIELD_START_IOCTL _IOW(VCPU_YIELD_IOC_MAGIC, \

@@ -23,7 +23,7 @@
 
 
 #define MAX_YIELD_VM_COUNT 10
-#define MAX_VCPU_YIELD_TIMEOUT_US 100000
+#define MAX_VCPU_YIELD_TIMEOUT_US 1000000
 #define MAX_IVC_READ_FLUSH 10
 
 #define DRV_NAME	"tegra_hv_vcpu_yield"
@@ -35,10 +35,10 @@ struct vcpu_yield_dev {
 	struct device *device;
 	struct mutex mutex_lock;
 	struct tegra_hv_ivc_cookie *ivck;
-	u32 ivc;
+	uint32_t ivc;
 	int vcpu;
 	int low_prio_vmid;
-	unsigned int timeout_us;
+	uint32_t timeout_us;
 	struct hrtimer yield_timer;
 	char name[32];
 	bool char_is_open;
@@ -51,6 +51,8 @@ struct vcpu_yield_plat_dev {
 	struct class *vcpu_yield_class;
 	int vmid_count;
 };
+
+static uint32_t max_timeout_us = MAX_VCPU_YIELD_TIMEOUT_US;
 
 static enum hrtimer_restart timer_callback_func(struct hrtimer *hrt)
 {
@@ -189,8 +191,8 @@ static long tegra_hv_vcpu_yield_ioctl(struct file *filp, unsigned int cmd,
 			data->timeout_us = yield_start_ctl_data.timeout_us;
 
 			/* Restrict to a Max VCPU Yield Timeout per invocation */
-			if (data->timeout_us > MAX_VCPU_YIELD_TIMEOUT_US)
-				data->timeout_us = MAX_VCPU_YIELD_TIMEOUT_US;
+			if (data->timeout_us > max_timeout_us)
+				data->timeout_us = max_timeout_us;
 
 			ret = work_on_cpu_safe(data->vcpu, vcpu_yield_func,
 					(void *)data);
@@ -277,7 +279,7 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	int ivc_count = 0;
 	int vcpu_count = 0;
 	int vmid_count = 0;
-	int i = 0;
+	int i = 0, ret = 0;
 	struct vcpu_yield_dev *vcpu_yield, *vcpu_yield_dev_list;
 	struct vcpu_yield_plat_dev *vcpu_yield_pdev;
 	struct device_node *np = pdev->dev.of_node;
@@ -330,6 +332,12 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 		pr_err("yield_vcpu count not matching low prio vmid count\n");
 		result = -EINVAL;
 		goto out;
+	}
+
+	ret = of_property_read_u32(np, "max_timeout_us", &max_timeout_us);
+	if (ret < 0) {
+		pr_debug("max_timeout_us not specified. using default value\n");
+		max_timeout_us = MAX_VCPU_YIELD_TIMEOUT_US;
 	}
 
 	vcpu_yield_pdev = kzalloc(sizeof(*vcpu_yield_pdev), GFP_KERNEL);
