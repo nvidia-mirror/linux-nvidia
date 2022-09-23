@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,6 +19,7 @@
 #include <linux/of_device.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
+#include <linux/device.h>
 
 /**
  * The following platform info is needed for backdoor
@@ -168,6 +169,16 @@ static int dce_req_interrupts(struct platform_device *pdev)
 	return ret;
 }
 
+static int match_display_dev(struct device *dev, const void *data)
+{
+	if ((dev != NULL) && (dev->of_node != NULL)) {
+		if (of_device_is_compatible(dev->of_node, "nvidia,tegra234-display"))
+			return 1;
+	}
+
+	return 0;
+}
+
 static int tegra_dce_probe(struct platform_device *pdev)
 {
 	int err = 0;
@@ -175,6 +186,8 @@ static int tegra_dce_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct dce_platform_data *pdata = NULL;
 	const struct of_device_id *match = NULL;
+	struct device *c_dev;
+	struct device_link *link;
 
 	match = of_match_device(tegra_dce_of_match, dev);
 	if (!match) {
@@ -224,6 +237,17 @@ static int tegra_dce_probe(struct platform_device *pdev)
 #ifdef CONFIG_DEBUG_FS
 	dce_init_debug(d);
 #endif
+
+	c_dev = bus_find_device(&platform_bus_type, NULL, NULL, match_display_dev);
+	if (c_dev != NULL) {
+		dce_info(d, "Found display consumer device");
+		link = device_link_add(c_dev, dev,
+				       DL_FLAG_PM_RUNTIME | DL_FLAG_AUTOREMOVE_SUPPLIER);
+		if (link == NULL) {
+			dce_err(d, "Failed to create device link to %s\n", dev_name(c_dev));
+			return -EINVAL;
+		}
+	}
 
 	return 0;
 
