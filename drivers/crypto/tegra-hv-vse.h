@@ -11,10 +11,19 @@ struct tegra_vse_soc_info {
 	bool gcm_decrypt_supported;
 };
 
+/* GCM Operation Supported Flag */
+enum tegra_gcm_dec_supported {
+	GCM_DEC_OP_NOT_SUPPORTED,
+	GCM_DEC_OP_SUPPORTED,
+};
+
 struct crypto_dev_to_ivc_map {
 	uint32_t ivc_id;
 	uint32_t se_engine;
 	uint32_t node_id;
+	uint32_t priority;
+	uint32_t channel_grp_id;
+	enum tegra_gcm_dec_supported gcm_dec_supported;
 	struct tegra_hv_ivc_cookie *ivck;
 	struct completion tegra_vse_complete;
 	struct task_struct *tegra_vse_task;

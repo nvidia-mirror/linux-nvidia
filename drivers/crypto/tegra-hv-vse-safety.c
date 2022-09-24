@@ -141,11 +141,15 @@
 
 #define TEGRA_VIRTUAL_SE_ERR_MAC_INVALID	11
 
-#define MAX_NUMBER_MISC_DEVICES         40U
-#define TEGRA_IVC_ID_OFFSET_DTS 0
-#define TEGRA_SE_ENGINE_ID_OFFSET_DTS 1
-#define TEGRA_CRYPTO_DEV_ID_OFFSET_DTS 2
-#define TEGRA_IVCCFG_ARRAY_LEN 6
+#define MAX_NUMBER_MISC_DEVICES				40U
+#define MAX_IVC_Q_PRIORITY				2U
+#define TEGRA_IVC_ID_OFFSET				0U
+#define TEGRA_SE_ENGINE_ID_OFFSET			1U
+#define TEGRA_CRYPTO_DEV_ID_OFFSET			2U
+#define TEGRA_IVC_PRIORITY_OFFSET			3U
+#define TEGRA_CHANNEL_GROUPID_OFFSET			6U
+#define TEGRA_GCM_SUPPORTED_FLAG_OFFSET			7U
+#define TEGRA_IVCCFG_ARRAY_LEN				8U
 
 static struct crypto_dev_to_ivc_map g_crypto_to_ivc_map[MAX_NUMBER_MISC_DEVICES];
 
@@ -3065,9 +3069,14 @@ static int tegra_vse_aes_gcm_decrypt(struct aead_request *req)
 	aes_ctx = crypto_aead_ctx(tfm);
 	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[aes_ctx->node_id].se_engine];
 
-	err = tegra_vse_aes_gcm_enc_dec(req, false);
-	if (err)
-		dev_err(se_dev->dev, "%s failed %d\n", __func__, err);
+	if (g_crypto_to_ivc_map[aes_ctx->node_id].gcm_dec_supported == GCM_DEC_OP_SUPPORTED) {
+		err = tegra_vse_aes_gcm_enc_dec(req, false);
+		if (err)
+			dev_err(se_dev->dev, "%s failed %d\n", __func__, err);
+	} else {
+		err = -EACCES;
+		dev_err(se_dev->dev, "%s failed for node_id %u\n", __func__, aes_ctx->node_id);
+	}
 
 	return err;
 }
@@ -4251,7 +4260,7 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 	for (cnt = 0; cnt < ivc_cnt; cnt++) {
 
 		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
-						 + TEGRA_CRYPTO_DEV_ID_OFFSET_DTS, &node_id);
+						 + TEGRA_CRYPTO_DEV_ID_OFFSET, &node_id);
 		if (err || node_id > MAX_NUMBER_MISC_DEVICES) {
 			pr_err("Error: invalid node_id. err %d\n", err);
 			err = -ENODEV;
@@ -4269,7 +4278,7 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 		}
 
 		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
-							+ TEGRA_IVC_ID_OFFSET_DTS, &ivc_id);
+							+ TEGRA_IVC_ID_OFFSET, &ivc_id);
 		if (err) {
 			pr_err("Error: failed to read ivc_id. err %d\n", err);
 			err = -ENODEV;
@@ -4284,7 +4293,7 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 			goto exit;
 		}
 		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
-					 + TEGRA_SE_ENGINE_ID_OFFSET_DTS, &crypto_dev->se_engine);
+					 + TEGRA_SE_ENGINE_ID_OFFSET, &crypto_dev->se_engine);
 		if (err) {
 			pr_err("Error: failed to read se_engine. err %d\n", err);
 			err = -ENODEV;
@@ -4293,6 +4302,30 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 
 		if (engine_id != crypto_dev->se_engine) {
 			pr_err("Error: se engine mistach for ivc_id %u\n", crypto_dev->ivc_id);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+					 + TEGRA_IVC_PRIORITY_OFFSET, &crypto_dev->priority);
+		if (err || crypto_dev->priority > MAX_IVC_Q_PRIORITY) {
+			pr_err("Error: invalid queue priority. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+				 + TEGRA_CHANNEL_GROUPID_OFFSET, &crypto_dev->channel_grp_id);
+		if (err) {
+			pr_err("Error: invalid channel group id. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+				 + TEGRA_GCM_SUPPORTED_FLAG_OFFSET, &crypto_dev->gcm_dec_supported);
+		if (err || crypto_dev->gcm_dec_supported > GCM_DEC_OP_SUPPORTED) {
+			pr_err("Error: invalid gcm decrypt supported flag. err %d\n", err);
 			err = -ENODEV;
 			goto exit;
 		}
