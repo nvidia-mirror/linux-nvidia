@@ -1,7 +1,7 @@
 /*
  * driver/platform/tegra/panel-simulator.c
  *
- * Copyright (c) 2014-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -601,5 +601,3 @@ struct tegra_panel __initdata panel_sim = {
 #endif
 	.set_disp_device = panel_sim_set_disp_device,
 };
-EXPORT_SYMBOL(panel_sim);
-
