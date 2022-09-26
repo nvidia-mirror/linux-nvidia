@@ -29,9 +29,11 @@
 #include <linux/version.h>
 #include <linux/iopoll.h>
 #include <linux/string.h>
-#include <linux/platform/tegra/tegra23x_cbb_reg.h>
 #ifdef CONFIG_TEGRA_SOC_HWPM
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#include <soc/tegra/tegra-cbb.h>
 #endif
 
 #include "dev.h"
@@ -523,20 +525,11 @@ int nvhost_flcn_finalize_poweron_t194(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_ARCH_TEGRA_23x_SOC)
 static bool sec_is_writable(u32 offset_write, u32 offset_ctl)
 {
-	u32 sec_blf_ctl, sec_blf_write_ctl;
-	bool firewall_enabled, ccplex_accessible;
+	bool ccplex_accessible;
 
-	sec_blf_ctl = tegra234_cbb_readl(offset_ctl);
-	nvhost_dbg_info("sec_blf_ctl: 0x%08x\n", sec_blf_ctl);
-	firewall_enabled =
-		(sec_blf_ctl & cbb_sec_blf_ctl_blf_lck_f());
+	ccplex_accessible = tegra234_cbb_access_allowed(offset_write, offset_ctl);
 
-	sec_blf_write_ctl = tegra234_cbb_readl(offset_write);
-	nvhost_dbg_info("sec_blf_write_ctl: 0x%08x\n", sec_blf_write_ctl);
-	ccplex_accessible =
-		(sec_blf_write_ctl & cbb_sec_blf_write_ctl_mstrid_1_f());
-
-	return !firewall_enabled || ccplex_accessible;
+	return ccplex_accessible;
 }
 
 static void configure_intf_crc_ctrl(struct platform_device *pdev)
