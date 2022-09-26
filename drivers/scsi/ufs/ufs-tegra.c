@@ -387,6 +387,23 @@ static int ufs_tegra_mphy_receiver_calibration(struct ufs_tegra_host *ufs_tegra)
 	return 0;
 }
 
+static void ufs_tegra_mphy_war(struct ufs_tegra_host *ufs_tegra)
+{
+	if ((ufs_tegra->chip_id == TEGRA234) && (ufs_tegra->x2config)) {
+		reset_control_assert(ufs_tegra->mphy_l1_rx_rst);
+		udelay(50);
+		reset_control_deassert(ufs_tegra->mphy_l1_rx_rst);
+		udelay(2);
+
+		mphy_update(ufs_tegra->mphy_l1_base,
+				MPHY_ENABLE_RX_MPHY2UPHY_IF_OVR_CTRL,
+					MPHY_RX_APB_VENDOR3_0_T234);
+		mphy_update(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
+				MPHY_RX_APB_VENDOR2_0_T234);
+		udelay(5);
+	}
+}
+
 static void ufs_tegra_disable_mphylane_clks(struct ufs_tegra_host *host)
 {
 	if (!host->is_lane_clks_enabled)
@@ -958,12 +975,15 @@ static void ufs_tegra_mphy_rx_sync_capability(struct ufs_tegra_host *ufs_tegra)
 	u32 val_94_97 = 0;
 	u32 val_8c_8f = 0;
 	u32 val_98_9b = 0;
-	u32 vendor2_reg;
+	u32 vendor2_reg, vendor3_reg;
 
-	if (ufs_tegra->chip_id == TEGRA234)
+	if (ufs_tegra->chip_id == TEGRA234) {
 		vendor2_reg = MPHY_RX_APB_VENDOR2_0_T234;
-	else
+		vendor3_reg = MPHY_RX_APB_VENDOR3_0_T234;
+	} else {
 		vendor2_reg = MPHY_RX_APB_VENDOR2_0;
+		vendor3_reg = MPHY_RX_APB_VENDOR3_0;
+	}
 
 	/* MPHY RX sync lengths capability changes */
 
@@ -1006,6 +1026,9 @@ static void ufs_tegra_mphy_rx_sync_capability(struct ufs_tegra_host *ufs_tegra)
 	mphy_writel(ufs_tegra->mphy_l0_base, val_98_9b,
 			MPHY_RX_APB_CAPABILITY_98_9B_0);
 	mphy_update(ufs_tegra->mphy_l0_base,
+			MPHY_ENABLE_RX_MPHY2UPHY_IF_OVR_CTRL,
+				vendor3_reg);
+	mphy_update(ufs_tegra->mphy_l0_base,
 				MPHY_GO_BIT, vendor2_reg);
 
 	if (ufs_tegra->x2config) {
@@ -1017,6 +1040,9 @@ static void ufs_tegra_mphy_rx_sync_capability(struct ufs_tegra_host *ufs_tegra)
 			MPHY_RX_APB_CAPABILITY_8C_8F_0);
 		mphy_writel(ufs_tegra->mphy_l1_base, val_98_9b,
 			MPHY_RX_APB_CAPABILITY_98_9B_0);
+		mphy_update(ufs_tegra->mphy_l1_base,
+				MPHY_ENABLE_RX_MPHY2UPHY_IF_OVR_CTRL,
+					vendor3_reg);
 		/* set gobit */
 		mphy_update(ufs_tegra->mphy_l1_base,
 				MPHY_GO_BIT, vendor2_reg);
@@ -1520,8 +1546,13 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 			 * Clock boost during power change
 			 * is required as per T234 IAS document
 			 */
-			if (ufs_tegra->chip_id == TEGRA234)
+			if (ufs_tegra->chip_id == TEGRA234) {
 				ufs_tegra_pwr_change_clk_boost(ufs_tegra);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+				ufshcd_dme_configure_adapt(hba, dev_req_params->gear_rx,
+						PA_INITIAL_ADAPT);
+#endif
+			}
 		} else {
 			if (ufs_tegra->max_pwm_gear) {
 				ufshcd_dme_get(hba,
@@ -1671,6 +1702,7 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba,
 		dev_info(hba->dev, "dme-link-startup Successful\n");
 		ufs_tegra_unipro_post_linkup(hba);
 		err = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
+		ufs_tegra_mphy_war(ufs_tegra);
 		break;
 	default:
 		break;
