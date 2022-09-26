@@ -87,6 +87,51 @@ static int acpi_compare_dev_id(struct mods_client *client,
 	return -ENODEV;
 }
 
+struct acpi_dev_check_context {
+	struct mods_client *client;
+	dev_children_fptr   fptr;
+	void               *out_data;
+};
+
+static int acpi_dev_check_one(struct acpi_device *adev, void *data)
+{
+	int                 err       = OK;
+	unsigned long long  device_id = 0;
+	acpi_status         status;
+	struct acpi_dev_check_context *adwc = data;
+
+	status = acpi_evaluate_integer(adev->handle,
+			"_ADR",
+			NULL,
+			&device_id);
+	if (ACPI_FAILURE(status))
+		/* Couldnt query device_id for this device */
+		return OK;
+
+	err = adwc->fptr(adwc->client, device_id, adev->handle, adwc->out_data);
+	return ((err == -EALREADY) ? OK : err);
+}
+
+#if KERNEL_VERSION(6, 0, 0) > MODS_KERNEL_VERSION
+static int acpi_dev_each_child_node(struct acpi_device *adev,
+				int (*fptr)(struct acpi_device *, void *),
+				void *data)
+{
+	struct list_head   *node    = NULL;
+	struct list_head   *next    = NULL;
+
+	list_for_each_safe(node, next, &adev->children) {
+		struct acpi_device *dev =
+			list_entry(node, struct acpi_device, node);
+
+		fptr(dev, data);
+	}
+	return OK;
+}
+#else
+#define acpi_dev_each_child_node acpi_dev_for_each_child
+#endif
+
 static int acpi_get_dev_children(struct mods_client *client,
 				 dev_children_fptr   fptr,
 				 acpi_handle         dev_handle,
@@ -95,8 +140,11 @@ static int acpi_get_dev_children(struct mods_client *client,
 	int                 err     = OK;
 	acpi_status         status;
 	struct acpi_device *device  = NULL;
-	struct list_head   *node    = NULL;
-	struct list_head   *next    = NULL;
+	struct acpi_dev_check_context adcc = {
+		.client		= client,
+		.fptr		= fptr,
+		.out_data	= out_data,
+	};
 
 	LOG_ENT();
 
@@ -112,26 +160,7 @@ static int acpi_get_dev_children(struct mods_client *client,
 		return -EINVAL;
 	}
 
-	list_for_each_safe(node, next, &device->children) {
-		unsigned long long device_id = 0;
-
-		struct acpi_device *dev =
-			list_entry(node, struct acpi_device, node);
-
-		status = acpi_evaluate_integer(dev->handle,
-					       "_ADR",
-					       NULL,
-					       &device_id);
-		if (ACPI_FAILURE(status))
-			/* Couldnt query device_id for this device */
-			continue;
-
-		err = fptr(client, device_id, dev->handle, out_data);
-		if (err == -EALREADY) {
-			err = OK;
-			break;
-		}
-	}
+	err = acpi_dev_each_child_node(device, acpi_dev_check_one, &adcc);
 
 	LOG_EXT();
 	return err;
