@@ -19,13 +19,19 @@ Required properties:
 - ivc: IVC channel corresponding to each of the low priority VM in low_prio_vmid
 		that is used by low priority VM to notify Linux VM that it is
 		done using the CPU
+- max_timeout_us: max timeout in uS per yield request(cap value). Any yield
+		request with a yield timeout higher than this will fall back
+		to this	value. Default value in driver if this is not passed in
+		the dt is 1 Second. This needs to be set based on the system
+		usecase.
 
 
 Example:
 	tegra_hv_vcpu_yield {
 		compatible = "nvidia,tegra-hv-vcpu-yield";
 		yield_vcpu = <2>;
-		low_prio_vmid = <2>;
+		low_prio_vmid = <1>;
 		ivc = <10>;
+		max_timeout_us = <500000>;
 		status = "okay";
 	};
