@@ -358,6 +358,7 @@ void tegra_soc_hwpm_ip_register(struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops)
 		}
 	}
 }
+EXPORT_SYMBOL(tegra_soc_hwpm_ip_register);
 
 void tegra_soc_hwpm_ip_unregister(struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops)
 {
@@ -389,6 +390,7 @@ void tegra_soc_hwpm_ip_unregister(struct tegra_soc_hwpm_ip_ops *hwpm_ip_ops)
 		}
 	}
 }
+EXPORT_SYMBOL(tegra_soc_hwpm_ip_unregister);
 
 void tegra_hwpm_release_ip_register_node(struct tegra_soc_hwpm *hwpm)
 {
