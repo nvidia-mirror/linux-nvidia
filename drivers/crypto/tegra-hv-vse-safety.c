@@ -4261,7 +4261,7 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 
 		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
 						 + TEGRA_CRYPTO_DEV_ID_OFFSET, &node_id);
-		if (err || node_id > MAX_NUMBER_MISC_DEVICES) {
+		if (err || node_id >= MAX_NUMBER_MISC_DEVICES) {
 			pr_err("Error: invalid node_id. err %d\n", err);
 			err = -ENODEV;
 			goto exit;
