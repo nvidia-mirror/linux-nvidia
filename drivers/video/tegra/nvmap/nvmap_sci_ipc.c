@@ -46,7 +46,7 @@ struct nvmap_sci_ipc_entry {
 	struct rb_node entry;
 	struct nvmap_client *client;
 	struct nvmap_handle *handle;
-	u32 sci_ipc_id;
+	u64 sci_ipc_id;
 	u64 peer_vuid;
 	u32 flags;
 	u32 refcount;
@@ -80,10 +80,10 @@ out:
 	return ret;
 }
 
-static u32 nvmap_unique_sci_ipc_id(void)
+static u64 nvmap_unique_sci_ipc_id(void)
 {
 	static atomic_t unq_id = { 0 };
-	u32 id;
+	u64 id;
 
 	if (!list_empty(&nvmapsciipc->free_sid_list)) {
 		struct free_sid_node *fnode = list_first_entry(
@@ -129,7 +129,7 @@ static void nvmap_insert_sci_ipc_entry(struct rb_root *root,
 {
 	struct nvmap_sci_ipc_entry *entry;
 	struct rb_node *parent = NULL;
-	u32 sid = new->sci_ipc_id;
+	u64 sid = new->sci_ipc_id;
 	struct rb_node **link;
 
 	link = &root->rb_node;
@@ -152,14 +152,14 @@ static void nvmap_insert_sci_ipc_entry(struct rb_root *root,
 int nvmap_create_sci_ipc_id(struct nvmap_client *client,
 				struct nvmap_handle *h,
 				u32 flags,
-				u32 *sci_ipc_id,
+				u64 *sci_ipc_id,
 				NvSciIpcEndpointVuid peer_vuid,
 				bool is_ro)
 {
 	struct nvmap_sci_ipc_entry *new_entry;
 	struct nvmap_sci_ipc_entry *entry;
 	int ret = -EINVAL;
-	u32 id;
+	u64 id;
 
 	mutex_lock(&nvmapsciipc->mlock);
 
@@ -168,7 +168,7 @@ int nvmap_create_sci_ipc_id(struct nvmap_client *client,
 	if (entry) {
 		entry->refcount++;
 		*sci_ipc_id = entry->sci_ipc_id;
-		pr_debug("%d: matched Sci_Ipc_Id:%u\n", __LINE__, *sci_ipc_id);
+		pr_debug("%d: matched Sci_Ipc_Id:%llu\n", __LINE__, *sci_ipc_id);
 		ret = 0;
 		goto unlock;
 	} else {
@@ -186,7 +186,7 @@ int nvmap_create_sci_ipc_id(struct nvmap_client *client,
 		new_entry->flags = flags;
 		new_entry->refcount = 1;
 
-		pr_debug("%d: New Sci_ipc_id %d entry->pr_vuid: %llu entry->flags: %u new_entry->handle:0x%p\n",
+		pr_debug("%d: New Sci_ipc_id %lld entry->pr_vuid: %llu entry->flags: %u new_entry->handle:0x%p\n",
 			__LINE__, new_entry->sci_ipc_id, new_entry->peer_vuid,
 			new_entry->flags, new_entry->handle);
 
@@ -202,7 +202,7 @@ unlock:
 }
 
 static struct nvmap_sci_ipc_entry *nvmap_find_entry_for_id(struct rb_root *es,
-					 u32 id)
+					 u64 id)
 {
 	struct nvmap_sci_ipc_entry *e = NULL;
 	struct rb_node *n;
@@ -217,7 +217,7 @@ found:
 }
 
 int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
-		u32 sci_ipc_id, NvSciIpcEndpointVuid localu_vuid, u32 *handle)
+		u64 sci_ipc_id, NvSciIpcEndpointVuid localu_vuid, u32 *handle)
 {
 	bool is_ro = (flags == PROT_READ) ? true : false, dmabuf_created = false;
 	struct nvmap_handle_ref *ref = NULL;
@@ -229,14 +229,14 @@ int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 
 	mutex_lock(&nvmapsciipc->mlock);
 
-	pr_debug("%d: Sci_Ipc_Id %d local_vuid: %llu flags: %u\n",
+	pr_debug("%d: Sci_Ipc_Id %lld local_vuid: %llu flags: %u\n",
 		__LINE__, sci_ipc_id, localu_vuid, flags);
 
 	entry = nvmap_find_entry_for_id(&nvmapsciipc->entries, sci_ipc_id);
 	if ((entry == NULL) || (entry->handle == NULL) ||
 		(entry->peer_vuid != localu_vuid) || (entry->flags != flags)) {
 
-		pr_debug("%d: No matching Sci_Ipc_Id %d found\n",
+		pr_debug("%d: No matching Sci_Ipc_Id %lld found\n",
 		__LINE__, sci_ipc_id);
 
 		ret = -EINVAL;

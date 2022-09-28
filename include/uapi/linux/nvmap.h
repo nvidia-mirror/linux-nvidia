@@ -221,7 +221,7 @@ struct nvmap_heap_size {
 struct nvmap_sciipc_map {
 	__u64 auth_token;    /* AuthToken */
 	__u32 flags;       /* Exporter permission flags */
-	__u32 sci_ipc_id;  /* FromImportId */
+	__u64 sci_ipc_id;  /* FromImportId */
 	__u32 handle;      /* Nvmap handle */
 };
 
