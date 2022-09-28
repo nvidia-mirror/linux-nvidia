@@ -28,6 +28,9 @@
 #include <tegra_hwpm_clk_rst.h>
 #include <os/linux/debugfs.h>
 #include <os/linux/driver.h>
+#if defined(CONFIG_TEGRA_NEXT2_HWPM)
+#include <os/linux/next2_hwpm_acpi.h>
+#endif
 
 static const struct of_device_id tegra_soc_hwpm_of_match[] = {
 	{
@@ -57,22 +60,34 @@ static char *tegra_hwpm_get_devnode(struct device *dev, umode_t *mode)
 
 static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
 {
+#if defined(CONFIG_ACPI)
+	/* This will be implemented in a follow-up patch */
+	return true;
+#else
 	struct device_node *np = pdev->dev.of_node;
 	bool allow_node = of_property_read_bool(np, "support-soc-tools");
-
-	if (!tegra_hwpm_is_platform_silicon()) {
-		return true;
-	}
 
 	if (!allow_node) {
 		tegra_hwpm_err(NULL, "support-soc-tools is absent");
 	}
 
 	return allow_node;
+#endif
 }
 
-static int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
+static int tegra_hwpm_get_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+	int ret = 0;
+
+	ret = tegra_hwpm_init_chip_info(hwpm_linux);
+	if (ret != 0) {
+		tegra_hwpm_err(&hwpm_linux->hwpm,
+			"Failed to initialize current chip info");
+		return ret;
+	}
+#endif
+
 	hwpm_linux->device_info.chip = tegra_hwpm_get_chip_id();
 	hwpm_linux->device_info.chip_revision = tegra_hwpm_get_major_rev();
 	hwpm_linux->device_info.revision = tegra_hwpm_chip_get_revision();
@@ -158,10 +173,10 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 	tegra_hwpm_debugfs_init(hwpm_linux);
 
-	ret = tegra_hwpm_init_chip_info(hwpm_linux);
+	ret = tegra_hwpm_get_chip_info(hwpm_linux);
 	if (ret != 0) {
-		tegra_hwpm_err(hwpm, "Failed to initialize current chip info");
-		goto init_chip_info_fail;
+		tegra_hwpm_err(hwpm, "Failed to get current chip info");
+		goto chip_info_fail;
 	}
 
 	ret = tegra_hwpm_init_sw_components(hwpm, hwpm_linux->device_info.chip,
@@ -187,7 +202,7 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	tegra_hwpm_dbg(hwpm, hwpm_info, "Probe successful!");
 	goto success;
 
-init_chip_info_fail:
+chip_info_fail:
 init_sw_components_fail:
 	tegra_hwpm_clk_rst_release(hwpm_linux);
 clock_reset_fail:
@@ -251,6 +266,9 @@ static struct platform_driver tegra_soc_hwpm_pdrv = {
 	.driver		= {
 		.name	= TEGRA_SOC_HWPM_MODULE_NAME,
 		.of_match_table = of_match_ptr(tegra_soc_hwpm_of_match),
+#if defined(CONFIG_TEGRA_NEXT2_HWPM) && defined(CONFIG_ACPI)
+		.acpi_match_table = ACPI_PTR(tegra_hwpm_acpi_match),
+#endif
 	},
 };
 

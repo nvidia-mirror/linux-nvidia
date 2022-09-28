@@ -12,10 +12,14 @@
  */
 
 #include <linux/of.h>
+#if CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 #include <soc/tegra/fuse-helper.h>
 
-#include <tegra_hwpm.h>
+#include <tegra_hwpm_log.h>
 #include <tegra_hwpm_soc.h>
+#include <os/linux/driver.h>
 
 #if defined(CONFIG_TEGRA_HWPM_OOT)
 #if defined(CONFIG_TEGRA_NEXT1_HWPM)
@@ -24,133 +28,164 @@
 #if defined(CONFIG_TEGRA_NEXT2_HWPM)
 #include <os/linux/next2_soc_utils.h>
 #endif
+
+static struct hwpm_soc_chip_info chip_info = {
+	.chip_id = CHIP_ID_UNKNOWN,
+	.chip_id_rev = CHIP_ID_REV_UNKNOWN,
+	.platform = PLAT_INVALID,
+};
+static bool chip_info_initialized;
+
+#if (!defined(CONFIG_ACPI))
+const struct hwpm_soc_chip_info t234_chip_info = {
+	.chip_id = 0x23,
+	.chip_id_rev = 0x4,
+	.platform = PLAT_SI,
+};
 #endif
 
-u32 tegra_hwpm_get_chip_id_impl(void)
+/* This function should be invoked only once before retrieving soc chip info */
+int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	u32 chip_id = CHIP_ID_UNKNOWN;
+	struct device *dev = hwpm_linux->dev;
+	struct tegra_soc_hwpm *hwpm = &hwpm_linux->hwpm;
+#if defined(CONFIG_ACPI)
+	const struct acpi_device_id *id;
+#endif
 
+	if (chip_info_initialized) {
+		return 0;
+	}
+#if defined(CONFIG_ACPI)
+	id = acpi_match_device(dev->driver->acpi_match_table, dev);
+	if (!id) {
+		tegra_hwpm_err(hwpm, "Couldn't find matching ACPI device");
+		return -ENODEV;
+	}
+
+	chip_info.chip_id = (id->driver_data >> 8) & 0xff;
+	chip_info.chip_id_rev = (id->driver_data >> 4) & 0xf;
+	chip_info.platform = (id->driver_data >> 20) & 0xf;
+
+	goto complete;
+#else /* !CONFIG_ACPI */
 	if (of_machine_is_compatible("nvidia,tegra234")) {
-		chip_id = 0x23U;
-		return chip_id;
+		chip_info.chip_id = t234_chip_info.chip_id;
+		chip_info.chip_id_rev = t234_chip_info.chip_id_rev;
+		chip_info.platform = t234_chip_info.platform;
+
+		goto complete;
 	}
 #if defined(CONFIG_TEGRA_NEXT1_HWPM)
-	chip_id = tegra_hwpm_next1_get_chip_id_impl();
-	if (chip_id != CHIP_ID_UNKNOWN) {
-		return chip_id;
+	if (tegra_hwpm_next1_get_chip_compatible(&chip_info) == 0) {
+		goto complete;
 	}
 #endif
 #if defined(CONFIG_TEGRA_NEXT2_HWPM)
-	chip_id = tegra_hwpm_next2_get_chip_id_impl();
-	if (chip_id != CHIP_ID_UNKNOWN) {
-		return chip_id;
+	if (tegra_hwpm_next2_get_chip_compatible(&chip_info) == 0) {
+		goto complete;
 	}
 #endif
-	return chip_id;
-#else
-	return (u32)tegra_get_chip_id();
-#endif /* CONFIG_TEGRA_HWPM_OOT */
+
+#endif /* CONFIG_ACPI */
+	return -EINVAL;
+complete:
+	chip_info_initialized = true;
+	return 0;
+}
+
+u32 tegra_hwpm_get_chip_id_impl(void)
+{
+	if (chip_info_initialized) {
+		return chip_info.chip_id;
+	}
+	return CHIP_ID_UNKNOWN;
 }
 
 u32 tegra_hwpm_get_major_rev_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	u32 chip_id_rev = CHIP_ID_REV_UNKNOWN;
-
-	if (of_machine_is_compatible("nvidia,tegra234")) {
-		chip_id_rev = 0x4U;
-		return chip_id_rev;
+	if (chip_info_initialized) {
+		return chip_info.chip_id_rev;
 	}
-#if defined(CONFIG_TEGRA_NEXT1_HWPM)
-	chip_id_rev = tegra_hwpm_next1_get_major_rev_impl();
-	if (chip_id_rev != CHIP_ID_REV_UNKNOWN) {
-		return chip_id_rev;
-	}
-#endif
-#if defined(CONFIG_TEGRA_NEXT2_HWPM)
-	chip_id_rev = tegra_hwpm_next2_get_major_rev_impl();
-	if (chip_id_rev != CHIP_ID_REV_UNKNOWN) {
-		return chip_id_rev;
-	}
-#endif
-	return chip_id_rev;
-#else
-	return (u32)tegra_get_major_rev();
-#endif
-}
-
-u32 tegra_hwpm_chip_get_revision_impl(void)
-{
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	return 0x0U;
-#else
-	return (u32)tegra_chip_get_revision();
-#endif
+	return CHIP_ID_REV_UNKNOWN;
 }
 
 u32 tegra_hwpm_get_platform_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	u32 plat = PLAT_INVALID;
+	if (chip_info_initialized) {
+		return chip_info.platform;
+	}
+	return PLAT_INVALID;
+}
 
-	if (of_machine_is_compatible("nvidia,tegra234")) {
-		plat = PLAT_SI;
-		return plat;
-	}
-#if defined(CONFIG_TEGRA_NEXT1_HWPM)
-	plat = tegra_hwpm_next1_get_major_rev_impl();
-	if (plat != PLAT_INVALID) {
-		return plat;
-	}
-#endif
-#if defined(CONFIG_TEGRA_NEXT2_HWPM)
-	plat = tegra_hwpm_next2_get_major_rev_impl();
-	if (plat != PLAT_INVALID) {
-		return plat;
-	}
-#endif
-	return plat;
-#else
-	return (u32)tegra_get_platform();
-#endif
+u32 tegra_hwpm_chip_get_revision_impl(void)
+{
+	return 0x0U;
 }
 
 bool tegra_hwpm_is_platform_silicon_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 	return tegra_hwpm_get_platform() == PLAT_SI;
-#else
-	return tegra_platform_is_silicon();
-#endif
 }
 
 bool tegra_hwpm_is_platform_simulation_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 	return tegra_hwpm_get_platform() == PLAT_PRE_SI_VDK;
-#else
-	return tegra_platform_is_vdk();
-#endif
 }
 
 bool tegra_hwpm_is_platform_vsp_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 	return tegra_hwpm_get_platform() == PLAT_PRE_SI_VSP;
-#else
-	return tegra_platform_is_vsp();
-#endif
 }
 
 bool tegra_hwpm_is_hypervisor_mode_impl(void)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 	return false;
-#else
-	return is_tegra_hypervisor_mode();
-#endif
 }
+
+#else /* !CONFIG_TEGRA_HWPM_OOT */
+
+u32 tegra_hwpm_get_chip_id_impl(void)
+{
+	return (u32)tegra_get_chip_id();
+}
+
+u32 tegra_hwpm_get_major_rev_impl(void)
+{
+	return (u32)tegra_get_major_rev();
+}
+
+u32 tegra_hwpm_chip_get_revision_impl(void)
+{
+	return (u32)tegra_chip_get_revision();
+}
+
+u32 tegra_hwpm_get_platform_impl(void)
+{
+	return (u32)tegra_get_platform();
+}
+
+bool tegra_hwpm_is_platform_silicon_impl(void)
+{
+	return tegra_platform_is_silicon();
+}
+
+bool tegra_hwpm_is_platform_simulation_impl(void)
+{
+	return tegra_platform_is_vdk();
+}
+
+bool tegra_hwpm_is_platform_vsp_impl(void)
+{
+	return tegra_platform_is_vsp();
+}
+
+bool tegra_hwpm_is_hypervisor_mode_impl(void)
+{
+	return is_tegra_hypervisor_mode();
+}
+
+#endif /* CONFIG_TEGRA_HWPM_OOT */
 
 int tegra_hwpm_fuse_readl_impl(struct tegra_soc_hwpm *hwpm,
 	u64 reg_offset, u32 *val)

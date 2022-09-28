@@ -14,8 +14,10 @@
 #ifndef TEGRA_HWPM_OS_LINUX_SOC_UTILS_H
 #define TEGRA_HWPM_OS_LINUX_SOC_UTILS_H
 
+struct tegra_hwpm_os_linux;
 struct tegra_soc_hwpm;
 
+int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux);
 u32 tegra_hwpm_get_chip_id_impl(void);
 u32 tegra_hwpm_get_major_rev_impl(void);
 u32 tegra_hwpm_chip_get_revision_impl(void);

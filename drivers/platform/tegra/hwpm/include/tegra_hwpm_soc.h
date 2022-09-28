@@ -18,13 +18,19 @@
 #define CHIP_ID_UNKNOWN			0x0U
 #define CHIP_ID_REV_UNKNOWN		0x0U
 
-#define PLAT_SI				0
-#define PLAT_PRE_SI_QT			1
-#define PLAT_PRE_SI_VDK			8
-#define PLAT_PRE_SI_VSP			9
-#define PLAT_INVALID			10
+#define PLAT_SI				0x0
+#define PLAT_PRE_SI_QT			0x1
+#define PLAT_PRE_SI_VDK			0x8
+#define PLAT_PRE_SI_VSP			0x9
+#define PLAT_INVALID			0xF
 
 #define TEGRA_FUSE_PRODUCTION_MODE 0x0
+
+struct hwpm_soc_chip_info {
+	u32 chip_id;
+	u32 chip_id_rev;
+	u32 platform;
+};
 #endif
 
 #ifdef __KERNEL__

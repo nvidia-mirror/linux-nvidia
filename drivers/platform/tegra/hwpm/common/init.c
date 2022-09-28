@@ -28,7 +28,6 @@
 #include <tegra_hwpm_next2_init.h>
 #endif
 
-
 static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm,
 	u32 chip_id, u32 chip_id_rev)
 {
@@ -44,7 +43,7 @@ static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm,
 			break;
 		default:
 #ifdef CONFIG_TEGRA_NEXT1_HWPM
-			err = tegra_hwpm_next1_init_chip_info(hwpm,
+			err = tegra_hwpm_next1_init_chip_ip_structures(hwpm,
 				chip_id, chip_id_rev);
 #else
 			tegra_hwpm_err(hwpm, "Chip 0x%x rev 0x%x not supported",
@@ -55,7 +54,7 @@ static int tegra_hwpm_init_chip_ip_structures(struct tegra_soc_hwpm *hwpm,
 		break;
 	default:
 #ifdef CONFIG_TEGRA_NEXT2_HWPM
-		err = tegra_hwpm_next2_init_chip_info(
+		err = tegra_hwpm_next2_init_chip_ip_structures(
 			hwpm, chip_id, chip_id_rev);
 #else
 		tegra_hwpm_err(hwpm, "Chip 0x%x not supported", chip_id);
