@@ -16,7 +16,12 @@
 
 #include <linux/types.h>
 #if defined(CONFIG_TEGRA_HWPM_OOT)
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+#include <linux/iosys-map.h>
+#else
 #include <linux/dma-buf-map.h>
+#endif
 #endif
 
 /* This macro is copy of TEGRA_SOC_HWPM_MEM_BYTES_INVALID */
@@ -42,7 +47,11 @@ struct tegra_hwpm_mem_mgmt {
 	u64 mem_bytes_buf_va;
 	void *mem_bytes_kernel;
 #if defined(CONFIG_TEGRA_HWPM_OOT)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+	struct iosys_map mem_bytes_map;
+#else
 	struct dma_buf_map mem_bytes_map;
+#endif
 #endif
 };
 

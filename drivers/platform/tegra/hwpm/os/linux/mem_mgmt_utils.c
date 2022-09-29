@@ -128,28 +128,26 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 		sg_dma_address(hwpm->mem_mgmt->mem_bytes_sgt->sgl);
 
 #if defined(CONFIG_TEGRA_HWPM_OOT)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+	hwpm->mem_mgmt->mem_bytes_kernel =
+		(struct iosys_map *) &hwpm->mem_mgmt->mem_bytes_map;
+	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
+		(struct iosys_map *)hwpm->mem_mgmt->mem_bytes_kernel);
+#else
 	hwpm->mem_mgmt->mem_bytes_kernel =
 		(struct dma_buf_map *) &hwpm->mem_mgmt->mem_bytes_map;
 	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-		(struct iosys_map *)hwpm->mem_mgmt->mem_bytes_kernel);
-#else
 		(struct dma_buf_map *)hwpm->mem_mgmt->mem_bytes_kernel);
 #endif
-	if (err != 0) {
-		tegra_hwpm_err(hwpm,
-			"Unable to map mem_bytes buffer into kernel VA space");
-		return -ENOMEM;
-	}
-#else
+#else /* !CONFIG_TEGRA_HWPM_OOT */
 	hwpm->mem_mgmt->mem_bytes_kernel =
 		dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf);
+#endif
 	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
 		tegra_hwpm_err(hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
-#endif
 
 	memset(hwpm->mem_mgmt->mem_bytes_kernel, 0, 32);
 
