@@ -548,7 +548,7 @@ static int nvsciipc_ioctl_get_dbsize(struct nvsciipc *ctx, unsigned int cmd,
 		goto exit;
 	}
 
-	INFO("%s : entry count: %d\n", __func__, ctx->num_eps);
+	DBG("%s : entry count: %d\n", __func__, ctx->num_eps);
 
 exit:
 	return ret;
@@ -598,6 +598,16 @@ static long nvsciipc_dev_ioctl(struct file *filp, unsigned int cmd,
 		ret = nvsciipc_ioctl_map_vuid(ctx, cmd, arg);
 		break;
 #endif /* DEBUG_AUTH_API */
+	case NVSCIIPC_IOCTL_GET_VMID:
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
+		if (copy_to_user((void __user *) arg, &s_guestid,
+			sizeof(s_guestid))) {
+			ret = -EFAULT;
+		}
+#else
+		ret = -EFAULT;
+#endif /* CONFIG_TEGRA_VIRTUALIZATION */
+		break;
 	default:
 		ERR("unrecognised ioctl cmd: 0x%x\n", cmd);
 		ret = -ENOTTY;

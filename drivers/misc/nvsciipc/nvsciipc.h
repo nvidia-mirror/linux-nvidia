@@ -19,8 +19,8 @@
 #include <uapi/linux/nvsciipc_ioctl.h>
 
 #define ERR(...) pr_err("nvsciipc: " __VA_ARGS__)
-#define DBG(...) pr_info("nvsciipc: " __VA_ARGS__)
 #define INFO(...) pr_info("nvsciipc: " __VA_ARGS__)
+#define DBG(...) pr_debug("nvsciipc: " __VA_ARGS__)
 
 #define MODULE_NAME			 "nvsciipc"
 #define MAX_NAME_SIZE		   64

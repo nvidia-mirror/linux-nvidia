@@ -126,6 +126,9 @@ struct nvsciipc_map_vuid {
 #define NVSCIIPC_IOCTL_MAP_VUID \
 	_IOWR(NVSCIIPC_IOCTL_MAGIC, 7, struct nvsciipc_map_vuid)
 
-#define NVSCIIPC_IOCTL_NUMBER_MAX 7
+#define NVSCIIPC_IOCTL_GET_VMID \
+	_IOWR(NVSCIIPC_IOCTL_MAGIC, 8, uint32_t)
+
+#define NVSCIIPC_IOCTL_NUMBER_MAX 8
 
 #endif /* __NVSCIIPC_IOCTL_H__ */
