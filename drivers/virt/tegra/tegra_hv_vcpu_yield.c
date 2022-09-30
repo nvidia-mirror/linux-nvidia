@@ -225,9 +225,9 @@ const struct file_operations fops = {
 static int tegra_hv_vcpu_yield_remove(struct platform_device *pdev)
 {
 	uint32_t i;
-	struct vcpu_yield_plat_dev *vcpu_yield_pdev;
-	struct vcpu_yield_dev *vcpu_yield, *vcpu_yield_dev_list;
-	struct class *vcpu_yield_class;
+	struct vcpu_yield_plat_dev *vcpu_yield_pdev = NULL;
+	struct vcpu_yield_dev *vcpu_yield = NULL, *vcpu_yield_dev_list = NULL;
+	struct class *vcpu_yield_class = NULL;
 
 	vcpu_yield_pdev = (struct vcpu_yield_plat_dev *)dev_get_drvdata(&pdev->dev);
 	if (vcpu_yield_pdev) {
