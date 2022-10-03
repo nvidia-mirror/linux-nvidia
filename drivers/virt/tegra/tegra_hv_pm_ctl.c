@@ -86,6 +86,21 @@ static u32 guest_id;
 
 static int tegra_hv_pm_ctl_get_guest_state(u32 vmid, u32 *state);
 
+static inline bool
+tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(size_t op, ssize_t *ret_val)
+{
+	bool ret = false;
+
+	if (op > (size_t)S64_MAX) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (ssize_t)op;
+		ret = true;
+	}
+
+	return ret;
+}
+
 /*
  * For dependency management on System suspend, if there are guests required
  * to wait and the guests are active, the privileged guest sends
@@ -445,6 +460,7 @@ static ssize_t trigger_sys_suspend_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -463,7 +479,13 @@ static ssize_t trigger_sys_suspend_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 
@@ -474,6 +496,7 @@ static ssize_t trigger_sys_shutdown_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -492,7 +515,13 @@ static ssize_t trigger_sys_shutdown_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 static ssize_t trigger_sys_reboot_store(struct device *dev,
@@ -502,6 +531,7 @@ static ssize_t trigger_sys_reboot_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -520,7 +550,13 @@ static ssize_t trigger_sys_reboot_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 static ssize_t trigger_guest_suspend_store(struct device *dev,
@@ -530,6 +566,7 @@ static ssize_t trigger_guest_suspend_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -542,7 +579,13 @@ static ssize_t trigger_guest_suspend_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 static ssize_t trigger_guest_resume_store(struct device *dev,
@@ -552,6 +595,7 @@ static ssize_t trigger_guest_resume_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -564,7 +608,13 @@ static ssize_t trigger_guest_resume_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 static ssize_t guest_state_show(struct device *dev,
@@ -593,6 +643,7 @@ static ssize_t guest_state_store(struct device *dev,
 	struct tegra_hv_pm_ctl *data = dev_get_drvdata(dev);
 	unsigned int val;
 	int ret;
+	ssize_t ssize_count = 0;
 
 	ret = kstrtouint(buf, 0, &val);
 	if (ret) {
@@ -605,7 +656,13 @@ static ssize_t guest_state_store(struct device *dev,
 	guest_id = val;
 	mutex_unlock(&data->mutex_lock);
 
-	return count;
+	if (!tegra_hv_pm_ctl_safe_cast_size_t_to_ssize_t(count, &ssize_count)) {
+		dev_err(data->dev, "%s: Failed to cast count %lu from size_t "
+			"to ssize_t\n", __func__, count);
+		return -EOVERFLOW;
+	}
+
+	return ssize_count;
 }
 
 static ssize_t wait_for_guests_show(struct device *dev,
