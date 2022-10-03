@@ -129,6 +129,37 @@ struct ivc_notify_info {
 static struct ivc_notify_info ivc_notify;
 #endif
 
+static inline bool tegra_hv_safe_mult_u32(u32 op1, u32 op2, u32 *ret_val)
+{
+	bool ret = false;
+
+	if ((op1 == 0U) || (op2 == 0U)) {
+		*ret_val = 0U;
+		ret = true;
+	} else if ((op1 > (U32_MAX / op2)) == false) {
+		*ret_val = op1 * op2;
+		ret = true;
+	} else {
+		WARN_ON(true);
+	}
+
+	return ret;
+}
+
+static inline bool tegra_hv_safe_cast_u32_to_s32(u32 op, s32 *ret_val)
+{
+	bool ret = false;
+
+	if (op > (u32)S32_MAX) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (s32)op;
+		ret = true;
+	}
+
+	return ret;
+}
+
 static void ivc_raise_irq(struct ivc *ivc_channel)
 {
 	struct hv_ivc *ivc = container_of(ivc_channel, struct hv_ivc, ivc);
@@ -404,7 +435,8 @@ static CLASS_ATTR_RO(vmid);
 
 static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 {
-	const int intr_property_size = 3;
+	const uint32_t intr_property_size = 3U;
+	uint32_t length = 0U;
 	uint64_t info_page;
 	uint32_t i;
 	int ret;
@@ -507,7 +539,7 @@ static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < hvd->info->nr_areas; i++) {
+	for (i = 0U; i < hvd->info->nr_areas; i++) {
 		hvd->guest_ivc_info[i].shmem = (uintptr_t)ioremap_cache(
 				hvd->info->areas[i].pa,
 				hvd->info->areas[i].size);
@@ -520,9 +552,16 @@ static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 		hvd->guest_ivc_info[i].length = hvd->info->areas[i].size;
 	}
 
+	if (!tegra_hv_safe_mult_u32(hvd->info->nr_queues,
+			(uint32_t)sizeof(uint32_t) * intr_property_size, &length)) {
+		ERR("overflow occurs on calculating length of interrupts_arr (%u * %u * %u)\n",
+		    hvd->info->nr_queues, (uint32_t)sizeof(uint32_t),
+		    intr_property_size);
+		return -EOVERFLOW;
+	}
+
 	/* Do not free this, of_add_property does not copy the structure */
-	interrupts_arr = kmalloc(hvd->info->nr_queues * sizeof(uint32_t)
-			* intr_property_size, GFP_KERNEL);
+	interrupts_arr = kmalloc((size_t)length, GFP_KERNEL);
 	if (interrupts_arr == NULL) {
 		ERR("failed to allocate array for interrupts property\n");
 		return -ENOMEM;
@@ -533,21 +572,34 @@ static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 	 * indexed array and device nodes, and create interrupts property
 	 */
 	hvd->max_qid = 0;
-	for (i = 0; i < hvd->info->nr_queues; i++) {
+	for (i = 0U; i < hvd->info->nr_queues; i++) {
 		const struct tegra_hv_queue_data *qd =
 				&ivc_info_queue_array(hvd->info)[i];
+		uint32_t idx = 0U;
+
 		if (qd->id > hvd->max_qid)
 			hvd->max_qid = qd->id;
+
+		if (!tegra_hv_safe_mult_u32(i, intr_property_size, &idx)) {
+			ERR("overflow occurs on calculating index of interrupts_arr (%u * %u)\n",
+			    i, intr_property_size);
+			kfree(interrupts_arr);
+			return -EOVERFLOW;
+		}
+
 		/* 0 => SPI */
-		interrupts_arr[(i * intr_property_size)] = (__force uint32_t)cpu_to_be32(0);
-		interrupts_arr[(i * intr_property_size) + 1] =
-			(__force uint32_t)cpu_to_be32(qd->irq - 32); /* Id in SPI namespace */
+		interrupts_arr[idx] = (__force uint32_t)cpu_to_be32(0);
+		interrupts_arr[idx + 1U] =
+			(__force uint32_t)cpu_to_be32(qd->irq - 32U); /* Id in SPI namespace */
 		/* 0x1 == low-to-high edge */
-		interrupts_arr[(i * intr_property_size) + 2] = (__force uint32_t)cpu_to_be32(0x1);
+		interrupts_arr[idx + 2U] = (__force uint32_t)cpu_to_be32(0x1);
 	}
 
-	interrupts_prop.length =
-		hvd->info->nr_queues * sizeof(uint32_t) * intr_property_size;
+	if (!tegra_hv_safe_cast_u32_to_s32(length, &(interrupts_prop.length))) {
+		ERR("failed to cast length %u from u32 to s32\n", length);
+		kfree(interrupts_arr);
+		return -EOVERFLOW;
+	}
 	interrupts_prop.value = interrupts_arr;
 
 	if (of_add_property(hvd->dev, &interrupts_prop)) {
@@ -565,7 +617,7 @@ static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 	}
 
 	/* instantiate the IVC */
-	for (i = 0; i < hvd->info->nr_queues; i++) {
+	for (i = 0U; i < hvd->info->nr_queues; i++) {
 		const struct tegra_hv_queue_data *qd =
 				&ivc_info_queue_array(hvd->info)[i];
 		ret = tegra_hv_add_ivc(hvd, qd, i);
@@ -585,7 +637,7 @@ static int __init tegra_hv_setup(struct tegra_hv_data *hvd)
 	}
 
 	/* Initialize mempools. */
-	for (i = 0; i < hvd->info->nr_mempools; i++) {
+	for (i = 0U; i < hvd->info->nr_mempools; i++) {
 		const struct ivc_mempool *mpd =
 				&ivc_info_mempool_array(hvd->info)[i];
 		struct tegra_hv_ivm_cookie *ivmk = &hvd->mempools[i].ivmk;
