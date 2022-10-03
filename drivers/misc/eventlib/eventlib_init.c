@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -79,7 +79,7 @@ static int shm_reader_check(struct eventlib_shared *copy,
 	 * order to protect against unexpected asynchronous changes.
 	 */
 	memcpy(&copy->num_buffers, &shm->num_buffers,
-	       sizeof(copy->num_buffers));
+		   sizeof(copy->num_buffers));
 	memcpy(copy->subsys, shm->subsys, sizeof(copy->subsys));
 
 	for (i = 0; i < EVENTLIB_SUBSYS_MAX; i++) {
@@ -172,7 +172,7 @@ int _eventlib_init(struct eventlib_ctx *ctx, uint32_t ctx_version,
 	ctx->r2w_shm_size = ALIGN_64_DOWN(ctx->r2w_shm_size);
 
 	if (ctx->direction == EVENTLIB_DIRECTION_WRITER &&
-	    ctx->num_buffers == 0)
+		ctx->num_buffers == 0)
 		ctx->num_buffers = 1;
 
 	ret = priv_init(ctx);
@@ -206,8 +206,7 @@ int _eventlib_init(struct eventlib_ctx *ctx, uint32_t ctx_version,
 void eventlib_close(struct eventlib_ctx *ctx)
 {
 #ifdef EVENTLIB_FLT_PRESENT
-	if (flt_fini)
-		flt_fini(ctx);
+	flt_fini(ctx);
 #endif
 	ctx->priv = NULL;
 }

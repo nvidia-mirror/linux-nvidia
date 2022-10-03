@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -65,6 +65,18 @@ static inline void read_barrier(void)
 	/* nothing */
 #endif
 }
+
+#ifndef speculation_barrier
+static inline void speculation_barrier(void)
+{
+#if defined(__aarch64__)
+	asm volatile("dsb sy\n"
+		"isb" ::: "memory");
+#else
+	assert(false);
+#endif
+}
+#endif
 
 static inline uint64_t read64(volatile uint64_t *addr)
 {

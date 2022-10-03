@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -174,10 +174,8 @@ static inline void sync_clear_bit(unsigned int n, uint32_t *p)
  * Linkage is optional to support writer environments w/out filtering.
  */
 
-#pragma weak flt_init
 extern int flt_init(struct eventlib_ctx *ctx);
 
-#pragma weak flt_fini
 extern void flt_fini(struct eventlib_ctx *ctx);
 
 #endif

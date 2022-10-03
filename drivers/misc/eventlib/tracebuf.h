@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -56,6 +56,13 @@ struct pullstate {
 	bool     copos;
 };
 
+struct pushstate {
+	uint64_t position;
+	uintptr_t destination;
+	uint32_t length;
+	bool wrapped;
+};
+
 /*
  * Description for pull_init()
  *   - Initialize a new pullstate structure used to mark the location
@@ -102,6 +109,46 @@ int tracebuf_init(struct tracectx *ctx, void *buffer, uint32_t length);
  */
 
 int tracebuf_bind(struct tracectx *ctx, void *buffer, uint32_t length);
+
+/*
+ * Description for tracebuf_push_begin()
+ *   - Reserve the space for the message in the buffer and return it by
+ *     filling `state`; this operation never fails.
+ *   - Caller must not modify `state`; `state->destination` and
+ *     `state->length` point to the reserved space. The caller
+ *     must fill the space and commit it by calling tracebuf_push_end
+ *     with the same `state`.
+ *   - If there is insufficient message space available, the oldest
+ *     message(s) will be overwritten.
+ *   - Space to be filled in may be less than requested if its size is larger than
+ *     tracebuf.maxsize, or padded up to at least MIN_WORD_SIZE.
+ * Parameters
+ *   - Param `ctx` is provided by the caller.
+ *   - Param `state` is filled by the callee
+ *   - Param `hdr.params` is provided by the caller.
+ *   - Param `hdr.seqid` and `hdr.length` is filled by the callee.
+ *   - Param `paylen` is provided by the caller.
+ * Return values
+ *   - Operation never fails.
+ */
+
+void tracebuf_push_begin(struct tracectx *ctx, struct pushstate *state,
+	struct tracehdr *hdr, uint32_t paylen);
+
+/*
+ * Description for tracebuf_push_end()
+ *   - Commits the message started by respective tracebuf_push_begin to the buffer
+ * Parameters
+ *   - Param `ctx` is provided by the caller.
+ *   - Param `state` is filled by the callee
+ *   - Param `hdr.params` is provided by the caller.
+ *   - Param `hdr.seqid` and `hdr.length` is filled by the callee.
+ *   - Param `paylen` is provided by the caller.
+ * Return values
+ *   - Operation never fails.
+ */
+
+void tracebuf_push_end(struct tracectx *ctx, struct pushstate *state);
 
 /*
  * Description for tracebuf_push()

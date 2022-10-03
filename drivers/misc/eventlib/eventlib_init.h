@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -100,8 +100,8 @@ struct eventlib_init {
 };
 
 _Static_assert(sizeof(struct eventlib_init) <=
-	       sizeof(((struct eventlib_ctx *)0)->local_mem),
-	       "Please increase local_mem size in struct eventlib_ctx");
+		sizeof(((struct eventlib_ctx *)0)->local_mem),
+		"Please increase local_mem size in struct eventlib_ctx");
 
 static inline void *subsys_shm_area(shmptr struct eventlib_shared *sh,
 	struct eventlib_shared *copy, int subsys)

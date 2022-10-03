@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -145,7 +145,22 @@ int tbuf_init(struct eventlib_ctx *ctx)
 void eventlib_write(struct eventlib_ctx *ctx, uint32_t idx,
 	event_type_t type, event_timestamp_t ts, void *data, uint32_t size)
 {
+	struct eventlib_write_buffer write_buffer;
+	uint32_t to_write;
+
+	eventlib_write_begin(ctx, &write_buffer, idx, type, ts, size);
+
+	to_write = write_buffer.size < size ? write_buffer.size : size;
+	memcpy(write_buffer.destination, data, to_write);
+
+	eventlib_write_end(ctx, idx);
+}
+
+void eventlib_write_begin(struct eventlib_ctx *ctx, struct eventlib_write_buffer *out_buf,
+	uint32_t idx, event_type_t type, event_timestamp_t ts, uint32_t size)
+{
 	struct tracehdr hdr;
+	struct eventlib_tbuf_ctx *context = &ctx->priv->tbuf[idx];
 
 	if (ctx->direction != EVENTLIB_DIRECTION_WRITER)
 		return;
@@ -156,7 +171,15 @@ void eventlib_write(struct eventlib_ctx *ctx, uint32_t idx,
 	hdr.params = ts;
 	hdr.reserved = type;
 
-	tracebuf_push(&ctx->priv->tbuf[idx].tbuf_ctx, &hdr, data, size);
+	tracebuf_push_begin(&context->tbuf_ctx, &context->tbuf_pushstate, &hdr, size);
+	out_buf->destination = (char *)context->tbuf_pushstate.destination;
+	out_buf->size = context->tbuf_pushstate.length;
+}
+
+
+void eventlib_write_end(struct eventlib_ctx *ctx, uint32_t idx)
+{
+	tracebuf_push_end(&ctx->priv->tbuf[idx].tbuf_ctx, &ctx->priv->tbuf[idx].tbuf_pushstate);
 }
 
 static int tbuf_pull_single(struct eventlib_tbuf_ctx *tbuf,

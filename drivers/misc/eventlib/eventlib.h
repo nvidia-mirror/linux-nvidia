@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,9 @@
 #ifndef EVENTLIB_H
 #define EVENTLIB_H
 
-#include <linux/types.h>
-#include <linux/errno.h>
 #include <linux/stddef.h>
+#include <linux/string.h>
+#include <linux/errno.h>
 
 /* Possible init flags */
 #define EVENTLIB_FLAG_INIT_FILTERING (1 << 0)
@@ -39,6 +39,13 @@
 
 /* Mask size is aligned to 4-byte boundary */
 #define EVENTLIB_FLT_MASK_SIZE(bit_count) ((((bit_count) + 31U) / 32U) * 4U)
+
+enum eventlib_array_write_status {
+	/* Indicates the array was written correctly */
+	EVENTLIB_ARRAY_WRITE_STATUS_SUCCESS = 0,
+	/* Indicates the array had invalid values passed during writing */
+	EVENTLIB_ARRAY_WRITE_STATUS_INVALID = 1
+};
 
 enum eventlib_direction {
 	EVENTLIB_DIRECTION_READER = 1,
@@ -54,6 +61,7 @@ enum eventlib_filter_domain {
 typedef uint32_t event_type_t;
 typedef uint64_t event_timestamp_t;
 typedef uint8_t *eventlib_bitmask_t;
+typedef uint8_t eventlib_array_status_t;
 
 /* ========================================
  * Initialization and finalization
@@ -99,6 +107,12 @@ struct eventlib_ctx {
 	 * Reader context value is ignored
 	 */
 	uint32_t num_buffers;
+};
+
+/* A non-owning buffer that writer fills with data. */
+struct eventlib_write_buffer {
+	char *destination;
+	uint32_t size;
 };
 
 /* Initialize communication
@@ -158,6 +172,35 @@ void eventlib_close(struct eventlib_ctx *ctx);
 
 void eventlib_write(struct eventlib_ctx *ctx, uint32_t idx,
 	event_type_t type, event_timestamp_t ts, void *data, uint32_t size);
+
+/*
+ * Begin adding an event. To be called on writer side.
+ * Writer must fill the buffer completely and then call eventlib_write_end
+ *
+ * Arguments:
+ *   ctx - library context
+ *   out_buf - buffer the writer should write to
+ *   idx - trace buffer id [indexed from 0]
+ *   type - event type, not anyhow interpreted, just passed to the reader
+ *   ts - event timestamp, not anyhow interpreted, just passed to the reader
+ *   size - size of the event data.
+ * This operation never fails.
+ * Note that if the event is too large then the size of 'out_buf' will less than 'size'.
+ * It is recommended to use 'eventlib_copy_to_buffer' instead of raw memcpy to fill this buffer.
+ * Old events may get overwritten.
+ */
+void eventlib_write_begin(struct eventlib_ctx *ctx, struct eventlib_write_buffer *out_buf,
+	uint32_t idx, event_type_t type, event_timestamp_t ts, uint32_t size);
+
+/*
+ * Finish adding an event. Must be called after eventlib_write_begin
+ *
+ * Arguments:
+ *   ctx - library context
+ *   idx - trace buffer id [indexed from 0]
+ * This operation never fails.
+ */
+void eventlib_write_end(struct eventlib_ctx *ctx, uint32_t idx);
 
 /* Try to extract many events from trace buffer. To be called at reader side.
  * It is not guaranteed that any particular event will be delivered.
@@ -367,5 +410,12 @@ static inline uint32_t eventlib_get_timer_freq(void)
 }
 
 #endif
+
+/* ========================================
+ * Buffer manipulation functions
+ * ========================================
+ */
+
+void eventlib_copy_to_buffer(struct eventlib_write_buffer *buffer, void *src, uint32_t size);
 
 #endif

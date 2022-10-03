@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -153,6 +153,20 @@ int tracebuf_bind(struct tracectx *ctx, void *buffer, uint32_t length)
 void tracebuf_push(struct tracectx *ctx, struct tracehdr *hdr,
 	void *payload, uint32_t paylen)
 {
+	struct pushstate state;
+	uint32_t writelen;
+
+	tracebuf_push_begin(ctx, &state, hdr, paylen);
+
+	writelen = state.length < paylen ? state.length : paylen;
+	memcpy((void *)state.destination, payload, writelen);
+
+	tracebuf_push_end(ctx, &state);
+}
+
+void tracebuf_push_begin(struct tracectx *ctx, struct pushstate *state, struct tracehdr *hdr,
+	uint32_t paylen)
+{
 	uint32_t padding;
 	uint64_t position;
 	uint64_t offset;
@@ -224,7 +238,18 @@ void tracebuf_push(struct tracectx *ctx, struct tracehdr *hdr,
 	memset((void *)addr, 0, padding);
 
 	addr -= paylen;
-	memcpy((void *)addr, payload, paylen);
+
+	state->position = position;
+	state->destination = addr;
+	state->length = paylen;
+	state->wrapped = wrapped;
+}
+
+void tracebuf_push_end(struct tracectx *ctx, struct pushstate *state)
+{
+	bool wrapped = state->wrapped;
+	uint64_t position = state->position;
+	uintptr_t addr = state->destination;
 
 	if (wrapped == true) {
 		addr = ctx->begin + GET_VALID(position);
@@ -285,11 +310,7 @@ int tracebuf_pull(struct tracectx *ctx, struct pullstate *state,
 	if ((addr < ctx->begin) || (addr + sizeof(uint64_t) > ctx->end))
 		return -EIO;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-	spec_bar();
-#else
 	speculation_barrier();
-#endif
 
 	offset = *(uint64_t *)addr;
 
