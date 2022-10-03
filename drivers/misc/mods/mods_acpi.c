@@ -114,8 +114,8 @@ static int acpi_dev_check_one(struct acpi_device *adev, void *data)
 
 #if KERNEL_VERSION(6, 0, 0) > MODS_KERNEL_VERSION
 static int acpi_dev_each_child_node(struct acpi_device *adev,
-				int (*fptr)(struct acpi_device *, void *),
-				void *data)
+				    int (*fptr)(struct acpi_device *, void *),
+				    void *data)
 {
 	struct list_head   *node    = NULL;
 	struct list_head   *next    = NULL;
@@ -719,3 +719,12 @@ int esc_mods_get_acpi_dev_children(struct mods_client                *client,
 	LOG_EXT();
 	return err;
 }
+
+#ifdef MODS_HAS_PXM_TO_NODE
+int esc_mods_proximity_to_numa_node(struct mods_client                 *client,
+				    struct MODS_PROXIMITY_TO_NUMA_NODE *p)
+{
+	p->numa_node = acpi_map_pxm_to_node(p->proximity);
+	return OK;
+}
+#endif

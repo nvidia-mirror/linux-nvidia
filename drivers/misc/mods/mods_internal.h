@@ -502,6 +502,10 @@ int esc_mods_acpi_get_ddc_2(struct mods_client         *client,
 			    struct MODS_ACPI_GET_DDC_2 *p);
 int esc_mods_get_acpi_dev_children(struct mods_client    *client,
 				   struct MODS_GET_ACPI_DEV_CHILDREN *p);
+#ifdef MODS_HAS_PXM_TO_NODE
+int esc_mods_proximity_to_numa_node(struct mods_client                 *client,
+				    struct MODS_PROXIMITY_TO_NUMA_NODE *p);
+#endif
 #endif
 /* pci */
 #ifdef CONFIG_PCI
@@ -550,6 +554,10 @@ int esc_mods_pci_set_dma_mask(struct mods_client      *client,
 			     struct MODS_PCI_DMA_MASK *dma_mask);
 int esc_mods_pci_reset_function(struct mods_client    *client,
 				struct mods_pci_dev_2 *pcidev);
+#ifdef MODS_HAS_DEV_PROPS
+int esc_mods_read_dev_property(struct mods_client            *client,
+			       struct MODS_READ_DEV_PROPERTY *p);
+#endif
 #endif
 /* irq */
 #if defined(MODS_HAS_TEGRA) && defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
@@ -635,8 +643,8 @@ int mods_init_dma(void);
 void mods_exit_dma(void);
 int esc_mods_dma_request_channel(struct mods_client     *client,
 				 struct MODS_DMA_HANDLE *p);
-int esc_mods_dma_request_channel_2(struct mods_client *client,
-				 struct MODS_DMA_HANDLE_2 *p_handle_2);
+int esc_mods_dma_request_channel_2(struct mods_client       *client,
+				   struct MODS_DMA_HANDLE_2 *p_handle_2);
 int esc_mods_dma_release_channel(struct mods_client     *client,
 				 struct MODS_DMA_HANDLE *p);
 int esc_mods_dma_set_config(struct mods_client             *client,

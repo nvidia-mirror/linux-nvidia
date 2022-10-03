@@ -73,6 +73,10 @@
 #       define MODS_HAS_CONSOLE_BINDING 1
 #endif
 
+#if KERNEL_VERSION(3, 19, 0) <= MODS_KERNEL_VERSION
+#       define MODS_HAS_DEV_PROPS 1
+#endif
+
 #if defined(CONFIG_PPC64) && KERNEL_VERSION(4, 5, 0) <= MODS_KERNEL_VERSION
 #       define MODS_HAS_PNV_PCI_GET_NPU_DEV 1
 #endif
@@ -98,6 +102,10 @@
 
 #if KERNEL_VERSION(4, 17, 0) <= MODS_KERNEL_VERSION
 #       define MODS_PCIE_FLR_HAS_ERR
+#endif
+
+#if defined(CONFIG_ACPI_NUMA) && KERNEL_VERSION(5, 1, 0) <= MODS_KERNEL_VERSION
+#       define MODS_HAS_PXM_TO_NODE 1
 #endif
 
 #if KERNEL_VERSION(5, 17, 0) <= MODS_KERNEL_VERSION

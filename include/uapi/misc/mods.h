@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
- * mods.h - This file is part of NVIDIA MODS kernel driver.
+ * This file is part of NVIDIA MODS kernel driver.
  *
  * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
  *
@@ -1639,7 +1639,6 @@ struct MODS_DMA_HANDLE_2 {
 	char ctrl_dir[MODS_DMA_HANDLE_CTRL_DIR_LEN];
 };
 
-
 enum MODS_DMA_TRANSFER_DIRECTION {
 	MODS_DMA_MEM_TO_MEM,
 	MODS_DMA_MEM_TO_DEV,
@@ -1861,6 +1860,39 @@ struct MODS_TEGRA_OIST_STATUS {
 
 #define MODS_IOMMU_MAP_CONTIGUOUS 1
 
+#define MODS_MAX_PROP_NAME_LEN 64
+#define MODS_MAX_PROP_SIZE     8192
+
+#define MODS_PROP_TYPE_U64 8
+
+/* Used by MODS_ESC_READ_DEV_PROPERTY
+ *
+ * Reads a device property from firmware.
+ */
+struct MODS_READ_DEV_PROPERTY {
+	/* IN */
+	struct mods_pci_dev_2 pci_device;
+	char                  prop_name[MODS_MAX_PROP_NAME_LEN];
+	__u32                 array_size;
+	__u8                  type;
+	__u8                  dummy_align[3];
+
+	/* OUT */
+	__u8                  output[MODS_MAX_PROP_SIZE];
+};
+
+/* Used by MODS_ESC_PROXIMITY_TO_NUMA_NODE
+ *
+ * Converts proximity id to NUMA node id.
+ */
+struct MODS_PROXIMITY_TO_NUMA_NODE {
+	/* IN */
+	__s32 proximity;
+
+	/* OUT */
+	__s32 numa_node;
+};
+
 #pragma pack(pop)
 
 #define MODS_IOC_MAGIC 'x'
@@ -2063,5 +2095,7 @@ struct MODS_TEGRA_OIST_STATUS {
 #define MODS_ESC_SEND_TZ_MSG MODSIO(WR, 139, MODS_TZ_PARAMS)
 #define MODS_ESC_OIST_STATUS MODSIO(WR, 140, MODS_TEGRA_OIST_STATUS)
 #define MODS_ESC_INVOKE_OPTEE_TA MODSIO(WR, 141, MODS_OPTEE_PARAMS)
+#define MODS_ESC_READ_DEV_PROPERTY MODSIO(WR, 142, MODS_READ_DEV_PROPERTY)
+#define MODS_ESC_PROXIMITY_TO_NUMA_NODE MODSIO(WR, 143, MODS_PROXIMITY_TO_NUMA_NODE)
 
 #endif /* _UAPI_MODS_H_  */

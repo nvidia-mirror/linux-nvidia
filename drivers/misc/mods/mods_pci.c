@@ -21,11 +21,14 @@
 #include "mods_internal.h"
 
 #include <linux/device.h>
+#if defined(MODS_HAS_DMA_OPS)
+#include <linux/dma-mapping.h>
+#endif
 #include <linux/io.h>
 #include <linux/fs.h>
 #include <linux/pci.h>
-#if defined(MODS_HAS_DMA_OPS)
-#include <linux/dma-mapping.h>
+#if KERNEL_VERSION(3, 19, 0) <= MODS_KERNEL_VERSION
+#include <linux/property.h>
 #endif
 
 int mods_is_pci_dev(struct pci_dev        *dev,
@@ -1006,3 +1009,57 @@ error:
 	return -EINVAL;
 #endif
 }
+
+#ifdef MODS_HAS_DEV_PROPS
+int esc_mods_read_dev_property(struct mods_client            *client,
+			       struct MODS_READ_DEV_PROPERTY *p)
+{
+	struct pci_dev *dev = NULL;
+	int             err = -EINVAL;
+
+	LOG_ENT();
+
+	if (unlikely(p->type != MODS_PROP_TYPE_U64)) {
+		cl_error("invalid property type %u\n", p->type);
+		goto error;
+	}
+
+	if (unlikely(sizeof(64) * p->array_size > sizeof(p->output))) {
+		cl_error("requested size %zu exceeds output array size %zu\n",
+			 sizeof(u64) * p->array_size,
+			 sizeof(p->output));
+		goto error;
+	}
+
+	if (unlikely(p->array_size == 0)) {
+		cl_error("invalid output array size 0\n");
+		goto error;
+	}
+
+	if (!memchr(p->prop_name, 0, sizeof(p->prop_name))) {
+		cl_error("invalid property name, misses terminating NUL\n");
+		goto error;
+	}
+
+	err = mods_find_pci_dev(client, &p->pci_device, &dev);
+	if (unlikely(err)) {
+		if (err == -ENODEV)
+			cl_error("dev %04x:%02x:%02x.%x not found\n",
+				 p->pci_device.domain,
+				 p->pci_device.bus,
+				 p->pci_device.device,
+				 p->pci_device.function);
+		goto error;
+	}
+
+	err = device_property_read_u64_array(&dev->dev, p->prop_name,
+					     (u64 *)p->output, p->array_size);
+	if (unlikely(err))
+		cl_error("failed to read property %s\n", p->prop_name);
+
+error:
+	pci_dev_put(dev);
+	LOG_EXT();
+	return err;
+}
+#endif

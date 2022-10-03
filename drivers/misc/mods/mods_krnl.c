@@ -2029,6 +2029,14 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_pci_reset_function,
 			   mods_pci_dev_2);
 		break;
+
+#ifdef MODS_HAS_DEV_PROPS
+	case MODS_ESC_READ_DEV_PROPERTY:
+		MODS_IOCTL(MODS_ESC_READ_DEV_PROPERTY,
+			   esc_mods_read_dev_property,
+			   MODS_READ_DEV_PROPERTY);
+		break;
+#endif
 #endif
 
 	case MODS_ESC_ALLOC_PAGES:
@@ -2257,8 +2265,17 @@ static long mods_krnl_ioctl(struct file  *fp,
 
 	case MODS_ESC_GET_ACPI_DEV_CHILDREN:
 		MODS_IOCTL(MODS_ESC_GET_ACPI_DEV_CHILDREN,
-			   esc_mods_get_acpi_dev_children, MODS_GET_ACPI_DEV_CHILDREN);
+			   esc_mods_get_acpi_dev_children,
+			   MODS_GET_ACPI_DEV_CHILDREN);
 		break;
+
+#ifdef MODS_HAS_PXM_TO_NODE
+	case MODS_ESC_PROXIMITY_TO_NUMA_NODE:
+		MODS_IOCTL(MODS_ESC_PROXIMITY_TO_NUMA_NODE,
+			   esc_mods_proximity_to_numa_node,
+			   MODS_PROXIMITY_TO_NUMA_NODE);
+		break;
+#endif
 #else
 	case MODS_ESC_EVAL_ACPI_METHOD:
 		/* fallthrough */
@@ -2437,7 +2454,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   MODS_DMA_TX_DESC);
 		break;
 	case MODS_ESC_DMA_TX_WAIT:
-		MODS_IOCTL(MODS_ESC_DMA_TX_WAIT,
+		MODS_IOCTL(MODS_MODS_ESC_DMA_TX_WAIT,
 			   esc_mods_dma_wait,
 			   MODS_DMA_WAIT_DESC);
 		break;
