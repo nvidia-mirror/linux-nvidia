@@ -4,7 +4,7 @@
  * Tegra Graphics Host Interrupt Management
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2010-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -94,7 +94,7 @@ static void t20_intr_set_host_clocks_per_usec(struct nvhost_intr *intr, u32 cpm)
 	host1x_sync_writel(dev, host1x_sync_usec_clk_r(), cpm);
 	/* set the ip_busy_timeout */
 	host1x_sync_writel(dev,
-			host1x_sync_ip_busy_timeout_r(), cpm * 500000);
+			host1x_sync_ip_busy_timeout_r(), cpm * 1000);
 }
 
 static void t20_intr_set_syncpt_threshold(struct nvhost_intr *intr,
