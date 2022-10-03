@@ -1,5 +1,6 @@
 obj-$(CONFIG_TEGRA_CAMERA_PLATFORM) += camera/
 obj-$(CONFIG_TEGRA_GRHOST) += host/
+obj-$(CONFIG_TEGRA_TSEC) += tsec/
 
 obj-$(CONFIG_ARCH_TEGRA) += nvmap/
 

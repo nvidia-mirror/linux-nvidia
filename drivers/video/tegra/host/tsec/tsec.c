@@ -777,9 +777,6 @@ static struct of_device_id tegra_tsec_of_match[] = {
 	{ .name = "tsecb",
 		.compatible = "nvidia,tegra194-tsec",
 		.data = (struct nvhost_device_data *)&t19_tsecb_info },
-	{ .name = "tsec",
-		.compatible = "nvidia,tegra234-tsec",
-		.data = (struct nvhost_device_data *)&t23x_tsec_info },
 #ifdef CONFIG_TEGRA_T239_GRHOST
 	{ .name = "tsec",
 		.compatible = "nvidia,tegra239-tsec",
@@ -873,7 +870,7 @@ struct platform_driver nvhost_tsec_driver = {
 	.remove = __exit_p(tsec_remove),
 	.driver = {
 		.owner = THIS_MODULE,
-		.name = "tsec",
+		.name = "tsecdeprecated",
 #ifdef CONFIG_PM
 		.pm = &nvhost_module_pm_ops,
 #endif

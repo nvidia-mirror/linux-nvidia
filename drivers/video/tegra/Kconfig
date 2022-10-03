@@ -68,6 +68,16 @@ config TEGRA_GRHOST_TSEC
           Driver for the Tegra TSEC is falcon based engine which
           provides security.
 
+config TEGRA_TSEC
+        depends on TEGRA_GRHOST && ( ARCH_TEGRA_234_SOC || ARCH_TEGRA_239_SOC )
+        tristate "Tegra TSEC RISCV support"
+        default y
+        help
+          Driver for the Tegra TSEC engine.
+          TSEC is riscv based engine which provides security.
+          Driver works both as a module and as part of kernel.
+          Default is to build driver as part of kernel
+
 config TEGRA_GRHOST_NVCSI
 	bool "Tegra NVCSI support"
 	depends on TEGRA_GRHOST && ( ARCH_TEGRA_18x_SOC || ARCH_TEGRA_186_SOC )
