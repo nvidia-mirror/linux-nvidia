@@ -1,7 +1,7 @@
 /*
  * drivers/mfd/tmpm32xi2c.c
  *
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -30,6 +30,20 @@ static struct mfd_cell tmpm32xi2c_cells[] = {
 	{ .name = "tmpm32xi2c-gpio", },
 	{ .name = "tmpm32xi2c-poweroff", },
 };
+
+static inline bool tmpm32xi2c_safe_cast_u32_to_u8(u32 op, u8 *ret_val)
+{
+	bool ret = false;
+
+	if (op > (u32)((u8)(~((u8)0U)))) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (u8)op;
+		ret = true;
+	}
+
+	return ret;
+}
 
 static int __tmpm32xi2c_write_read(struct tmpm32xi2c_chip *chip,
 			u8 *tx_buf, int tx_size, u8 *rx_buf, int rx_size)
@@ -83,10 +97,12 @@ static int __tmpm32xi2c_power_get_value(struct tmpm32xi2c_chip *chip,
 					unsigned int cmd, unsigned int ch)
 {
 	int ret, i, max_bytes;
-	u8 tx_buf[] = { 0 /*cmd*/, 0 /*ch*/ };
-	u8 rx_buf[] = { 0 /*val*/ };
-	uint32_t val = 0;
+	u8 tx_buf[] = { 0U /*cmd*/, 0U /*ch*/ };
+	u8 rx_buf[] = { 0U /*val*/ };
+	uint32_t val = 0U;
 	bool err_flag = false;
+	u8 cmd_u8 = 0U;
+	u8 ch_u8 = 0U;
 
 	if ((cmd != CMD_RD_VOLT) && (cmd != CMD_RD_ADC)) {
 		dev_err(chip->dev, "%s: Invalid CMD[0x%02x]\n", __func__, cmd);
@@ -95,9 +111,23 @@ static int __tmpm32xi2c_power_get_value(struct tmpm32xi2c_chip *chip,
 
 	dev_dbg(chip->dev, "%s: CMD[0x%02x] CH[0x%02x]\n", __func__, cmd, ch);
 
+	if (!tmpm32xi2c_safe_cast_u32_to_u8(cmd, &cmd_u8)) {
+		dev_err(chip->dev,
+			"%s: Failed to cast type of cmd from u32 to u8\n",
+			__func__);
+		return -EOVERFLOW;
+	}
+
+	if (!tmpm32xi2c_safe_cast_u32_to_u8(ch, &ch_u8)) {
+		dev_err(chip->dev,
+			"%s: Failed to cast type of ch from u32 to u8\n",
+			__func__);
+		return -EOVERFLOW;
+	}
+
 	/* send channel info */
-	tx_buf[0] = (u8)cmd;
-	tx_buf[1] = (u8)ch;
+	tx_buf[0] = cmd_u8;
+	tx_buf[1] = ch_u8;
 	ret = __tmpm32xi2c_write_read(chip, tx_buf, sizeof(tx_buf), NULL, 0);
 	if (ret < 0) {
 		dev_err(chip->dev, "%s: Failed to send channel info, %d\n",
