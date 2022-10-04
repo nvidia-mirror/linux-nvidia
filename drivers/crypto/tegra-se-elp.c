@@ -3549,7 +3549,7 @@ static int tegra_se_ecdh_max_size(struct crypto_kpp *tfm)
 	curve = tegra_se_ecc_get_curve(ctx->curve_id);
 	if (!curve) {
 		dev_err(ctx->se_dev->dev, "ECC Curve not supported\n");
-		return -EOPNOTSUPP;
+		return 0; /* -EOPNOTSUPP */
 	}
 
 	nbytes = curve->nbytes;

@@ -434,7 +434,7 @@ static void tegra_se_restore_cpu_freq_fn(struct work_struct *work)
 static void tegra_se_boost_cpu_freq(struct tegra_se_dev *se_dev)
 {
 	unsigned long delay = BOOST_PERIOD;
-	s32 cpufreq_hz = boost_cpu_freq * 1000;
+	s32 cpufreq_hz = (s32)(boost_cpu_freq * 1000);
 
 	mutex_lock(&se_dev->boost_cpufreq_lock);
 	if (!se_dev->cpufreq_boosted) {
@@ -504,7 +504,7 @@ static inline void se_writel(struct tegra_se_dev *se_dev, unsigned int val,
 }
 
 static inline unsigned int se_readl(struct tegra_se_dev *se_dev,
-				    unsigned int reg_offset)
+				    unsigned long reg_offset)
 {
 	unsigned int val;
 
@@ -1046,7 +1046,7 @@ static int tegra_se_get_free_cmdbuf(struct tegra_se_dev *se_dev)
 			udelay(SE_WAIT_UDELAY);
 	}
 
-	return (i == SE_MAX_CMDBUF_TIMEOUT) ? -ENOMEM : index;
+	return (i == SE_MAX_CMDBUF_TIMEOUT) ? -ENOMEM : (int)index;
 }
 
 static void tegra_se_sha_complete_callback(void *priv, int nr_completed)
@@ -1057,7 +1057,7 @@ static void tegra_se_sha_complete_callback(void *priv, int nr_completed)
 	struct crypto_ahash *tfm;
 	struct tegra_se_req_context *req_ctx;
 	struct tegra_se_sha_context *sha_ctx;
-	int dst_len;
+	unsigned int dst_len;
 
 	pr_debug("%s:%d sha callback", __func__, __LINE__);
 
@@ -3007,7 +3007,8 @@ static int tegra_se_sha_process_buf(struct ahash_request *req, bool is_last,
 	struct tegra_se_ll *src_ll;
 	struct tegra_se_ll *dst_ll;
 	u32 current_total = 0, num_sgs, bytes_process_in_req = 0, num_blks;
-	int err = 0, dst_len = crypto_ahash_digestsize(tfm);
+	unsigned int dst_len = crypto_ahash_digestsize(tfm);
+	int err = 0;
 
 	pr_debug("%s:%d process sha buffer\n", __func__, __LINE__);
 
@@ -4595,14 +4596,14 @@ static int tegra_se_dh_setkey(struct crypto_kpp *tfm)
 	struct tegra_se_dev *se_dev;
 	u32 module_key_length = 0;
 	u32 exponent_key_length = 0;
-	u32 pkt, val;
+	u32 pkt, val, i = 0;
 	u32 key_size_words;
 	u32 key_word_size = 4;
 	u32 *pkeydata, *cmdbuf_cpuvaddr = NULL;
 	struct tegra_se_rsa_slot *pslot;
 	u32 cmdbuf_num_words = 0;
 	dma_addr_t cmdbuf_iova = 0;
-	int i = 0, err, j;
+	int err, j;
 
 	if (!ctx) {
 		pr_err("Invalid DH context\n");
@@ -5054,7 +5055,7 @@ static int tegra_se_ccm_init_crypt(struct aead_request *req)
 	return 0;
 }
 
-static int ccm_set_msg_len(u8 *block, unsigned int msglen, int csize)
+static int ccm_set_msg_len(u8 *block, unsigned int msglen, unsigned int csize)
 {
 	__be32 data;
 
@@ -5284,7 +5285,7 @@ static int tegra_se_ccm_compute_auth(struct aead_request *req, bool encrypt)
 		src_ll++;
 	}
 
-	count = cryptlen - pt_bytes;
+	count = (int)(cryptlen - pt_bytes);
 	while (count) {
 		ret = dma_map_sg(se_dev->dev, sg, 1, DMA_TO_DEVICE);
 		if (!ret) {
@@ -5389,7 +5390,8 @@ static int tegra_se_ccm_ctr(struct aead_request *req, bool encrypt)
 	struct scatterlist *src_sg, *dst_sg, *src_sg_start;
 	unsigned int assoclen, cryptlen, total, pad_bytes_len;
 	unsigned int mapped_cryptlen, mapped_len;
-	int ret = 0, count, index = 0, num_sgs;
+	unsigned int index = 0, num_sgs;
+	int ret = 0, count;
 	struct tegra_se_dev *se_dev;
 	u8 *dst_buf;
 	dma_addr_t dst_buf_dma_addr;
@@ -5454,7 +5456,7 @@ static int tegra_se_ccm_ctr(struct aead_request *req, bool encrypt)
 	src_sg_start = src_sg;
 	dst_sg = req->dst;
 	/* 2.1 Iterative over assoclen, to skip it for encryption */
-	count = assoclen;
+	count = (int)assoclen;
 	while (count) {
 		/* If a SG has both assoc data and PT/CT data */
 		if (count < src_sg->length) {
@@ -5499,7 +5501,7 @@ static int tegra_se_ccm_ctr(struct aead_request *req, bool encrypt)
 	}
 
 	/* 2.2 Add plain text to src_ll and dst_ll list */
-	count = cryptlen - mapped_cryptlen;
+	count = (int)(cryptlen - mapped_cryptlen);
 	while (count) {
 		ret = dma_map_sg(se_dev->dev, src_sg, 1, DMA_TO_DEVICE);
 		if (!ret) {
@@ -5929,7 +5931,8 @@ static int tegra_se_gcm_op(struct aead_request *req, bool encrypt)
 	struct tegra_se_dev *se_dev;
 	u32 *cpuvaddr = NULL, num_sgs;
 	dma_addr_t iova = 0;
-	int ret, count, index;
+	int ret, count;
+	unsigned int index;
 	u32 iv[4];
 	u8 *dst_buf;
 	dma_addr_t dst_buf_dma_addr;
@@ -5963,7 +5966,7 @@ static int tegra_se_gcm_op(struct aead_request *req, bool encrypt)
 	src_sg = req->src;
 	src_sg_start = src_sg;
 	/* 1.1 Iterative over assoclen, to skip it for encryption */
-	count = assoclen;
+	count = (int)assoclen;
 	while (count) {
 		/* If a SG has both assoc data and PT/CT data */
 		if (count < src_sg->length) {
@@ -6115,7 +6118,8 @@ static int tegra_se_gcm_final(struct aead_request *req, bool encrypt)
 	u32 *cpuvaddr = NULL;
 	unsigned int cryptlen;
 	dma_addr_t iova = 0;
-	int ret, index, i;
+	int ret, index;
+	unsigned int i;
 	struct tegra_se_dev *se_dev;
 	u32 iv[4], val;
 
