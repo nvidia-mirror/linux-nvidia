@@ -1,7 +1,7 @@
 /*
  * drivers/gpio/gpio-tmpm32xi2c.c
  *
- * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -40,12 +40,12 @@
 #define TMPM_GET_BANK(_A, _pos)		(_A[(_pos) / TMPM_BANK_SZ])
 #define TMPM_GET_BANKOFFSET(_pos)	((_pos) % TMPM_BANK_SZ)
 
-#define TMPM_SET_BIT(_A, _pos) \
-	(_A[(_pos) / TMPM_BANK_SZ] |= (1 << TMPM_GET_BANKOFFSET(_pos)))
-#define TMPM_CLR_BIT(_A, _pos) \
-	(_A[(_pos) / TMPM_BANK_SZ] &= ~(1 << TMPM_GET_BANKOFFSET(_pos)))
-#define TMPM_TEST_BIT(_A, _pos) \
-	(_A[(_pos) / TMPM_BANK_SZ] & (1 << TMPM_GET_BANKOFFSET(_pos)))
+#define TMPM_SET_BIT_U8(_A, _pos) \
+	(_A[(_pos) / TMPM_BANK_SZ] |= ((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
+#define TMPM_CLR_BIT_U8(_A, _pos) \
+	(_A[(_pos) / TMPM_BANK_SZ] &= ~((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
+#define TMPM_TEST_BIT_U8(_A, _pos) \
+	(_A[(_pos) / TMPM_BANK_SZ] & ((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
 
 struct tmpm32xi2c_intr_map {
 	/* index: intr-num, data: gpio-num */
@@ -72,7 +72,7 @@ struct tmpm32xi2c_intr_map {
  * *---------------------------------------*
  */
 static struct tmpm32xi2c_intr_map intr_map = {
-	{ 24, 25, 35, 27, 28, 29, 81, ~0 }, { ~0, }
+	{ 24, 25, 35, 27, 28, 29, 81, U32_MAX }, { U32_MAX, }
 };
 
 #define TMPM_GET_GPIO_NUM(index) (intr_map.iidg[(index)])
@@ -108,6 +108,20 @@ struct tmpm32xi2c_gpio_data {
 static void tmpm32xi2c_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
 				      int val);
 
+static inline bool tmpm32xi2c_gpio_safe_cast_u64_to_u16(u64 op, u16 *ret_val)
+{
+	bool ret = false;
+
+	if (op > (u64)((u16)(~((u16)0U)))) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (u16)op;
+		ret = true;
+	}
+
+	return ret;
+}
+
 static inline
 struct tmpm32xi2c_gpio_data *gc_to_tmpm32xi2c_gpio(struct gpio_chip *gpio_chip)
 {
@@ -118,11 +132,11 @@ static int tmpm32xi2c_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
 {
 	struct tmpm32xi2c_gpio_data *data = gc_to_tmpm32xi2c_gpio(gc);
 
-	if (TMPM_TEST_BIT(data->irq_available, offset))
+	if (TMPM_TEST_BIT_U8(data->irq_available, offset))
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
-		return irq_find_mapping(gc->irq.domain, offset);
+		return (int)irq_find_mapping(gc->irq.domain, offset);
 #else
-		return irq_find_mapping(gc->irqdomain, offset);
+		return (int)irq_find_mapping(gc->irqdomain, offset);
 #endif
 
 	dev_dbg(data->dev, "%s: offset[%u] is not available for irq\n",
@@ -141,9 +155,9 @@ static int __tmpm32xi2c_gpio_direction_input(struct tmpm32xi2c_gpio_data *data,
 
 	dev_dbg(data->dev, "%s: offset[%u]\n", __func__, offset);
 
-	if (!TMPM_TEST_BIT(data->dir_output_init, offset))
+	if (!TMPM_TEST_BIT_U8(data->dir_output_init, offset))
 		update = 1;
-	else if (TMPM_TEST_BIT(data->dir_output, offset))
+	else if (TMPM_TEST_BIT_U8(data->dir_output, offset))
 		update = 1;
 
 	if (!update)
@@ -154,11 +168,11 @@ static int __tmpm32xi2c_gpio_direction_input(struct tmpm32xi2c_gpio_data *data,
 	if (ret < 0)
 		goto exit;
 
-	TMPM_CLR_BIT(data->dir_output, offset);
+	TMPM_CLR_BIT_U8(data->dir_output, offset);
 	intr_num = TMPM_GET_INTR_NUM(offset);
-	if (intr_num != ~0)
-		TMPM_SET_BIT(data->reg_direction_intr, intr_num);
-	TMPM_SET_BIT(data->dir_output_init, offset);
+	if (intr_num != U32_MAX)
+		TMPM_SET_BIT_U8(data->reg_direction_intr, intr_num);
+	TMPM_SET_BIT_U8(data->dir_output_init, offset);
 
 	ret = 0;
 
@@ -189,9 +203,9 @@ static int __tmpm32xi2c_gpio_direction_output(struct tmpm32xi2c_gpio_data *data,
 
 	dev_dbg(data->dev, "%s: offset[%u], val[%d]\n", __func__, offset, val);
 
-	if (!TMPM_TEST_BIT(data->dir_output_init, offset))
+	if (!TMPM_TEST_BIT_U8(data->dir_output_init, offset))
 		update = 1;
-	else if (!TMPM_TEST_BIT(data->dir_output, offset))
+	else if (!TMPM_TEST_BIT_U8(data->dir_output, offset))
 		update = 1;
 
 	if (!update)
@@ -205,11 +219,11 @@ static int __tmpm32xi2c_gpio_direction_output(struct tmpm32xi2c_gpio_data *data,
 	if (ret < 0)
 		goto exit;
 
-	TMPM_SET_BIT(data->dir_output, offset);
+	TMPM_SET_BIT_U8(data->dir_output, offset);
 	intr_num = TMPM_GET_INTR_NUM(offset);
-	if (intr_num != ~0)
-		TMPM_CLR_BIT(data->reg_direction_intr, intr_num);
-	TMPM_SET_BIT(data->dir_output_init, offset);
+	if (intr_num != U32_MAX)
+		TMPM_CLR_BIT_U8(data->reg_direction_intr, intr_num);
+	TMPM_SET_BIT_U8(data->dir_output_init, offset);
 	ret = 0;
 
 exit:
@@ -240,8 +254,8 @@ static int __tmpm32xi2c_gpio_get_value(struct tmpm32xi2c_gpio_data *data,
 
 	dev_dbg(data->dev, "%s: offset[%u]\n", __func__, offset);
 
-	if (TMPM_TEST_BIT(data->dir_output, offset)) {
-		ret = TMPM_TEST_BIT(data->output_val, offset) ? 1 : 0;
+	if (TMPM_TEST_BIT_U8(data->dir_output, offset)) {
+		ret = TMPM_TEST_BIT_U8(data->output_val, offset) ? 1 : 0;
 	} else {
 		u8 tx_buf[] = { CMD_PIN_RD, 0 /*pin*/ };
 		u8 rx_buf[] = { 0 /*val*/ };
@@ -279,11 +293,11 @@ static void __tmpm32xi2c_gpio_set_value(struct tmpm32xi2c_gpio_data *data,
 
 	dev_dbg(data->dev, "%s: offset[%u], val[%d]\n", __func__, offset, val);
 
-	if (!TMPM_TEST_BIT(data->output_val_init, offset))
+	if (!TMPM_TEST_BIT_U8(data->output_val_init, offset))
 		update = 1;
-	else if (TMPM_TEST_BIT(data->output_val, offset) && !val)
+	else if (TMPM_TEST_BIT_U8(data->output_val, offset) && !val)
 		update = 1;
-	else if (!TMPM_TEST_BIT(data->output_val, offset) && val)
+	else if (!TMPM_TEST_BIT_U8(data->output_val, offset) && val)
 		update = 1;
 
 	if (!update)
@@ -296,10 +310,10 @@ static void __tmpm32xi2c_gpio_set_value(struct tmpm32xi2c_gpio_data *data,
 		return;
 
 	if (val)
-		TMPM_SET_BIT(data->output_val, offset);
+		TMPM_SET_BIT_U8(data->output_val, offset);
 	else
-		TMPM_CLR_BIT(data->output_val, offset);
-	TMPM_SET_BIT(data->output_val_init, offset);
+		TMPM_CLR_BIT_U8(data->output_val, offset);
+	TMPM_SET_BIT_U8(data->output_val_init, offset);
 }
 
 static void tmpm32xi2c_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
@@ -345,8 +359,8 @@ static int tmpm32xi2c_gpio_irq_pending(struct tmpm32xi2c_gpio_data *data)
 
 		if (irq_trig_raise || irq_trig_fall) {
 			/* Check pending irq based on configured irq type. */
-			pending[i] = (trig_raise & irq_trig_raise) |
-				     (trig_fall & irq_trig_fall);
+			pending[i] = (u8)(trig_raise & irq_trig_raise) |
+				     (u8)(trig_fall & irq_trig_fall);
 		} else {
 			/*
 			 * If there was no configured irq type, consider any
@@ -377,7 +391,7 @@ static irqreturn_t tmpm32xi2c_gpio_irq_handler(int irq, void *devid)
 
 	for (i = 0; i < TMPM_MAX_INTR_BANK; i++) {
 		while (data->irq_pending[i]) {
-			level = __ffs(data->irq_pending[i]);
+			level = (uint8_t)__ffs(data->irq_pending[i]);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 			gpio_irq = irq_find_mapping(data->gc.irq.domain,
 						    TMPM_GET_GPIO_NUM(level));
@@ -386,7 +400,7 @@ static irqreturn_t tmpm32xi2c_gpio_irq_handler(int irq, void *devid)
 						    TMPM_GET_GPIO_NUM(level));
 #endif
 			handle_nested_irq(gpio_irq);
-			data->irq_pending[i] &= ~(1 << level);
+			data->irq_pending[i] &= ~((uint8_t)1U << level);
 			nhandled++;
 		}
 	}
@@ -410,12 +424,12 @@ tmpm32xi2c_gpio_update_irq_mask_reg(struct tmpm32xi2c_gpio_data *data)
 		new_irqs = ~irq_mask_cache & data->reg_direction_intr[i];
 
 		while (new_irqs) {
-			level = __ffs(new_irqs);
+			level = (uint8_t)__ffs(new_irqs);
 			mutex_lock(&data->lock);
 			__tmpm32xi2c_gpio_direction_input(
 					data, TMPM_GET_GPIO_NUM(level));
 			mutex_unlock(&data->lock);
-			new_irqs &= ~(1 << level);
+			new_irqs &= ~((uint8_t)1U << level);
 		}
 
 		if (irq_mask_cache != data->irq_mask[i]) {
@@ -432,7 +446,7 @@ static void tmpm32xi2c_gpio_irq_mask(struct irq_data *d)
 	struct tmpm32xi2c_gpio_data *data = gc_to_tmpm32xi2c_gpio(gc);
 	uint32_t intr_num = TMPM_GET_INTR_NUM(d->hwirq);
 
-	TMPM_CLR_BIT(data->irq_mask_cache, intr_num);
+	TMPM_CLR_BIT_U8(data->irq_mask_cache, intr_num);
 }
 
 static void tmpm32xi2c_gpio_irq_unmask(struct irq_data *d)
@@ -441,7 +455,7 @@ static void tmpm32xi2c_gpio_irq_unmask(struct irq_data *d)
 	struct tmpm32xi2c_gpio_data *data = gc_to_tmpm32xi2c_gpio(gc);
 	uint32_t intr_num = TMPM_GET_INTR_NUM(d->hwirq);
 
-	TMPM_SET_BIT(data->irq_mask_cache, intr_num);
+	TMPM_SET_BIT_U8(data->irq_mask_cache, intr_num);
 }
 
 static void tmpm32xi2c_gpio_irq_bus_lock(struct irq_data *d)
@@ -470,11 +484,11 @@ static int tmpm32xi2c_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	dev_dbg(data->dev, "%s: irq=%u, hwirq=%lu, type=%u\n",
 		__func__, d->irq, d->hwirq, type);
 
-	if (!TMPM_TEST_BIT(data->irq_available, d->hwirq))
+	if (!TMPM_TEST_BIT_U8(data->irq_available, d->hwirq))
 		return 0;
 
 	intr_num = TMPM_GET_INTR_NUM(d->hwirq);
-	if (type & ~IRQ_TYPE_SENSE_MASK)
+	if (type & ~((uint32_t)IRQ_TYPE_SENSE_MASK))
 		return -EINVAL;
 
 	/* FIXME: LEVEL type is not supported yet in current MCU firmware. */
@@ -482,14 +496,14 @@ static int tmpm32xi2c_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 		return 0;
 
 	if (type & IRQ_TYPE_EDGE_FALLING)
-		TMPM_SET_BIT(data->irq_trig_fall, intr_num);
+		TMPM_SET_BIT_U8(data->irq_trig_fall, intr_num);
 	else
-		TMPM_CLR_BIT(data->irq_trig_fall, intr_num);
+		TMPM_CLR_BIT_U8(data->irq_trig_fall, intr_num);
 
 	if (type & IRQ_TYPE_EDGE_RISING)
-		TMPM_SET_BIT(data->irq_trig_raise, intr_num);
+		TMPM_SET_BIT_U8(data->irq_trig_raise, intr_num);
 	else
-		TMPM_CLR_BIT(data->irq_trig_raise, intr_num);
+		TMPM_CLR_BIT_U8(data->irq_trig_raise, intr_num);
 
 	return 0;
 }
@@ -515,8 +529,8 @@ static int tmpm32xi2c_gpio_irq_setup(struct tmpm32xi2c_gpio_data *data,
 
 	for (i = 0; i < ARRAY_SIZE(intr_map.iidg); i++) {
 		gpio_num = TMPM_GET_GPIO_NUM(i);
-		if (gpio_num != ~0) {
-			TMPM_SET_BIT(data->irq_available, gpio_num);
+		if (gpio_num != U32_MAX) {
+			TMPM_SET_BIT_U8(data->irq_available, gpio_num);
 			intr_map.igdi[gpio_num] = i;
 		}
 	}
@@ -534,7 +548,7 @@ static int tmpm32xi2c_gpio_irq_setup(struct tmpm32xi2c_gpio_data *data,
 	}
 
 	irq_flags = IRQF_ONESHOT | IRQF_SHARED | IRQF_EARLY_RESUME;
-	ret = devm_request_threaded_irq(data->dev, data->irq, NULL,
+	ret = devm_request_threaded_irq(data->dev, (uint32_t)data->irq, NULL,
 					tmpm32xi2c_gpio_irq_handler,
 					data->irq_flags | irq_flags,
 					dev_name(data->dev), data);
@@ -560,6 +574,7 @@ static int tmpm32xi2c_gpio_probe(struct platform_device *pdev)
 	const struct platform_device_id *id = platform_get_device_id(pdev);
 	struct tmpm32xi2c_chip *chip = dev_get_drvdata(pdev->dev.parent);
 	struct tmpm32xi2c_gpio_data *data;
+	uint16_t ngpio = 0U;
 	int ret;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(struct tmpm32xi2c_gpio_data),
@@ -587,6 +602,11 @@ static int tmpm32xi2c_gpio_probe(struct platform_device *pdev)
 	data->gc.can_sleep = true;
 	data->gc.base = -1;
 	data->gc.ngpio = id->driver_data;
+	if (!tmpm32xi2c_gpio_safe_cast_u64_to_u16(id->driver_data, &ngpio)) {
+		dev_err(&pdev->dev,
+			"Failed to cast type of driver_data from u64 to u16\n");
+		return -EOVERFLOW;
+	}
 	data->gc.label = pdev->name;
 	data->gc.parent = &pdev->dev;
 	data->gc.owner = THIS_MODULE;
@@ -635,7 +655,7 @@ static int tmpm32xi2c_gpio_suspend(struct device *dev)
 	disable_irq(data->irq);
 
 	if (device_may_wakeup(dev)) {
-		ret = enable_irq_wake(data->irq);
+		ret = enable_irq_wake((uint32_t)data->irq);
 		if (ret < 0)
 			dev_err(dev,
 				"Failed to enable irq wake for irq%d, %d\n",
@@ -652,7 +672,7 @@ static int tmpm32xi2c_gpio_resume(struct device *dev)
 	if (device_may_wakeup(dev))
 		disable_irq_wake(data->irq);
 
-	enable_irq(data->irq);
+	enable_irq((uint32_t)data->irq);
 
 	/* If there is any pending irq, invoke the irq handler. */
 	if (tmpm32xi2c_gpio_irq_pending(data)) {
