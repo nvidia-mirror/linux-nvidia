@@ -37,20 +37,16 @@
  * use case is retrieval of the HV trace log when it is available.
  */
 
+#define MAX_NAME_SIZE 50
+
 struct hyp_shared_memory_info {
-	const char *node_name;
+	char node_name[MAX_NAME_SIZE];
 	struct bin_attribute attr;
 	uint64_t ipa;
 	unsigned long size;
 };
 
-enum HYP_SHM_ID {
-	HYP_SHM_ID_LOG,
-	HYP_SHM_ID_PCT,
-
-	HYP_SHM_ID_NUM
-};
-
+#define HYP_SHM_ID_NUM  (2 * NGUESTS_MAX + 1U) // trace buffers + PCT.
 static struct hyp_shared_memory_info hyp_shared_memory_attrs[HYP_SHM_ID_NUM];
 
 
@@ -134,6 +130,8 @@ static int __init hvc_sysfs_register(void)
 	uint64_t ipa;
 	struct hyp_info_page *info;
 	uint64_t log_mask;
+	struct trace_buf *buffs;
+	uint16_t i, count;
 
 	if (is_tegra_hypervisor_mode() == false) {
 		TEGRA_HV_INFO("hypervisor is not present\n");
@@ -155,32 +153,62 @@ static int __init hvc_sysfs_register(void)
 	if (info == NULL)
 		return -EFAULT;
 
-	if (info->log_size != 0) {
-		hyp_shared_memory_attrs[HYP_SHM_ID_LOG].ipa = info->log_ipa;
-		hyp_shared_memory_attrs[HYP_SHM_ID_LOG].size =
-			(size_t)info->log_size;
-		hyp_shared_memory_attrs[HYP_SHM_ID_LOG].node_name = "log";
+	buffs = info->trace_buffs;
+	count = ARRAY_SIZE(info->trace_buffs);
 
-		ret = hvc_create_sysfs(kobj,
-			&hyp_shared_memory_attrs[HYP_SHM_ID_LOG]);
-		if (ret == 0)
-			TEGRA_HV_INFO("log is available\n");
-		else
-			TEGRA_HV_INFO("log is unavailable\n");
+	/* 2 bytes for number, 1 for "_" and 1 for null character.*/
+	if (MAX_NAME_SIZE < (ARRAY_SIZE(buffs[i].name) + 4U)) {
+		TEGRA_HV_INFO("hyp_shared_memory_attrs.name size is small\n");
+		iounmap((void __iomem *)info);
+		return -EFAULT;
+	}
 
-		if (ret == 0 && hyp_trace_get_mask(&log_mask) == 0) {
-			ret = create_log_mask_node(kobj);
+	for (i = 0; i < count; i++) {
+		if (buffs[i].ipa != 0U && buffs[i].size != 0U) {
+			hyp_shared_memory_attrs[i].ipa = buffs[i].ipa;
+			hyp_shared_memory_attrs[i].size = (size_t)buffs[i].size;
+
+			/* Suffix number to the process name, this solves the duplicate process
+			 * name issue.
+			 */
+			ret = snprintf(hyp_shared_memory_attrs[i].node_name, MAX_NAME_SIZE,
+					"%s_%u", buffs[i].name, i);
+
+			if (ret > 0U) {
+				hyp_shared_memory_attrs[i].node_name[ret] = '\0';
+			} else {
+				TEGRA_HV_INFO("snprintf failure - %s\n", buffs[i].name);
+				iounmap((void __iomem *)info);
+				return -EFAULT;
+			}
+
+			ret = hvc_create_sysfs(kobj, &hyp_shared_memory_attrs[i]);
 			if (ret == 0)
-				TEGRA_HV_INFO(
-					"access to trace event mask is available\n");
+				TEGRA_HV_INFO(" %s trace is available\n", buffs[i].name);
+			else
+				TEGRA_HV_INFO(" %s trace is unavailable\n", buffs[i].name);
 		}
 	}
 
-	hyp_shared_memory_attrs[HYP_SHM_ID_PCT].ipa = info->pct_ipa;
-	hyp_shared_memory_attrs[HYP_SHM_ID_PCT].size = (size_t)info->pct_size;
-	hyp_shared_memory_attrs[HYP_SHM_ID_PCT].node_name = "pct";
+	if (hyp_trace_get_mask(&log_mask) == 0) {
+		ret = create_log_mask_node(kobj);
+		if (ret == 0)
+			TEGRA_HV_INFO("access to trace event mask is available\n");
+	}
 
-	ret = hvc_create_sysfs(kobj, &hyp_shared_memory_attrs[HYP_SHM_ID_PCT]);
+	hyp_shared_memory_attrs[i].ipa = info->pct_ipa;
+	hyp_shared_memory_attrs[i].size = (size_t)info->pct_size;
+	ret = snprintf(hyp_shared_memory_attrs[i].node_name, MAX_NAME_SIZE, "pct");
+
+	if (ret > 0U) {
+		hyp_shared_memory_attrs[i].node_name[ret] = '\0';
+	} else {
+		TEGRA_HV_INFO("snprintf failure - pct\n");
+		iounmap((void __iomem *)info);
+		return -EFAULT;
+	}
+
+	ret = hvc_create_sysfs(kobj, &hyp_shared_memory_attrs[i]);
 	if (ret == 0)
 		TEGRA_HV_INFO("pct is available\n");
 	else
