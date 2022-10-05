@@ -161,6 +161,13 @@ fail:
 	return ret;
 }
 
+int tegra_hwpm_check_status(struct tegra_soc_hwpm *hwpm)
+{
+	tegra_hwpm_fn(hwpm, " ");
+
+	return hwpm->active_chip->check_status(hwpm);
+}
+
 int tegra_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm)
 {
 	tegra_hwpm_fn(hwpm, " ");

@@ -46,6 +46,7 @@ static struct tegra_soc_hwpm_chip t234_chip_info = {
 	.perfmon_disable = t234_hwpm_perfmon_disable,
 	.perfmux_disable = tegra_hwpm_perfmux_disable,
 	.disable_triggers = t234_hwpm_disable_triggers,
+	.check_status = t234_hwpm_check_status,
 
 	.disable_mem_mgmt = t234_hwpm_disable_mem_mgmt,
 	.enable_mem_mgmt = t234_hwpm_enable_mem_mgmt,
@@ -151,6 +152,11 @@ static bool t234_hwpm_validate_hals(struct tegra_soc_hwpm *hwpm)
 
 	if (hwpm->active_chip->disable_triggers == NULL) {
 		tegra_hwpm_err(hwpm, "disable_triggers uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->check_status == NULL) {
+		tegra_hwpm_err(hwpm, "check_status uninitialized");
 		return false;
 	}
 

@@ -162,12 +162,13 @@ enum tegra_hwpm_element_type {
 enum tegra_hwpm_funcs {
 	TEGRA_HWPM_INIT_IP_STRUCTURES,
 	TEGRA_HWPM_MATCH_BASE_ADDRESS,
+	TEGRA_HWPM_FIND_GIVEN_ADDRESS,
 	TEGRA_HWPM_UPDATE_IP_INST_MASK,
 	TEGRA_HWPM_GET_ALIST_SIZE,
 	TEGRA_HWPM_COMBINE_ALIST,
 	TEGRA_HWPM_RESERVE_GIVEN_RESOURCE,
 	TEGRA_HWPM_BIND_RESOURCES,
-	TEGRA_HWPM_FIND_GIVEN_ADDRESS,
+	TEGRA_HWPM_UNBIND_RESOURCES,
 	TEGRA_HWPM_RELEASE_RESOURCES,
 	TEGRA_HWPM_RELEASE_ROUTER,
 	TEGRA_HWPM_RELEASE_IP_STRUCTURES
@@ -396,6 +397,7 @@ struct tegra_soc_hwpm_chip {
 	int (*reserve_rtr)(struct tegra_soc_hwpm *hwpm);
 	int (*release_rtr)(struct tegra_soc_hwpm *hwpm);
 
+	int (*check_status)(struct tegra_soc_hwpm *hwpm);
 	int (*disable_triggers)(struct tegra_soc_hwpm *hwpm);
 	int (*perfmon_enable)(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon);

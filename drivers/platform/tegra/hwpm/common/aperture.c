@@ -57,7 +57,7 @@ fail:
 	return err;
 }
 
-int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_element_disable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *element)
 {
 	int err = 0;
@@ -73,13 +73,6 @@ int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
 				element->element_index_mask);
 			goto fail;
 		}
-
-		err = tegra_hwpm_perfmon_release(hwpm, element);
-		if (err != 0) {
-			tegra_hwpm_err(hwpm, "Element mask 0x%x release failed",
-				element->element_index_mask);
-			goto fail;
-		}
 		break;
 	case IP_ELEMENT_PERFMUX:
 	case IP_ELEMENT_BROADCAST:
@@ -89,7 +82,37 @@ int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
 				element->element_index_mask);
 			goto fail;
 		}
+		break;
+	case HWPM_ELEMENT_INVALID:
+	default:
+		tegra_hwpm_err(hwpm, "Invalid element type %d",
+			element->element_type);
+		return -EINVAL;
+	}
 
+fail:
+	return err;
+}
+
+int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *element)
+{
+	int err = 0;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+	switch (element->element_type) {
+	case HWPM_ELEMENT_PERFMON:
+	case HWPM_ELEMENT_PERFMUX:
+		err = tegra_hwpm_perfmon_release(hwpm, element);
+		if (err != 0) {
+			tegra_hwpm_err(hwpm, "Element mask 0x%x release failed",
+				element->element_index_mask);
+			goto fail;
+		}
+		break;
+	case IP_ELEMENT_PERFMUX:
+	case IP_ELEMENT_BROADCAST:
 		err = tegra_hwpm_perfmux_release(hwpm, element);
 		if (err != 0) {
 			tegra_hwpm_err(hwpm, "Element mask 0x%x release failed",
@@ -362,6 +385,34 @@ static int tegra_hwpm_func_single_element(struct tegra_soc_hwpm *hwpm,
 					ip_idx, a_type, static_aperture_idx);
 				goto fail;
 			}
+		}
+		break;
+	case TEGRA_HWPM_UNBIND_RESOURCES:
+		if ((element->element_index_mask &
+			ip_inst->element_fs_mask) == 0U) {
+			tegra_hwpm_dbg(hwpm, hwpm_dbg_bind,
+				"IP %d inst %d a_type %d element type %d"
+				" start_addr 0x%llx not reserved",
+				ip_idx, static_inst_idx, a_type,
+				element->element_type, element->start_abs_pa);
+			return 0;
+		}
+
+		err = tegra_hwpm_element_disable(hwpm, element);
+		if (err != 0) {
+			tegra_hwpm_err(hwpm, "IP %d element"
+				" type %d idx %d enable failed",
+				ip_idx, a_type, static_aperture_idx);
+			goto fail;
+		}
+
+		err = hwpm->active_chip->zero_alist_regs(
+			hwpm, ip_inst, element);
+		if (err != 0) {
+			tegra_hwpm_err(hwpm, "IP %d element"
+				" type %d idx %d zero regs failed",
+				ip_idx, a_type, static_aperture_idx);
+			goto fail;
 		}
 		break;
 	case TEGRA_HWPM_RELEASE_IP_STRUCTURES:
@@ -660,6 +711,7 @@ int tegra_hwpm_func_single_ip(struct tegra_soc_hwpm *hwpm,
 	case TEGRA_HWPM_GET_ALIST_SIZE:
 	case TEGRA_HWPM_COMBINE_ALIST:
 	case TEGRA_HWPM_BIND_RESOURCES:
+	case TEGRA_HWPM_UNBIND_RESOURCES:
 		/* Skip unavailable IPs */
 		if (!chip_ip->reserved) {
 			tegra_hwpm_dbg(hwpm, hwpm_dbg_allowlist | hwpm_dbg_bind,

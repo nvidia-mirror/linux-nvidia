@@ -80,6 +80,7 @@ bool tegra_hwpm_check_alist(struct tegra_soc_hwpm *hwpm,
 int tegra_hwpm_setup_hw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm);
+int tegra_hwpm_check_status(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_release_hw(struct tegra_soc_hwpm *hwpm);
 void tegra_hwpm_release_sw_setup(struct tegra_soc_hwpm *hwpm);
 

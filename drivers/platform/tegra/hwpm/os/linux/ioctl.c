@@ -412,6 +412,12 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 		goto fail;
 	}
 
+	ret = tegra_hwpm_check_status(hwpm);
+	if (ret < 0) {
+		tegra_hwpm_err(hwpm, "HW not ready for profiling session");
+		goto fail;
+	}
+
 	ret = tegra_hwpm_setup_sw(hwpm);
 	if (ret < 0) {
 		tegra_hwpm_err(hwpm, "Failed to setup sw");

@@ -163,8 +163,4 @@
 #define pmasys_enginestatus_mbu_status_idle_v()                    (0x00000000U)
 #define pmasys_enginestatus_mbu_status_busy_v()                    (0x00000001U)
 #define pmasys_enginestatus_mbu_status_pending_v()                 (0x00000002U)
-#define pmasys_sys_trigger_start_mask_r()                          (0x0f14a66cU)
-#define pmasys_sys_trigger_start_maskb_r()                         (0x0f14a670U)
-#define pmasys_sys_trigger_stop_mask_r()                           (0x0f14a684U)
-#define pmasys_sys_trigger_stop_maskb_r()                          (0x0f14a688U)
 #endif

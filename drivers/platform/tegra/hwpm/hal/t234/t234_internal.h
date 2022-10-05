@@ -86,6 +86,7 @@ int t234_hwpm_init_prod_values(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_disable_cg(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_enable_cg(struct tegra_soc_hwpm *hwpm);
 
+int t234_hwpm_check_status(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm);
 int t234_hwpm_perfmon_enable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *perfmon);

@@ -110,6 +110,12 @@ int tegra_hwpm_release_resources(struct tegra_soc_hwpm *hwpm)
 
 	tegra_hwpm_fn(hwpm, " ");
 
+	ret = tegra_hwpm_func_all_ip(hwpm, NULL, TEGRA_HWPM_UNBIND_RESOURCES);
+	if (ret != 0) {
+		tegra_hwpm_err(hwpm, "failed to release resources");
+		return ret;
+	}
+
 	ret = tegra_hwpm_func_all_ip(hwpm, NULL, TEGRA_HWPM_RELEASE_RESOURCES);
 	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "failed to release resources");
