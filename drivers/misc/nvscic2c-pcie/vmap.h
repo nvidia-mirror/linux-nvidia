@@ -246,13 +246,13 @@ vmap_obj_map(void *vmap_h, struct vmap_obj_map_params *params,
 
 /* Unmap objects from pcie device.*/
 int
-vmap_obj_unmap(void *vmap_h, enum vmap_obj_type type, u32 obj_id);
+vmap_obj_unmap(void *vmap_h, enum vmap_obj_type type, s32 obj_id);
 
 /* Increment reference count for objects. */
 int
-vmap_obj_getref(void *vmap_h, enum vmap_obj_type type, u32 obj_id);
+vmap_obj_getref(void *vmap_h, enum vmap_obj_type type, s32 obj_id);
 
 /* Decrement reference count for objects. */
 int
-vmap_obj_putref(void *vmap_h, enum vmap_obj_type type, u32 obj_id);
+vmap_obj_putref(void *vmap_h, enum vmap_obj_type type, s32 obj_id);
 #endif // __VMAP_H__

@@ -770,7 +770,7 @@ stream_extension_init(struct stream_ext_params *params, void **stream_ext_h)
 void
 stream_extension_deinit(void **stream_ext_h)
 {
-	int ret = 0;
+	long ret = 0;
 	struct file *filep = NULL;
 	struct copy_request *cr = NULL;
 	struct stream_ext_obj *stream_obj = NULL;
@@ -1198,6 +1198,10 @@ validate_flush_range(struct stream_ext_ctx_t *ctx,
 	struct stream_ext_obj *stream_obj = NULL;
 
 	if (flush_range->size <= 0)
+		return -EINVAL;
+
+	/* eDMA expects u32 datatype.*/
+	if (flush_range->size > U32_MAX)
 		return -EINVAL;
 
 	if (flush_range->size & 0x3)

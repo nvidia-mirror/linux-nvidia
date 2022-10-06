@@ -82,7 +82,7 @@ struct endpoint_t {
 	char name[NAME_MAX];
 
 	/* char device management.*/
-	int minor;
+	u32 minor;
 	dev_t dev;
 	struct cdev cdev;
 	struct device *device;
@@ -453,6 +453,10 @@ static int
 ioctl_get_info_impl(struct endpoint_t *endpoint,
 		    struct nvscic2c_pcie_endpoint_info *get_info)
 {
+	if (endpoint->peer_mem.size > U32_MAX ||
+	    endpoint->self_mem.size > U32_MAX)
+		return -EINVAL;
+
 	get_info->nframes     = endpoint->nframes;
 	get_info->frame_size  = endpoint->frame_sz;
 	get_info->peer.offset = (PEER_MEM_MMAP << PAGE_SHIFT);

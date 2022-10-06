@@ -580,7 +580,7 @@ link_msg_cb(void *data, void *ctx)
 static void
 nvscic2c_pcie_epf_unbind(struct pci_epf *epf)
 {
-	int ret = 0;
+	long ret = 0;
 	struct driver_ctx_t *drv_ctx = NULL;
 
 	if (!epf)

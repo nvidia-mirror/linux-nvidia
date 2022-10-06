@@ -61,7 +61,7 @@ memobj_map(struct vmap_ctx_t *vmap_ctx,
 	   struct vmap_obj_attributes *attrib)
 {
 	int ret = 0;
-	u32 id_exist = 0;
+	s32 id_exist = 0;
 	struct memobj_map_ref *map = NULL;
 	struct dma_buf *dmabuf = NULL;
 
@@ -216,7 +216,7 @@ syncobj_map(struct vmap_ctx_t *vmap_ctx,
 	    struct vmap_obj_attributes *attrib)
 {
 	int ret = 0;
-	u32 id_exist = 0;
+	s32 id_exist = 0;
 	u32 syncpt_id = 0;
 	struct syncobj_map_ref *map = NULL;
 
@@ -367,7 +367,7 @@ importobj_map(struct vmap_ctx_t *vmap_ctx,
 	      struct vmap_obj_attributes *attrib)
 {
 	int ret = 0;
-	u32 id_exist = 0;
+	s32 id_exist = 0;
 	struct importobj_map_ref *map = NULL;
 
 	mutex_lock(&vmap_ctx->import_idr_lock);
@@ -508,7 +508,7 @@ vmap_obj_map(void *vmap_h, struct vmap_obj_map_params *params,
 }
 
 int
-vmap_obj_unmap(void *vmap_h, enum vmap_obj_type type, u32 obj_id)
+vmap_obj_unmap(void *vmap_h, enum vmap_obj_type type, s32 obj_id)
 {
 	int ret = 0;
 	struct vmap_ctx_t *vmap_ctx = (struct vmap_ctx_t *)vmap_h;
@@ -534,7 +534,7 @@ vmap_obj_unmap(void *vmap_h, enum vmap_obj_type type, u32 obj_id)
 }
 
 int
-vmap_obj_getref(void *vmap_h, enum vmap_obj_type type, u32 obj_id)
+vmap_obj_getref(void *vmap_h, enum vmap_obj_type type, s32 obj_id)
 {
 	int ret = 0;
 	struct vmap_ctx_t *vmap_ctx = (struct vmap_ctx_t *)vmap_h;
@@ -560,7 +560,7 @@ vmap_obj_getref(void *vmap_h, enum vmap_obj_type type, u32 obj_id)
 }
 
 int
-vmap_obj_putref(void *vmap_h, enum vmap_obj_type type, u32 obj_id)
+vmap_obj_putref(void *vmap_h, enum vmap_obj_type type, s32 obj_id)
 {
 	int ret = 0;
 	struct vmap_ctx_t *vmap_ctx = (struct vmap_ctx_t *)vmap_h;
@@ -612,7 +612,7 @@ vmap_importobj_register(void *data, void *ctx)
 	struct vmap_ctx_t *vmap_ctx = (struct vmap_ctx_t *)ctx;
 	struct comm_msg *msg = (struct comm_msg *)data;
 	struct importobj_map_ref *map = NULL;
-	u32 id_exist = 0;
+	s32 id_exist = 0;
 
 	WARN_ON(!vmap_ctx);
 	WARN_ON(!msg);
