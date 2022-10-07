@@ -16,6 +16,7 @@
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 
 static struct hwpm_ip_aperture t234_pcie_inst0_perfmon_element_static_array[
 	T234_HWPM_IP_PCIE_NUM_PERFMON_PER_INST] = {
@@ -25,6 +26,7 @@ static struct hwpm_ip_aperture t234_pcie_inst0_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie0",
+		.device_index = T234_PCIE0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c0_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c0_limit_r(),
 		.start_pa = 0ULL,
@@ -44,6 +46,7 @@ static struct hwpm_ip_aperture t234_pcie_inst1_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie1",
+		.device_index = T234_PCIE1_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c1_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c1_limit_r(),
 		.start_pa = 0ULL,
@@ -63,6 +66,7 @@ static struct hwpm_ip_aperture t234_pcie_inst2_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie2",
+		.device_index = T234_PCIE2_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c2_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c2_limit_r(),
 		.start_pa = 0ULL,
@@ -82,6 +86,7 @@ static struct hwpm_ip_aperture t234_pcie_inst3_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie3",
+		.device_index = T234_PCIE3_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c3_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c3_limit_r(),
 		.start_pa = 0ULL,
@@ -101,6 +106,7 @@ static struct hwpm_ip_aperture t234_pcie_inst4_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie4",
+		.device_index = T234_PCIE4_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c4_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c4_limit_r(),
 		.start_pa = 0ULL,
@@ -120,6 +126,7 @@ static struct hwpm_ip_aperture t234_pcie_inst5_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie5",
+		.device_index = T234_PCIE5_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c5_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c5_limit_r(),
 		.start_pa = 0ULL,
@@ -139,6 +146,7 @@ static struct hwpm_ip_aperture t234_pcie_inst6_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie6",
+		.device_index = T234_PCIE6_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c6_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c6_limit_r(),
 		.start_pa = 0ULL,
@@ -158,6 +166,7 @@ static struct hwpm_ip_aperture t234_pcie_inst7_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie7",
+		.device_index = T234_PCIE7_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c7_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c7_limit_r(),
 		.start_pa = 0ULL,
@@ -177,6 +186,7 @@ static struct hwpm_ip_aperture t234_pcie_inst8_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie8",
+		.device_index = T234_PCIE8_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c8_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c8_limit_r(),
 		.start_pa = 0ULL,
@@ -196,6 +206,7 @@ static struct hwpm_ip_aperture t234_pcie_inst9_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie9",
+		.device_index = T234_PCIE9_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c9_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c9_limit_r(),
 		.start_pa = 0ULL,
@@ -215,6 +226,7 @@ static struct hwpm_ip_aperture t234_pcie_inst10_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie10",
+		.device_index = T234_PCIE10_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pcie_c10_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pcie_c10_limit_r(),
 		.start_pa = 0ULL,

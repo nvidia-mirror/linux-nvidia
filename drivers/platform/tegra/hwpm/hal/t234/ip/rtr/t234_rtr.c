@@ -16,6 +16,7 @@
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 
 /* RTR aperture should be placed in instance T234_HWPM_IP_RTR_STATIC_RTR_INST */
 static struct hwpm_ip_aperture t234_rtr_inst0_perfmux_element_static_array[
@@ -26,6 +27,7 @@ static struct hwpm_ip_aperture t234_rtr_inst0_perfmux_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "rtr",
+		.device_index = T234_RTR_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rtr_base_r(),
 		.end_abs_pa = addr_map_rtr_limit_r(),
 		.start_pa = 0ULL,
@@ -47,6 +49,7 @@ static struct hwpm_ip_aperture t234_rtr_inst1_perfmux_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "pma",
+		.device_index = T234_PMA_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_pma_base_r(),
 		.end_abs_pa = addr_map_pma_limit_r(),
 		.start_pa = 0ULL,

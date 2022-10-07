@@ -210,6 +210,13 @@ struct hwpm_ip_aperture {
 	/* DT tree name */
 	char name[64];
 
+	/*
+	 * Device index corresponding to device node aperture address index
+	 * in Device tree or ACPI table.
+	 * This is used to map HWPM apertures only
+	 */
+	u32 device_index;
+
 	/* Allowlist */
 	struct allowlist *alist;
 	u64 alist_size;

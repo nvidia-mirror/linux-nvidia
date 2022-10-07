@@ -16,6 +16,7 @@
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 
 static struct hwpm_ip_aperture t234_mss_gpu_hub_inst0_perfmon_element_static_array[
 	T234_HWPM_IP_MSS_GPU_HUB_NUM_PERFMON_PER_INST] = {
@@ -25,6 +26,7 @@ static struct hwpm_ip_aperture t234_mss_gpu_hub_inst0_perfmon_element_static_arr
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mssnvlhsh0",
+		.device_index = T234_MSSNVLHSH0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_mssnvl_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_mssnvl_limit_r(),
 		.start_pa = 0,

@@ -37,10 +37,19 @@ int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 	}
 
 	/* Reserve */
-	res = platform_get_resource_byname(hwpm_linux->pdev,
-		IORESOURCE_MEM, perfmon->name);
+	res = platform_get_resource(hwpm_linux->pdev,
+		IORESOURCE_MEM, perfmon->device_index);
 	if ((!res) || (res->start == 0) || (res->end == 0)) {
 		tegra_hwpm_err(hwpm, "Failed to get perfmon %s", perfmon->name);
+		return -ENOMEM;
+	}
+
+	if (res->start != perfmon->start_abs_pa) {
+		tegra_hwpm_err(hwpm, "Failed to get correct"
+			"perfmon address for %s,"
+			"Expected - 0x%llx, Returned - 0x%llx",
+			perfmon->name, perfmon->start_abs_pa,
+			res->start);
 		return -ENOMEM;
 	}
 

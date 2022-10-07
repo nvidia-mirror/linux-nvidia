@@ -16,6 +16,7 @@
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 
 static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_static_array[
 	T234_HWPM_IP_MSS_ISO_NISO_HUBS_NUM_PERFMON_PER_INST] = {
@@ -25,6 +26,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_stati
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_msshub0",
+		.device_index = T234_MSSHUB0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_msshub0_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_msshub0_limit_r(),
 		.start_pa = 0,
@@ -40,6 +42,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_stati
 		.element_index = 1U,
 		.dt_mmio = NULL,
 		.name = "perfmon_msshub1",
+		.device_index = T234_MSSHUB1_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_msshub1_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_msshub1_limit_r(),
 		.start_pa = 0,

@@ -16,6 +16,7 @@
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 
 static struct hwpm_ip_aperture t234_mgbe_inst0_perfmon_element_static_array[
 	T234_HWPM_IP_MGBE_NUM_PERFMON_PER_INST] = {
@@ -25,6 +26,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst0_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe0",
+		.device_index = T234_MGBE0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_mgbe0_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_mgbe0_limit_r(),
 		.start_pa = 0,
@@ -44,6 +46,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst1_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe1",
+		.device_index = T234_MGBE1_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_mgbe1_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_mgbe1_limit_r(),
 		.start_pa = 0,
@@ -63,6 +66,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst2_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe2",
+		.device_index = T234_MGBE2_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_mgbe2_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_mgbe2_limit_r(),
 		.start_pa = 0,
@@ -82,6 +86,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst3_perfmon_element_static_array[
 		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe3",
+		.device_index = T234_MGBE3_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_mgbe3_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_mgbe3_limit_r(),
 		.start_pa = 0,
