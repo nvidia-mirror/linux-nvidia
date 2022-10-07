@@ -683,17 +683,18 @@ static int tegra_wdt_t18x_probe(struct platform_device *pdev)
 	tegra_wdt_t18x_disable(&twdt_t18x->wdt);
 	writel(TOP_TKE_TMR_PCR_INTR, twdt_t18x->wdt_timer + TOP_TKE_TMR_PCR);
 
-	ret = devm_request_threaded_irq(&pdev->dev, twdt_t18x->irq,
-					NULL, tegra_wdt_t18x_isr,
-					IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
-					dev_name(&pdev->dev), twdt_t18x);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to register irq %d err %d\n",
-			twdt_t18x->irq, ret);
-		return ret;
-	}
-
 	if (twdt_t18x->enable_on_init) {
+		/* Register interrupt handler only when WDT is configured to enable on boot */
+		ret = devm_request_threaded_irq(&pdev->dev, twdt_t18x->irq,
+						NULL, tegra_wdt_t18x_isr,
+						IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+						dev_name(&pdev->dev), twdt_t18x);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Failed to register irq %d err %d\n",
+				twdt_t18x->irq, ret);
+			return ret;
+		}
+
 		tegra_wdt_t18x_enable(&twdt_t18x->wdt);
 		set_bit(WDOG_ACTIVE, &twdt_t18x->wdt.status);
 		set_bit(WDT_ENABLED_ON_INIT, &twdt_t18x->status);
