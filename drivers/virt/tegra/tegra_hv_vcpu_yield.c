@@ -244,15 +244,15 @@ static int tegra_hv_vcpu_yield_remove(struct platform_device *pdev)
 				device_del(vcpu_yield->device);
 			}
 
-			devm_free_irq(vcpu_yield->device, vcpu_yield->ivck->irq,
-				vcpu_yield);
-
-			device_destroy(vcpu_yield_class, vcpu_yield->dev);
-
 			if (vcpu_yield->ivck) {
+				devm_free_irq(vcpu_yield->device, vcpu_yield->ivck->irq,
+					vcpu_yield);
 				tegra_hv_ivc_unreserve(vcpu_yield->ivck);
 				vcpu_yield->ivck = NULL;
 			}
+
+			device_destroy(vcpu_yield_class, vcpu_yield->dev);
+
 		}
 		kfree(vcpu_yield_dev_list);
 	}
