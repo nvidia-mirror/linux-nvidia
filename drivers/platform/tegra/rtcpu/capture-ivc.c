@@ -2,7 +2,7 @@
  * @file drivers/platform/tegra/rtcpu/capture-ivc.c
  * @brief Capture IVC driver
  *
- * Copyright (c) 2017-2022 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2017-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -45,7 +45,7 @@ static int tegra_capture_ivc_tx_(struct tegra_capture_ivc *civc,
 		return -ENODEV;
 
 	chan = civc->chan;
-	if (WARN_ON(!chan->is_ready))
+	if (chan == NULL || WARN_ON(!chan->is_ready))
 		return -EIO;
 
 	ret = mutex_lock_interruptible(&civc->ivc_wr_lock);
