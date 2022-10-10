@@ -222,3 +222,172 @@ void tegra_hwpm_release_sw_setup(struct tegra_soc_hwpm *hwpm)
 
 	return;
 }
+
+/* Validate HALs that are expected to be populated for each chip */
+bool tegra_hwpm_validate_primary_hals(struct tegra_soc_hwpm *hwpm)
+{
+	tegra_hwpm_fn(hwpm, " ");
+
+	if (hwpm->active_chip->is_ip_active == NULL) {
+		tegra_hwpm_err(hwpm, "is_ip_active HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->is_resource_active == NULL) {
+		tegra_hwpm_err(hwpm, "is_resource_active HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_rtr_int_idx == NULL) {
+		tegra_hwpm_err(hwpm, "get_rtr_int_idx HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_ip_max_idx == NULL) {
+		tegra_hwpm_err(hwpm, "get_ip_max_idx HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->extract_ip_ops == NULL) {
+		tegra_hwpm_err(hwpm, "extract_ip_ops uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->force_enable_ips == NULL) {
+		tegra_hwpm_err(hwpm, "force_enable_ips uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->validate_current_config == NULL) {
+		tegra_hwpm_err(hwpm, "validate_current_config uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_fs_info == NULL) {
+		tegra_hwpm_err(hwpm, "get_fs_info uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_resource_info == NULL) {
+		tegra_hwpm_err(hwpm, "get_resource_info uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->init_prod_values == NULL) {
+		tegra_hwpm_err(hwpm, "init_prod_values uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->disable_cg == NULL) {
+		tegra_hwpm_err(hwpm, "disable_cg uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->enable_cg == NULL) {
+		tegra_hwpm_err(hwpm, "enable_cg uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->reserve_rtr == NULL) {
+		tegra_hwpm_err(hwpm, "reserve_rtr uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->release_rtr == NULL) {
+		tegra_hwpm_err(hwpm, "release_rtr uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->perfmon_enable == NULL) {
+		tegra_hwpm_err(hwpm, "perfmon_enable HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->perfmon_disable == NULL) {
+		tegra_hwpm_err(hwpm, "perfmon_disable HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->perfmux_disable == NULL) {
+		tegra_hwpm_err(hwpm, "perfmux_disable HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->disable_triggers == NULL) {
+		tegra_hwpm_err(hwpm, "disable_triggers uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->check_status == NULL) {
+		tegra_hwpm_err(hwpm, "check_status uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->disable_mem_mgmt == NULL) {
+		tegra_hwpm_err(hwpm, "disable_mem_mgmt HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->enable_mem_mgmt == NULL) {
+		tegra_hwpm_err(hwpm, "enable_mem_mgmt HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->invalidate_mem_config == NULL) {
+		tegra_hwpm_err(hwpm, "invalidate_mem_config HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->stream_mem_bytes == NULL) {
+		tegra_hwpm_err(hwpm, "stream_mem_bytes uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->disable_pma_streaming == NULL) {
+		tegra_hwpm_err(hwpm, "disable_pma_streaming uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->update_mem_bytes_get_ptr == NULL) {
+		tegra_hwpm_err(hwpm, "update_mem_bytes_get_ptr uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_mem_bytes_put_ptr == NULL) {
+		tegra_hwpm_err(hwpm, "get_mem_bytes_put_ptr uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->membuf_overflow_status == NULL) {
+		tegra_hwpm_err(hwpm, "membuf_overflow_status uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->get_alist_buf_size == NULL) {
+		tegra_hwpm_err(hwpm, "alist_buf_size uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->zero_alist_regs == NULL) {
+		tegra_hwpm_err(hwpm, "zero_alist_regs HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->copy_alist == NULL) {
+		tegra_hwpm_err(hwpm, "copy_alist HAL uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->check_alist == NULL) {
+		tegra_hwpm_err(hwpm, "check_alist uninitialized");
+		return false;
+	}
+
+	if (hwpm->active_chip->validate_secondary_hals == NULL) {
+		tegra_hwpm_err(hwpm,
+			"validate_secondary_hals HAL uninitialized");
+		return false;
+	}
+
+	return hwpm->active_chip->validate_secondary_hals(hwpm);
+}

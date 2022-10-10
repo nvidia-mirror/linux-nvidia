@@ -36,19 +36,16 @@ static struct hwpm_soc_chip_info chip_info = {
 };
 static bool chip_info_initialized;
 
-#if (!defined(CONFIG_ACPI))
 const struct hwpm_soc_chip_info t234_chip_info = {
 	.chip_id = 0x23,
 	.chip_id_rev = 0x4,
 	.platform = PLAT_SI,
 };
-#endif
 
 /* This function should be invoked only once before retrieving soc chip info */
 int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 	struct device *dev = hwpm_linux->dev;
-	struct tegra_soc_hwpm *hwpm = &hwpm_linux->hwpm;
 #if defined(CONFIG_ACPI)
 	const struct acpi_device_id *id;
 #endif
@@ -56,19 +53,19 @@ int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 	if (chip_info_initialized) {
 		return 0;
 	}
+
 #if defined(CONFIG_ACPI)
+	/* Get device node info from ACPI table */
 	id = acpi_match_device(dev->driver->acpi_match_table, dev);
-	if (!id) {
-		tegra_hwpm_err(hwpm, "Couldn't find matching ACPI device");
-		return -ENODEV;
+	if (id) {
+		chip_info.chip_id = (id->driver_data >> 8) & 0xff;
+		chip_info.chip_id_rev = (id->driver_data >> 4) & 0xf;
+		chip_info.platform = (id->driver_data >> 20) & 0xf;
+
+		goto complete;
 	}
-
-	chip_info.chip_id = (id->driver_data >> 8) & 0xff;
-	chip_info.chip_id_rev = (id->driver_data >> 4) & 0xf;
-	chip_info.platform = (id->driver_data >> 20) & 0xf;
-
-	goto complete;
-#else /* !CONFIG_ACPI */
+#endif
+	/* Get device node info from device tree */
 	if (of_machine_is_compatible("nvidia,tegra234")) {
 		chip_info.chip_id = t234_chip_info.chip_id;
 		chip_info.chip_id_rev = t234_chip_info.chip_id_rev;
@@ -87,8 +84,7 @@ int tegra_hwpm_init_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 	}
 #endif
 
-#endif /* CONFIG_ACPI */
-	return -EINVAL;
+	return -ENODEV;
 complete:
 	chip_info_initialized = true;
 	return 0;

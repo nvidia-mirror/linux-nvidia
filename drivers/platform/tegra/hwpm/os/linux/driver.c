@@ -166,13 +166,6 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 	(void) dma_set_mask_and_coherent(hwpm_linux->dev, DMA_BIT_MASK(39));
 
-	ret = tegra_hwpm_clk_rst_prepare(hwpm_linux);
-	if (ret != 0) {
-		goto clock_reset_fail;
-	}
-
-	tegra_hwpm_debugfs_init(hwpm_linux);
-
 	ret = tegra_hwpm_get_chip_info(hwpm_linux);
 	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to get current chip info");
@@ -185,6 +178,15 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 		tegra_hwpm_err(hwpm, "Failed to init sw components");
 		goto init_sw_components_fail;
 	}
+
+	if (hwpm->active_chip->clk_rst_prepare) {
+		ret = hwpm->active_chip->clk_rst_prepare(hwpm_linux);
+		if (ret != 0) {
+			goto clock_reset_fail;
+		}
+	}
+
+	tegra_hwpm_debugfs_init(hwpm_linux);
 
 	/*
 	 * Currently VDK doesn't have a fmodel for SOC HWPM. Therefore, we
@@ -202,10 +204,11 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 	tegra_hwpm_dbg(hwpm, hwpm_info, "Probe successful!");
 	goto success;
 
-chip_info_fail:
-init_sw_components_fail:
-	tegra_hwpm_clk_rst_release(hwpm_linux);
 clock_reset_fail:
+	tegra_hwpm_release_ip_register_node(hwpm);
+	tegra_hwpm_release_sw_setup(hwpm);
+init_sw_components_fail:
+chip_info_fail:
 	device_destroy(&hwpm_linux->class, hwpm_linux->dev_t);
 device_create:
 	cdev_del(&hwpm_linux->cdev);
@@ -243,7 +246,9 @@ static int tegra_hwpm_remove(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	tegra_hwpm_clk_rst_release(hwpm_linux);
+	if (hwpm->active_chip->clk_rst_release) {
+		hwpm->active_chip->clk_rst_release(hwpm_linux);
+	}
 
 	tegra_hwpm_release_ip_register_node(hwpm);
 	tegra_hwpm_release_sw_setup(hwpm);

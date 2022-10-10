@@ -26,15 +26,8 @@
 
 #define LA_CLK_RATE 625000000UL
 
-int tegra_hwpm_clk_rst_prepare_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_prepare(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	/*
-	 * Starting OOT config, clocks and resets are handled by UEFI layer
-	 * Hence, do nothing.
-	 */
-	return 0;
-#else
 	int ret = 0;
 	struct tegra_soc_hwpm *hwpm = &hwpm_linux->hwpm;
 
@@ -73,19 +66,10 @@ int tegra_hwpm_clk_rst_prepare_impl(struct tegra_hwpm_os_linux *hwpm_linux)
 
 fail:
 	return ret;
-#endif
 }
 
-int tegra_hwpm_clk_rst_set_rate_enable_impl(
-	struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_set_rate_enable(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	/*
-	 * Starting OOT config, clocks and resets are handled by UEFI layer
-	 * Hence, do nothing.
-	 */
-	return 0;
-#else
 	int ret = 0;
 	struct tegra_soc_hwpm *hwpm = &hwpm_linux->hwpm;
 
@@ -135,18 +119,10 @@ int tegra_hwpm_clk_rst_set_rate_enable_impl(
 
 fail:
 	return ret;
-#endif
 }
 
-int tegra_hwpm_clk_rst_disable_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_disable(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	/*
-	 * Starting OOT config, clocks and resets are handled by UEFI layer
-	 * Hence, do nothing.
-	 */
-	return 0;
-#else
 	int ret = 0;
 	struct tegra_soc_hwpm *hwpm = &hwpm_linux->hwpm;
 
@@ -165,17 +141,10 @@ int tegra_hwpm_clk_rst_disable_impl(struct tegra_hwpm_os_linux *hwpm_linux)
 	}
 fail:
 	return ret;
-#endif
 }
 
-void tegra_hwpm_clk_rst_release_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+void tegra_hwpm_clk_rst_release(struct tegra_hwpm_os_linux *hwpm_linux)
 {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-	/*
-	 * Starting OOT config, clocks and resets are handled by UEFI layer
-	 * Hence, do nothing.
-	 */
-#else
 	if (tegra_hwpm_is_platform_silicon()) {
 		if (hwpm_linux->la_clk) {
 			devm_clk_put(hwpm_linux->dev, hwpm_linux->la_clk);
@@ -191,5 +160,4 @@ void tegra_hwpm_clk_rst_release_impl(struct tegra_hwpm_os_linux *hwpm_linux)
 			reset_control_assert(hwpm_linux->hwpm_rst);
 		}
 	}
-#endif
 }

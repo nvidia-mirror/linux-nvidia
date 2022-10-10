@@ -20,10 +20,9 @@
 
 struct tegra_hwpm_os_linux;
 
-int tegra_hwpm_clk_rst_prepare_impl(struct tegra_hwpm_os_linux *hwpm_linux);
-int tegra_hwpm_clk_rst_set_rate_enable_impl(
-	struct tegra_hwpm_os_linux *hwpm_linux);
-int tegra_hwpm_clk_rst_disable_impl(struct tegra_hwpm_os_linux *hwpm_linux);
-void tegra_hwpm_clk_rst_release_impl(struct tegra_hwpm_os_linux *hwpm_linux);
+int tegra_hwpm_clk_rst_prepare(struct tegra_hwpm_os_linux *hwpm_linux);
+int tegra_hwpm_clk_rst_set_rate_enable(struct tegra_hwpm_os_linux *hwpm_linux);
+int tegra_hwpm_clk_rst_disable(struct tegra_hwpm_os_linux *hwpm_linux);
+void tegra_hwpm_clk_rst_release(struct tegra_hwpm_os_linux *hwpm_linux);
 
 #endif /* TEGRA_HWPM_OS_LINUX_CLK_RST_UTILS_H */

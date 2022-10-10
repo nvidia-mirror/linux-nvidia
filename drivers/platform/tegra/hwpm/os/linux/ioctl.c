@@ -401,9 +401,11 @@ static int tegra_hwpm_open(struct inode *inode, struct file *filp)
 		return -EAGAIN;
 	}
 
-	ret = tegra_hwpm_clk_rst_set_rate_enable(hwpm_linux);
-	if (ret != 0) {
-		goto fail;
+	if (hwpm->active_chip->clk_rst_set_rate_enable) {
+		ret = tegra_hwpm_clk_rst_set_rate_enable(hwpm_linux);
+		if (ret != 0) {
+			goto fail;
+		}
 	}
 
 	ret = tegra_hwpm_setup_hw(hwpm);
@@ -477,14 +479,14 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 	}
 
 	ret = tegra_hwpm_disable_triggers(hwpm);
-	if (ret < 0) {
+	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to disable PMA triggers");
 		err = ret;
 	}
 
 	/* Disable and release reserved IPs */
 	ret = tegra_hwpm_release_resources(hwpm);
-	if (ret < 0) {
+	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to release IP apertures");
 		err = ret;
 		goto fail;
@@ -492,7 +494,7 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 
 	/* Clear MEM_BYTES pipeline */
 	ret = tegra_hwpm_clear_mem_pipeline(hwpm);
-	if (ret < 0) {
+	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to clear MEM_BYTES pipeline");
 		err = ret;
 		goto fail;
@@ -502,17 +504,19 @@ static int tegra_hwpm_release(struct inode *inode, struct file *filp)
 	tegra_hwpm_release_mem_mgmt(hwpm);
 
 	ret = tegra_hwpm_release_hw(hwpm);
-	if (ret < 0) {
+	if (ret != 0) {
 		tegra_hwpm_err(hwpm, "Failed to release hw");
 		err = ret;
 		goto fail;
 	}
 
-	ret = tegra_hwpm_clk_rst_disable(hwpm_linux);
-	if (ret < 0) {
-		tegra_hwpm_err(hwpm, "Failed to release clock");
-		err = ret;
-		goto fail;
+	if (hwpm->active_chip->clk_rst_disable) {
+		ret = tegra_hwpm_clk_rst_disable(hwpm_linux);
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm, "Failed to release clock");
+			err = ret;
+			goto fail;
+		}
 	}
 
 	/* De-init driver on last close call only */

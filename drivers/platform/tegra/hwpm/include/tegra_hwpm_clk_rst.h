@@ -23,36 +23,23 @@
 #else
 struct tegra_hwpm_os_linux;
 
-int tegra_hwpm_clk_rst_prepare_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_prepare(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 	return -EINVAL;
 }
 
-int tegra_hwpm_clk_rst_set_rate_enable_impl(
-	struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_set_rate_enable(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 	return -EINVAL;
 }
 
-int tegra_hwpm_clk_rst_disable_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+int tegra_hwpm_clk_rst_disable(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 }
 
-void tegra_hwpm_clk_rst_release_impl(struct tegra_hwpm_os_linux *hwpm_linux)
+void tegra_hwpm_clk_rst_release(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 }
 #endif
-
-#define tegra_hwpm_clk_rst_prepare(hwpm_linux)			\
-	tegra_hwpm_clk_rst_prepare_impl(hwpm_linux)
-
-#define tegra_hwpm_clk_rst_set_rate_enable(hwpm_linux)		\
-	tegra_hwpm_clk_rst_set_rate_enable_impl(hwpm_linux)
-
-#define tegra_hwpm_clk_rst_disable(hwpm_linux)			\
-	tegra_hwpm_clk_rst_disable_impl(hwpm_linux)
-
-#define tegra_hwpm_clk_rst_release(hwpm_linux)			\
-	tegra_hwpm_clk_rst_release_impl(hwpm_linux)
 
 #endif /* TEGRA_HWPM_CLK_RST_H */

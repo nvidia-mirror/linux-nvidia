@@ -30,6 +30,7 @@
 #define TEGRA_HWPM_FUSE_SECURITY_MODE_MASK		BIT(1)
 #define TEGRA_HWPM_FUSE_HWPM_GLOBAL_DISABLE_MASK	BIT(2)
 
+struct tegra_hwpm_os_linux;
 struct tegra_hwpm_mem_mgmt;
 struct tegra_hwpm_allowlist_map;
 enum tegra_soc_hwpm_ip_reg_op;
@@ -372,6 +373,13 @@ struct tegra_soc_hwpm_chip {
 	struct hwpm_ip **chip_ips;
 
 	/* Chip HALs */
+	bool (*validate_secondary_hals)(struct tegra_soc_hwpm *hwpm);
+
+	int (*clk_rst_prepare)(struct tegra_hwpm_os_linux *hwpm_linux);
+	int (*clk_rst_set_rate_enable)(struct tegra_hwpm_os_linux *hwpm_linux);
+	int (*clk_rst_disable)(struct tegra_hwpm_os_linux *hwpm_linux);
+	void (*clk_rst_release)(struct tegra_hwpm_os_linux *hwpm_linux);
+
 	bool (*is_ip_active)(struct tegra_soc_hwpm *hwpm,
 	u32 ip_enum, u32 *config_ip_index);
 	bool (*is_resource_active)(struct tegra_soc_hwpm *hwpm,

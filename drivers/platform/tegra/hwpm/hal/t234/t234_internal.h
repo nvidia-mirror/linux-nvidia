@@ -68,6 +68,7 @@ enum tegra_soc_hwpm_resource;
 struct tegra_soc_hwpm;
 struct hwpm_ip_aperture;
 
+bool t234_hwpm_validate_secondary_hals(struct tegra_soc_hwpm *hwpm);
 bool t234_hwpm_is_ip_active(struct tegra_soc_hwpm *hwpm,
 	u32 ip_enum, u32 *config_ip_index);
 bool t234_hwpm_is_resource_active(struct tegra_soc_hwpm *hwpm,

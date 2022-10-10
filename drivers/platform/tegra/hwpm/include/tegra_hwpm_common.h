@@ -77,6 +77,7 @@ int tegra_hwpm_copy_alist(struct tegra_soc_hwpm *hwpm,
 bool tegra_hwpm_check_alist(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 phys_addr);
 
+bool tegra_hwpm_validate_primary_hals(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_setup_hw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_setup_sw(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_disable_triggers(struct tegra_soc_hwpm *hwpm);
