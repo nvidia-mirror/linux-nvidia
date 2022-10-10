@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -118,9 +118,9 @@ DECLARE_EVENT_CLASS(capture__progress_event,
 );
 
 DECLARE_EVENT_CLASS(capture__isp_event,
-	TP_PROTO(u64 ts, u32 channel_id, u32 prog_sequence, u32 cap_sequence,
+	TP_PROTO(u64 ts, u32 channel_id, u32 cap_sequence, u32 prog_sequence,
 		u8 isp_settings_id, u8 vi_channel_id),
-	TP_ARGS(ts, channel_id, prog_sequence, cap_sequence, isp_settings_id, vi_channel_id),
+	TP_ARGS(ts, channel_id, cap_sequence, prog_sequence, isp_settings_id, vi_channel_id),
 	TP_STRUCT__entry(
 		__field(u64, ts)
 		__field(u32, channel_id)
@@ -180,21 +180,21 @@ DEFINE_EVENT(capture__progress_event, capture_event_reschedule,
 );
 
 DEFINE_EVENT(capture__isp_event, capture_event_reschedule_isp,
-	TP_PROTO(u64 ts, u32 channel_id, u32 prog_sequence, u32 cap_sequence,
+	TP_PROTO(u64 ts, u32 channel_id, u32 cap_sequence, u32 prog_sequence,
 		u8 isp_settings_id, u8 vi_channel_id),
-	TP_ARGS(ts, channel_id, prog_sequence, cap_sequence, isp_settings_id, vi_channel_id)
+	TP_ARGS(ts, channel_id, cap_sequence, prog_sequence, isp_settings_id, vi_channel_id)
 );
 
 DEFINE_EVENT(capture__isp_event, capture_event_isp_done,
-	TP_PROTO(u64 ts, u32 channel_id, u32 prog_sequence, u32 cap_sequence,
+	TP_PROTO(u64 ts, u32 channel_id, u32 cap_sequence, u32 prog_sequence,
 		u8 isp_settings_id, u8 vi_channel_id),
-	TP_ARGS(ts, channel_id, prog_sequence, cap_sequence, isp_settings_id, vi_channel_id)
+	TP_ARGS(ts, channel_id, cap_sequence, prog_sequence, isp_settings_id, vi_channel_id)
 );
 
 DEFINE_EVENT(capture__isp_event, capture_event_isp_error,
-	TP_PROTO(u64 ts, u32 channel_id, u32 prog_sequence, u32 cap_sequence,
+	TP_PROTO(u64 ts, u32 channel_id, u32 cap_sequence, u32 prog_sequence,
 		u8 isp_settings_id, u8 vi_channel_id),
-	TP_ARGS(ts, channel_id, prog_sequence, cap_sequence, isp_settings_id, vi_channel_id)
+	TP_ARGS(ts, channel_id, cap_sequence, prog_sequence, isp_settings_id, vi_channel_id)
 );
 
 DEFINE_EVENT(capture__progress_event, capture_event_report_program,
