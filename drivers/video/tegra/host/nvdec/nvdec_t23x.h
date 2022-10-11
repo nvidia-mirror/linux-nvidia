@@ -1,9 +1,5 @@
 /*
- * drivers/video/tegra/host/nvdec/nvdec_t23x.h
- *
- * Tegra NVDEC Module Support on t23x
- *
- * Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,12 +12,17 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
  */
 
 #ifndef __NVHOST_NVDEC_T23x_H__
 #define __NVHOST_NVDEC_T23x_H__
 
 #include <linux/nvhost.h>
+
+#define MTHD_ADDR_ACTMON_WEIGHT 0xC9U
+#define MTHD_ADDR_ACTMON_ACTIVE_MASK 0xCAU
+#define MTHD_ADDR_ACTMON_ACTIVE_BORPS 0xCBU
 
 int nvhost_nvdec_finalize_poweron_t23x(struct platform_device *dev);
 int nvhost_nvdec_prepare_poweroff_t23x(struct platform_device *dev);

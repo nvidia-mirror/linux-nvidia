@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -310,7 +310,6 @@ struct nvhost_device_data t23x_nvdec_info = {
 	.actmon_enabled         = true,
 	.actmon_irq		= 4,
 	.actmon_weight_count	= 216,
-	.actmon_setting_regs	= t23x_nvdec_actmon_registers,
 	.devfreq_governor	= "userspace",
 	.enable_timestamps	= flcn_enable_timestamps,
 	.enable_usage_debugfs	= true,

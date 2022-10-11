@@ -1,7 +1,7 @@
 /*
  * Tegra NVDEC Module Support on T23x
  *
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -58,6 +58,43 @@ static int nvdec_riscv_wait_mem_scrubbing(struct platform_device *dev)
 	}
 
 	return err;
+
+}
+
+static void nvdec_actmon_configure(struct platform_device *pdev)
+{
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_MASK
+	 * - Mask out signals with associated bit field value equals to 1
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 0111
+	 * - STARVED signal is not used in nvdec
+	 */
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_OFFSET * 4,
+		      MTHD_ADDR_ACTMON_ACTIVE_MASK);
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_DATA * 4, 0x00000007);
+
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_BORPS
+	 * - 2 bits are used to describe the usage of each signal
+	 * - bit #0 => POLARITY, 1=NEGATIVE, 0=POSITIVE
+	 * - bit #1 => OPERATION, 1=AND, 0=OR
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 10000000
+	 */
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_OFFSET * 4,
+		      MTHD_ADDR_ACTMON_ACTIVE_BORPS);
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_DATA * 4, 0x00000080);
+
+	/*
+	 * NV_PNVDEC_TFBIF_ACTMON_ACTIVE_WEIGHT
+	 * - 32 bits are used to specify the count weight
+	 * - NVDEC will toggle active signal every `count_weight` cycle time
+	 * - count_weight formula = nvdec_fmax / actmon_clk * 4
+	 */
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_OFFSET * 4,
+		      MTHD_ADDR_ACTMON_WEIGHT);
+	host1x_writel(pdev, FLCN_UCLASS_METHOD_DATA * 4, 0x000000d0);
 
 }
 
@@ -386,6 +423,9 @@ int nvhost_nvdec_finalize_poweron_t23x(struct platform_device *dev)
 		flcn_enable_thi_sec(dev);
 		err = nvhost_nvdec_finalize_poweron(dev);
 	}
+
+	if (!err)
+		nvdec_actmon_configure(dev);
 
 	return err;
 }
