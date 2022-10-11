@@ -116,7 +116,7 @@ Required properties:
 				example: rxq_enable_ctrl = <rx0 rx1 rx2 rx3>
 				0x0 = Not enabled, 0x1 = Enabled for AV
 				0x2 = Enabled for Legacy, 0x3 = Reserved
-- nvidia,pause_frames: 		Enable(0) Disable(1) for Pause frame support.
+- nvidia,pause_frames:		Enable(1) Disable(0) for Pause frame support.
 - nvidia,rx_riwt:		Specifies the RX wathcdog interrupt timeout in
 				usec.The RIWT field is programmed as
 				(<val> * 256) / 62.5. if rx_riwt is 0 then RIWT
