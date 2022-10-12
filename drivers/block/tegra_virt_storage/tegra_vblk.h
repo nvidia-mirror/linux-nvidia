@@ -99,7 +99,9 @@ struct vblk_dev {
 	struct vsc_request reqs[MAX_VSC_REQS];
 	DECLARE_BITMAP(pending_reqs, MAX_VSC_REQS);
 	uint32_t inflight_reqs;
+	uint32_t inflight_ioctl_reqs;
 	uint32_t max_requests;
+	uint32_t max_ioctl_requests;
 	struct mutex req_lock;
 	struct mutex ivc_lock;
 	enum vblk_queue_state queue_state;

@@ -353,13 +353,16 @@ static bool complete_bio_req(struct vblk_dev *vblkdev)
 			vblk_complete_ioctl_req(vblkdev, vsc_req,
 					req_resp.blkdev_resp.
 					ioctl_resp.status);
-				blk_mq_end_request(bio_req, BLK_STS_OK);
+			vblkdev->inflight_ioctl_reqs--;
+			blk_mq_end_request(bio_req, BLK_STS_OK);
 		}  else {
 			handle_non_ioctl_resp(vblkdev, vsc_req,
 				&(req_resp.blkdev_resp.blk_resp));
 		}
 
 	} else if ((bio_req != NULL) && (status != 0)) {
+		if (req_op(bio_req) == REQ_OP_DRV_IN)
+			vblkdev->inflight_ioctl_reqs--;
 		req_error_handler(vblkdev, bio_req);
 	} else {
 		dev_err(vblkdev->device,
@@ -448,6 +451,12 @@ static bool submit_bio_req(struct vblk_dev *vblkdev)
 	if(!list_empty(&vblkdev->req_list)) {
 		entry = list_first_entry(&vblkdev->req_list, struct req_entry,
 						list_entry);
+		if ((req_op(entry->req) == REQ_OP_DRV_IN) &&
+				(vblkdev->config.blk_config.use_vm_address) &&
+				(vblkdev->inflight_ioctl_reqs >= vblkdev->max_ioctl_requests)) {
+			spin_unlock(&vblkdev->queue_lock);
+			goto bio_exit;
+		}
 		list_del(&entry->list_entry);
 		bio_req = entry->req;
 		kfree(entry);
@@ -570,6 +579,7 @@ static bool submit_bio_req(struct vblk_dev *vblkdev)
 				"Failed to prepare ioctl request!\n");
 			goto bio_exit;
 		}
+		vblkdev->inflight_ioctl_reqs++;
 	}
 
 	if (!tegra_hv_ivc_write(vblkdev->ivck, vs_req,
@@ -790,6 +800,7 @@ static void setup_device(struct vblk_dev *vblkdev)
 	uint32_t max_io_bytes;
 	uint32_t req_id;
 	uint32_t max_requests;
+	uint32_t max_ioctl_requests;
 	struct vsc_request *req;
 
 	vblkdev->size =
@@ -835,7 +846,20 @@ static void setup_device(struct vblk_dev *vblkdev)
 		return;
 	}
 
-	max_requests = ((vblkdev->ivmk->size) / max_io_bytes);
+	/* If IOVA feature is enabled for virt partition, then set max_requests
+	 * to number of IVC frames. Since IOCTL's still use mempool, set
+	 * max_ioctl_requests based on mempool.
+	 */
+	if (vblkdev->config.blk_config.use_vm_address == 1U) {
+		max_requests = vblkdev->ivck->nframes;
+		max_ioctl_requests = ((vblkdev->ivmk->size) / max_io_bytes);
+		if (max_ioctl_requests > MAX_VSC_REQS)
+			max_ioctl_requests = MAX_VSC_REQS;
+	} else {
+		max_requests = ((vblkdev->ivmk->size) / max_io_bytes);
+		max_ioctl_requests = max_requests;
+	}
+
 
 	if (max_requests < MAX_VSC_REQS) {
 		/* Warn if the virtual storage device supports
@@ -856,7 +880,7 @@ static void setup_device(struct vblk_dev *vblkdev)
 			MAX_VSC_REQS);
 	}
 
-	/* if the number of ivc frames is lesser than th  maximum requests that
+	/* if the number of ivc frames is lesser than the maximum requests that
 	 * can be supported(calculated based on mempool size above), treat this
 	 * as critical error and panic.
 	 *
@@ -896,9 +920,15 @@ static void setup_device(struct vblk_dev *vblkdev)
 
 	for (req_id = 0; req_id < max_requests; req_id++){
 		req = &vblkdev->reqs[req_id];
-		req->mempool_virt = (void *)((uintptr_t)vblkdev->shared_buffer +
-			(uintptr_t)(req_id * max_io_bytes));
-		req->mempool_offset = (req_id * max_io_bytes);
+		if (vblkdev->config.blk_config.use_vm_address == 0U) {
+			req->mempool_virt = (void *)((uintptr_t)vblkdev->shared_buffer +
+					(uintptr_t)(req_id * max_io_bytes));
+			req->mempool_offset = (req_id * max_io_bytes);
+		} else {
+			req->mempool_virt = (void *)((uintptr_t)vblkdev->shared_buffer +
+					(uintptr_t)((req_id % max_ioctl_requests) * max_io_bytes));
+			req->mempool_offset = ((req_id % max_ioctl_requests) * max_io_bytes);
+		}
 		req->mempool_len = max_io_bytes;
 		req->id = req_id;
 		req->vblkdev = vblkdev;
@@ -912,6 +942,7 @@ static void setup_device(struct vblk_dev *vblkdev)
 	mutex_init(&vblkdev->req_lock);
 
 	vblkdev->max_requests = max_requests;
+	vblkdev->max_ioctl_requests = max_ioctl_requests;
 	blk_queue_max_hw_sectors(vblkdev->queue, max_io_bytes / SECTOR_SIZE);
 	blk_queue_flag_set(QUEUE_FLAG_NONROT, vblkdev->queue);
 
