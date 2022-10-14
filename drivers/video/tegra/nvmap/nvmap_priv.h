@@ -263,6 +263,15 @@ struct nvmap_handle {
 	 * read-only.
 	 */
 	bool is_ro;
+
+	/* list node in case this handle's pages are referenced */
+	struct list_head pg_ref;
+	/* list of all the handles whose
+	 * pages are refernced in this handle
+	 */
+	struct list_head pg_ref_h;
+	struct mutex pg_ref_h_lock;
+	bool is_subhandle;
 };
 
 struct nvmap_handle_info {
@@ -401,6 +410,13 @@ struct nvmap_device {
 	bool co_cache_flush_at_alloc;
 };
 
+struct handles_range {
+	u32 start; /* start handle no where buffer range starts */
+	u32 end;   /* end handle no where buffer range ends */
+	u64 offs_start; /* keep track of intermediate offset */
+	u64 offs; /* user passed offset */
+	u64 sz; /* user passed size */
+};
 
 extern struct nvmap_device *nvmap_dev;
 extern ulong nvmap_init_time;
@@ -906,4 +922,8 @@ void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
 
 extern void __dma_flush_area(const void *cpu_va, size_t size);
 extern void __dma_map_area(const void *cpu_va, size_t size, int dir);
+
+int nvmap_assign_pages_to_handle(struct nvmap_client *client,
+		struct nvmap_handle **hs, struct nvmap_handle *h,
+		struct handles_range *rng);
 #endif /* __VIDEO_TEGRA_NVMAP_NVMAP_H */

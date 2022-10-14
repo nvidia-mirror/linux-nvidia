@@ -1045,6 +1045,9 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 	for (i = page_index; i < nr_page; i++) {
 		if (h->from_va)
 			put_page(h->pgalloc.pages[i]);
+		/* Knowingly kept in "else if" handle for subrange */
+		else if (h->is_subhandle)
+			put_page(h->pgalloc.pages[i]);
 		else
 			__free_page(h->pgalloc.pages[i]);
 	}
@@ -1155,4 +1158,99 @@ void nvmap_free_handle_from_fd(struct nvmap_client *client,
 
 	trace_refcount_free_handle(handle, dmabuf, handle_ref, dmabuf_ref,
 				   is_ro ? "RO" : "RW");
+}
+
+static int nvmap_assign_pages_per_handle(struct nvmap_handle *src_h,
+			struct nvmap_handle *dest_h, u64 src_h_start,
+			u64 src_h_end, u32 *pg_cnt)
+{
+	/* Increament ref count of source handle as its pages
+	 * are referenced here to create new nvmap handle.
+	 * By increamenting the ref count of source handle,
+	 * source handle pages are not freed until new handle's fd is not closed.
+	 * Note: nvmap_dmabuf_release, need to decreement source handle ref count
+	 */
+	src_h = nvmap_handle_get(src_h);
+	if (!src_h)
+		return -EINVAL;
+
+	while (src_h_start < src_h_end) {
+		unsigned long next;
+		struct page *src_page;
+		struct page *dest_page;
+
+		dest_h->pgalloc.pages[*pg_cnt] =
+			src_h->pgalloc.pages[src_h_start >> PAGE_SHIFT];
+		src_page = nvmap_to_page(src_h->pgalloc.pages
+				[src_h_start >> PAGE_SHIFT]);
+		dest_page = nvmap_to_page(dest_h->pgalloc.pages[*pg_cnt]);
+		get_page(dest_page);
+		nvmap_clean_cache_page(src_page);
+
+		next = min(((src_h_start + PAGE_SIZE) & PAGE_MASK),
+				src_h_end);
+		src_h_start = next;
+		*pg_cnt = *pg_cnt + 1;
+	}
+
+	mutex_lock(&dest_h->pg_ref_h_lock);
+	list_add_tail(&src_h->pg_ref, &dest_h->pg_ref_h);
+	mutex_unlock(&dest_h->pg_ref_h_lock);
+
+	return 0;
+}
+
+int nvmap_assign_pages_to_handle(struct nvmap_client *client,
+			       struct nvmap_handle **hs, struct nvmap_handle *h,
+			       struct handles_range *rng)
+{
+	size_t nr_page = h->size >> PAGE_SHIFT;
+	struct page **pages;
+	u64 end_cur = 0;
+	u64 start = 0;
+	u64 end = 0;
+	u32 pg_cnt = 0;
+	u32 i;
+	int err = 0;
+
+	h = nvmap_handle_get(h);
+	if (!h)
+		return -EINVAL;
+
+	if (h->alloc) {
+		nvmap_handle_put(h);
+		return -EEXIST;
+	}
+
+	pages = nvmap_altalloc(nr_page * sizeof(*pages));
+	if (!pages) {
+		nvmap_handle_put(h);
+		return -ENOMEM;
+	}
+	h->pgalloc.pages = pages;
+
+	start = rng->offs_start;
+	end = rng->sz;
+
+	for (i = rng->start; i <= rng->end; i++) {
+		end_cur = (end >= hs[i]->size) ? (hs[i]->size - start) : end;
+		err = nvmap_assign_pages_per_handle(hs[i], h, start, start + end_cur, &pg_cnt);
+		if (err) {
+			nvmap_altfree(pages, nr_page * sizeof(*pages));
+			goto err_h;
+		}
+		end -= (hs[i]->size - start);
+		start = 0;
+	}
+
+	h->heap_type = NVMAP_HEAP_IOVMM;
+	h->heap_pgalloc = true;
+	h->alloc = true;
+	h->is_subhandle = true;
+	atomic_set(&h->pgalloc.ndirty, 0);
+	mb();
+	return err;
+err_h:
+	nvmap_handle_put(h);
+	return err;
 }

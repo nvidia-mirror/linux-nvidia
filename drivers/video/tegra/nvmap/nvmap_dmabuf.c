@@ -223,6 +223,24 @@ static void nvmap_dmabuf_release(struct dma_buf *dmabuf)
 	}
 	mutex_unlock(&info->handle->lock);
 
+	if (!list_empty(&info->handle->pg_ref_h)) {
+		struct nvmap_handle *tmp, *src;
+
+		mutex_lock(&info->handle->pg_ref_h_lock);
+		/* Closing dmabuf_fd,
+		 * 1. Remove all the handles in page_ref_h list
+		 * 2. Decreament handle ref count of all the handles in page_ref_h list
+		 * 3. NULL page_ref_h list;
+		 */
+		list_for_each_entry_safe(src, tmp, &info->handle->pg_ref_h,
+			pg_ref) {
+			list_del(&src->pg_ref);
+			nvmap_handle_put(src);
+		}
+
+		mutex_unlock(&info->handle->pg_ref_h_lock);
+	}
+
 	nvmap_handle_put(info->handle);
 	kfree(info);
 }

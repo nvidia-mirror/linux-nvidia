@@ -246,6 +246,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	INIT_LIST_HEAD(&h->lru);
 	INIT_LIST_HEAD(&h->dmabuf_priv);
 
+	INIT_LIST_HEAD(&h->pg_ref_h);
 	/*
 	 * This takes out 1 ref on the dambuf. This corresponds to the
 	 * handle_ref that gets automatically made by nvmap_create_handle().

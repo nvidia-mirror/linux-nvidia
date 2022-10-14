@@ -229,9 +229,15 @@ static int nvmap_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		if (PageAnon(page) && (vma->vm_flags & VM_SHARED))
 			return VM_FAULT_SIGSEGV;
 
+		if (priv->handle->is_subhandle) {
+			pr_err("sub_handle page:%p\n", page);
+			kaddr  = kmap(page);
+			BUG_ON(!kaddr);
+			inner_cache_maint(NVMAP_CACHE_OP_WB_INV, kaddr, PAGE_SIZE);
+			kunmap(page);
+		}
 		if (!nvmap_handle_track_dirty(priv->handle))
 			goto finish;
-
 		mutex_lock(&priv->handle->lock);
 		if (nvmap_page_dirty(priv->handle->pgalloc.pages[offs])) {
 			mutex_unlock(&priv->handle->lock);

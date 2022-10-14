@@ -1432,3 +1432,174 @@ out:
 				is_ro ? "RO" : "RW");
 	return ret;
 }
+
+static int find_range_of_handles(struct nvmap_handle **hs, u32 nr,
+		struct handles_range *hrange)
+{
+	u64 tot_sz = 0, rem_sz = 0;
+	u64 offs = hrange->offs;
+	u32 start = 0, end = 0;
+	u64 sz = hrange->sz;
+	u32 i;
+
+	hrange->offs_start = offs;
+	/* Find start handle */
+	for (i = 0; i < nr; i++) {
+		tot_sz += hs[i]->size;
+		if (offs > tot_sz) {
+			hrange->offs_start -= tot_sz;
+			continue;
+		} else {
+			rem_sz = tot_sz - offs;
+			start = i;
+			/* Check size in current handle */
+			if (rem_sz >= sz) {
+				end = i;
+				hrange->start = start;
+				hrange->end = end;
+				return 0;
+			}
+			/* Though start found but end lies in further handles */
+			i++;
+			break;
+		}
+	}
+	/* find end handle number */
+	for (; i < nr; i++) {
+		rem_sz += hs[i]->size;
+		if (rem_sz >= sz) {
+			end = i;
+			hrange->start = start;
+			hrange->end = end;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+int nvmap_ioctl_get_fd_from_list(struct file *filp, void __user *arg)
+{
+	struct nvmap_client *client = filp->private_data;
+	struct nvmap_fd_for_range_from_list op = {0};
+	struct nvmap_handle_ref *ref = NULL;
+	struct nvmap_handle **hs = NULL;
+	struct dma_buf *dmabuf = NULL;
+	struct nvmap_handle *h = NULL;
+	struct handles_range hrange = {0};
+	size_t tot_hs_size = 0;
+	u32 i, count = 0;
+	size_t bytes;
+	int err = 0;
+	int fd = -1;
+	u32 *hndls;
+
+	if (!client)
+		return -ENODEV;
+
+	if (copy_from_user(&op, arg, sizeof(op)))
+		return -EFAULT;
+
+	if (!op.handles || !op.num_handles
+		 || !op.size || op.num_handles > U32_MAX / sizeof(u32))
+		return -EINVAL;
+
+	hrange.offs = op.offset;
+	hrange.sz = op.size;
+
+	/* memory for nvmap_handle pointers */
+	bytes =  op.num_handles * sizeof(*hs);
+	if (!ACCESS_OK(VERIFY_READ, (const void __user *)op.handles,
+		op.num_handles * sizeof(u32)))
+		return -EFAULT;
+
+	/* memory for handles passed by userspace */
+	bytes += op.num_handles * sizeof(u32);
+	hs = nvmap_altalloc(bytes);
+	if (!hs) {
+		pr_err("memory allocation failed\n");
+		return -ENOMEM;
+	}
+	hndls = (u32 *)(hs + op.num_handles);
+	if (!IS_ALIGNED((ulong)hndls, sizeof(u32))) {
+		pr_err("handle pointer is not properly aligned!!\n");
+		err = -EINVAL;
+		goto free_mem;
+	}
+
+	if (copy_from_user(hndls, (void __user *)op.handles,
+		op.num_handles * sizeof(u32))) {
+		pr_err("Can't copy from user pointer op.handles\n");
+		err = -EFAULT;
+		goto free_mem;
+	}
+
+	for (i = 0; i < op.num_handles; i++) {
+		hs[i] = nvmap_handle_get_from_id(client, hndls[i]);
+		tot_hs_size += hs[i]->size;
+		if (IS_ERR_OR_NULL(hs[i])) {
+			pr_err("invalid handle_ptr[%d] = %u\n",
+				i, hndls[i]);
+			while (i--)
+				nvmap_handle_put(hs[i]);
+			err = -EINVAL;
+			goto free_mem;
+		}
+	}
+
+	/* Add check for sizes of all the handles should be > offs and size */
+	if (tot_hs_size < (hrange.offs + hrange.sz)) {
+		err = -EINVAL;
+		goto free_hs;
+	}
+
+	/* Check all of the handles from system heap */
+	for (i = 0; i < op.num_handles; i++)
+		if (hs[i]->heap_pgalloc)
+			count++;
+	if (!count || (op.num_handles && count % op.num_handles)) {
+		pr_err("all or none of the handles should be from heap\n");
+		err = -EINVAL;
+		goto free_hs;
+	}
+
+	/* Find actual range of handles where the offset/size range is lying */
+	if (find_range_of_handles(hs, op.num_handles, &hrange)) {
+		err = -EINVAL;
+		goto free_hs;
+	}
+
+	if (hrange.start > op.num_handles || hrange.end > op.num_handles) {
+		err = -EINVAL;
+		goto free_hs;
+	}
+	/* Create new handle for the size */
+	ref = nvmap_create_handle(client, hrange.sz, false);
+	if (IS_ERR_OR_NULL(ref))
+		goto free_hs;
+
+	ref->handle->orig_size = hrange.sz;
+	h = ref->handle;
+
+	/* Assign pages from the handles to newly created nvmap handle */
+	err =  nvmap_assign_pages_to_handle(client, hs, h, &hrange);
+	if (err)
+		goto free_hs;
+
+	dmabuf = h->dmabuf;
+	/* Create dmabuf fd out of dmabuf */
+	fd = nvmap_get_dmabuf_fd(client, h, false);
+	op.fd = fd;
+	err = nvmap_install_fd(client, h, fd,
+				arg, &op, sizeof(op), 1, dmabuf);
+free_hs:
+	for (i = 0; i < op.num_handles; i++)
+		nvmap_handle_put(hs[i]);
+
+	if (h) {
+		nvmap_handle_put(h);
+		nvmap_free_handle(client, h, false);
+	}
+free_mem:
+	nvmap_altfree(hs, bytes);
+	return err;
+}

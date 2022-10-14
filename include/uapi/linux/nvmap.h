@@ -259,6 +259,17 @@ struct nvmap_duplicate_handle {
 	__u32 dup_handle;
 };
 
+/**
+ * Struct used while duplicating memory handle
+ */
+struct nvmap_fd_for_range_from_list {
+	__u32 *handles;  /* Head of handles list */
+	__u32 num_handles; /* Number of handles in the list */
+	__u64 offset; /* Offset aligned by page size in the buffers */
+	__u64 size; /* Size of the sub buffer for which fd to be returned */
+	__s32 fd; /* Sub range Dma Buf fd to be returned*/
+};
+
 #define NVMAP_IOC_MAGIC 'N'
 
 /* Creates a new memory handle. On input, the argument is the size of the new
@@ -361,6 +372,10 @@ struct nvmap_duplicate_handle {
 #define NVMAP_IOC_DUP_HANDLE _IOWR(NVMAP_IOC_MAGIC, 106, \
 		struct nvmap_duplicate_handle)
 
-#define NVMAP_IOC_MAXNR (_IOC_NR(NVMAP_IOC_DUP_HANDLE))
+/*  Get for range from list of NvRmMemHandles */
+#define NVMAP_IOC_GET_FD_FOR_RANGE_FROM_LIST _IOR(NVMAP_IOC_MAGIC, 107, \
+		struct nvmap_fd_for_range_from_list)
+
+#define NVMAP_IOC_MAXNR (_IOC_NR(NVMAP_IOC_GET_FD_FOR_RANGE_FROM_LIST))
 
 #endif /* __UAPI_LINUX_NVMAP_H */
