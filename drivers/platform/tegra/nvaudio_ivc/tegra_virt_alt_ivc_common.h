@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -204,7 +204,7 @@ struct nvaudio_ivc_t210_mvc_info {
 
 struct nvaudio_ivc_t186_asrc_info {
 	int32_t		id;
-	uint32_t	stream_num;
+	int32_t		stream_num;
 	uint32_t	int_ratio;
 	uint32_t	frac_ratio;
 	uint32_t	input_threshold;
@@ -227,7 +227,7 @@ struct nvaudio_ivc_t186_arad_info {
 };
 
 struct nvaudio_ivc_xbar_link {
-	uint32_t	rx_reg;
+	int32_t		rx_reg;
 	uint32_t	tx_value;
 	uint32_t	tx_idx;
 	uint32_t	bit_pos;

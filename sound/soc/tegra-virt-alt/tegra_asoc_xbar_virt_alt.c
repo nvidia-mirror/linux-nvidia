@@ -1,7 +1,7 @@
 /*
  * tegra_asoc_xbar_virt_alt.c - Tegra xbar dai link for machine drivers
  *
- * Copyright (c) 2017-2021 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1026,7 +1026,7 @@ int tegra_virt_get_route(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
-	uint64_t reg = (uint64_t)e->reg;
+	int32_t reg = e->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err, i = 0;
@@ -1034,7 +1034,7 @@ int tegra_virt_get_route(struct snd_kcontrol *kcontrol,
 
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_XBAR_GET_ROUTE;
-	msg.params.xbar_info.rx_reg = (int) reg;
+	msg.params.xbar_info.rx_reg = reg;
 
 	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
@@ -1066,7 +1066,7 @@ int tegra_virt_put_route(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
-	uint64_t reg = (uint64_t)e->reg;
+	int32_t reg = e->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err;
@@ -1076,7 +1076,7 @@ int tegra_virt_put_route(struct snd_kcontrol *kcontrol,
 
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_XBAR_SET_ROUTE;
-	msg.params.xbar_info.rx_reg = (int) reg;
+	msg.params.xbar_info.rx_reg = reg;
 	msg.params.xbar_info.tx_value =
 	e->values[ucontrol->value.integer.value[0]];
 

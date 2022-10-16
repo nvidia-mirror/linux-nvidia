@@ -180,7 +180,7 @@ struct tegra210_adsp {
 	struct work_struct override_freq_work;
 	uint32_t i2s_rate;
 	struct mutex mutex;
-	int init_done;
+	uint32_t init_done;
 	int adsp_started;
 	bool is_shutdown;
 	uint32_t adma_ch_page;
@@ -2005,7 +2005,7 @@ static int tegra_ivc_start_playback(
 
 static int tegra_ivc_start_capture(
 					struct tegra210_adsp *adsp,
-					uint32_t ivc_msg_admaif_id,
+					int32_t ivc_msg_admaif_id,
 					bool ack_required)
 {
 	int err = 0;
@@ -2029,7 +2029,7 @@ static int tegra_ivc_start_capture(
 
 static int tegra_ivc_stop_playback(
 					struct tegra210_adsp *adsp,
-					uint32_t ivc_msg_admaif_id,
+					int32_t ivc_msg_admaif_id,
 					bool ack_required)
 {
 	int err = 0;
@@ -2053,7 +2053,7 @@ static int tegra_ivc_stop_playback(
 
 static int tegra_ivc_stop_capture(
 					struct tegra210_adsp *adsp,
-					uint32_t ivc_msg_admaif_id,
+					int32_t ivc_msg_admaif_id,
 					bool ack_required)
 {
 	int err = 0;
@@ -2190,7 +2190,7 @@ static int tegra210_adsp_send_hv_state_msg(
 	return ret;
 }
 
-static uint32_t tegra210_adsp_hv_pcm_trigger(
+static int32_t tegra210_adsp_hv_pcm_trigger(
 					struct tegra210_adsp *adsp,
 					uint32_t apm_out_in,
 					int stream,
@@ -3141,7 +3141,7 @@ static int tegra210_adsp_init_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
 	struct tegra210_adsp *adsp = snd_soc_component_get_drvdata(cmpnt);
-	int init = ucontrol->value.enumerated.item[0];
+	uint32_t init = ucontrol->value.enumerated.item[0];
 	int ret = 0;
 
 	if (init == adsp->init_done)

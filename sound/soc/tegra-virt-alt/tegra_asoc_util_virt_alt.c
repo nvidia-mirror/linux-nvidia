@@ -56,7 +56,7 @@ int tegra_virt_t210mixer_get_gain(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -66,7 +66,7 @@ int tegra_virt_t210mixer_get_gain(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_GET_RX_GAIN;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.rx_idx = (int) reg;
+	msg.params.amixer_info.rx_idx = reg;
 
 	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
@@ -86,7 +86,7 @@ int tegra_virt_t210mixer_set_gain(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -96,7 +96,7 @@ int tegra_virt_t210mixer_set_gain(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_SET_RX_GAIN;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.rx_idx = (int) reg;
+	msg.params.amixer_info.rx_idx = reg;
 	msg.params.amixer_info.gain =
 		ucontrol->value.integer.value[0];
 	msg.params.amixer_info.is_instant_gain = 0;
@@ -118,7 +118,7 @@ int tegra_virt_t210mixer_set_gain_instant(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -128,7 +128,7 @@ int tegra_virt_t210mixer_set_gain_instant(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_SET_RX_GAIN;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.rx_idx = (int) reg;
+	msg.params.amixer_info.rx_idx = reg;
 	msg.params.amixer_info.gain =
 		ucontrol->value.integer.value[0];
 	msg.params.amixer_info.is_instant_gain = 1;
@@ -150,7 +150,7 @@ int tegra_virt_t210mixer_get_duration(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -160,7 +160,7 @@ int tegra_virt_t210mixer_get_duration(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_GET_RX_DURATION;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.rx_idx = (int) reg;
+	msg.params.amixer_info.rx_idx = reg;
 
 	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
@@ -180,7 +180,7 @@ int tegra_virt_t210mixer_set_duration(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -190,7 +190,7 @@ int tegra_virt_t210mixer_set_duration(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_SET_RX_DURATION;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.rx_idx = (int) reg;
+	msg.params.amixer_info.rx_idx = reg;
 	msg.params.amixer_info.duration_n3 =
 		ucontrol->value.integer.value[0];
 	msg.params.amixer_info.is_instant_gain = 0;
@@ -212,7 +212,7 @@ int tegra_virt_t210mixer_get_adder_config(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -222,9 +222,9 @@ int tegra_virt_t210mixer_get_adder_config(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_GET_TX_ADDER_CONFIG;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.adder_idx = (((int) reg) >>
+	msg.params.amixer_info.adder_idx = ((reg) >>
 				MIXER_CONFIG_SHIFT_VALUE) & 0xFFFF;
-	msg.params.amixer_info.adder_rx_idx = ((int) reg) & 0xFFFF;
+	msg.params.amixer_info.adder_rx_idx = (reg) & 0xFFFF;
 
 	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
@@ -249,7 +249,7 @@ int tegra_virt_t210mixer_set_adder_config(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_dapm(kcontrol);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -259,9 +259,9 @@ int tegra_virt_t210mixer_set_adder_config(struct snd_kcontrol *kcontrol,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMIXER_SET_TX_ADDER_CONFIG;
 	msg.params.amixer_info.id = 0;
-	msg.params.amixer_info.adder_idx = (((int) reg) >>
+	msg.params.amixer_info.adder_idx = ((reg) >>
 				MIXER_CONFIG_SHIFT_VALUE) & 0xFFFF;
-	msg.params.amixer_info.adder_rx_idx = ((int) reg) & 0xFFFF;
+	msg.params.amixer_info.adder_rx_idx = (reg) & 0xFFFF;
 	msg.params.amixer_info.adder_rx_idx_enable =
 		ucontrol->value.integer.value[0];
 
@@ -429,7 +429,7 @@ int tegra_virt_t210sfc_set_out_freq(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -579,7 +579,7 @@ int tegra_virt_t210mvc_get_mute(struct snd_kcontrol *kcontrol,
 
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -642,7 +642,7 @@ int tegra186_virt_asrc_get_ratio(struct snd_kcontrol *kcontrol,
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mreg_control *mc =
 		(struct soc_mreg_control *)kcontrol->private_value;
-	unsigned int reg = mc->regbase;
+	int32_t reg = mc->regbase;
 	int err;
 	uint64_t val;
 	struct nvaudio_ivc_msg msg;
@@ -677,7 +677,7 @@ int tegra186_virt_asrc_set_ratio(struct snd_kcontrol *kcontrol,
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mreg_control *mc =
 		(struct soc_mreg_control *)kcontrol->private_value;
-	unsigned int reg = mc->regbase;
+	int32_t reg = mc->regbase;
 	int err;
 	uint64_t val;
 	struct nvaudio_ivc_msg msg;
@@ -771,7 +771,7 @@ int tegra186_virt_asrc_get_stream_enable(struct snd_kcontrol *kcontrol,
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	int err;
 	struct nvaudio_ivc_msg msg;
 
@@ -800,7 +800,7 @@ int tegra186_virt_asrc_set_stream_enable(struct snd_kcontrol *kcontrol,
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err;
@@ -833,7 +833,7 @@ int tegra186_virt_asrc_get_hwcomp_disable(struct snd_kcontrol *kcontrol,
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	int err;
 	struct nvaudio_ivc_msg msg;
 
@@ -862,7 +862,7 @@ int tegra186_virt_asrc_set_hwcomp_disable(struct snd_kcontrol *kcontrol,
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err;
@@ -895,7 +895,7 @@ int tegra186_virt_asrc_get_input_threshold(struct snd_kcontrol *kcontrol,
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	int err;
 	struct nvaudio_ivc_msg msg;
 
@@ -927,7 +927,7 @@ int tegra186_virt_asrc_set_input_threshold(struct snd_kcontrol *kcontrol,
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err;
@@ -961,7 +961,7 @@ int tegra186_virt_asrc_get_output_threshold(
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	int err;
 	struct nvaudio_ivc_msg msg;
 
@@ -992,7 +992,7 @@ int tegra186_virt_asrc_set_output_threshold(
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
 	int err;
@@ -1031,7 +1031,7 @@ int tegra_virt_t210_amx_set_input_stream_enable(
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -1040,9 +1040,9 @@ int tegra_virt_t210_amx_set_input_stream_enable(
 
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AMX_SET_INPUT_STREAM_ENABLE;
-	msg.params.amx_info.amx_id = (((int) reg) >>
+	msg.params.amx_info.amx_id = ((reg) >>
 				MIXER_CONFIG_SHIFT_VALUE) & 0xFFFF;
-	msg.params.amx_info.amx_stream_id = ((int) reg) & 0xFFFF;
+	msg.params.amx_info.amx_stream_id = (reg) & 0xFFFF;
 	msg.params.amx_info.amx_stream_enable =
 		ucontrol->value.integer.value[0];
 
@@ -1425,7 +1425,7 @@ int tegra_virt_i2s_set_rate(
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -1462,7 +1462,7 @@ int tegra_virt_t210ahub_set_regdump(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
-	unsigned int reg = mc->reg;
+	int32_t reg = mc->reg;
 	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
 	struct nvaudio_ivc_ctxt *hivc_client =
 		nvaudio_ivc_alloc_ctxt(card->dev);
@@ -1471,10 +1471,10 @@ int tegra_virt_t210ahub_set_regdump(struct snd_kcontrol *kcontrol,
 
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.cmd = NVAUDIO_AHUB_BLOCK_REGDUMP;
-	msg.params.ahub_block_info.block_id = ((int) reg) & 0xFFFF;
-	msg.params.ahub_block_info.stream_id = (((int) reg) >>
+	msg.params.ahub_block_info.block_id = (reg) & 0xFFFF;
+	msg.params.ahub_block_info.stream_id = ((reg) >>
 				STREAM_ID_SHIFT_VALUE) & 0xFF;
-	msg.params.ahub_block_info.dump_cmd = (((int) reg) >>
+	msg.params.ahub_block_info.dump_cmd = ((reg) >>
 				REGDUMP_CMD_SHIFT_VALUE) & 0xFF;
 
 	err = nvaudio_ivc_send_retry(hivc_client,

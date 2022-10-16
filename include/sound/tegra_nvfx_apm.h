@@ -2,7 +2,7 @@
  * tegra_nvfx_apm.h - Shared APM interface between Tegra ADSP ALSA driver and
  *                    ADSP side user space code.
  *
- * Copyright (c) 2014-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -47,7 +47,7 @@ enum apm_mbx_cmd {
  * APM methods
  *
  */
-#define NVFX_APM_METHOD_ACK_BIT		(1 << 31) /* Flag to request ACK */
+#define NVFX_APM_METHOD_ACK_BIT		(1U << 31) /* Flag to request ACK */
 
 /* Input modes of APM
  * In PUSH mode, APM blocks if there is no input available. Usually

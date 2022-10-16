@@ -1,7 +1,7 @@
 /*
  * tegra210_virt_alt_admaif.h - Tegra210 ADMAIF registers
  *
- * Copyright (c) 2014-2020 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2022 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -88,7 +88,7 @@ struct tegra210_virt_audio_cif {
 	unsigned int expand;
 	unsigned int stereo_conv;
 	unsigned int replicate;
-	unsigned int direction;
+	int32_t direction;
 	unsigned int truncate;
 	unsigned int mono_conv;
 };
