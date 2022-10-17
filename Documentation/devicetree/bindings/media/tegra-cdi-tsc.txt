@@ -1,0 +1,30 @@
+NVIDIA tegra cdi-tsc driver
+
+This file documents the properties used by the cdi-tsc driver in the Tegra Platform.
+
+Required properties:
+- compatible: Should be "nvidia,tegra234-cdi-tsc"
+
+Generators describe discrete Tegra TSC signal outputs, enumerated as generator@<addr>.
+
+Required properties:
+- freq_hz: Frequency of the signal in Hertz.
+- duty_cycle: Percentage duty cycle of the signal, 0 to 100.
+- offset_ms: Offset to shift the signal in milliseconds.
+
+Example:
+tsc_sig_gen@c6a0000 {
+	compatible = "nvidia,tegra234-cdi-tsc";
+	ranges = <0x0 0x0 0xc6a0000 0x10000>;
+	reg = <0x0 0xc6a0000 0x0 0x18>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+	status = "okay";
+
+	generator@380 {
+		reg = <0x380 0x80>;
+		freq_hz = <30>;
+		duty_cycle = <25>;
+		offset_ms = <0>;
+		status = "okay";
+};
