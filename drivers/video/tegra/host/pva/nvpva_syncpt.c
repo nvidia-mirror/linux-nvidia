@@ -19,7 +19,8 @@
 #include <linux/nvhost_t194.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/dma-iommu.h>
+#include <linux/version.h>
+#include <linux/iommu.h>
 #include <linux/dma-mapping.h>
 #include "pva.h"
 
