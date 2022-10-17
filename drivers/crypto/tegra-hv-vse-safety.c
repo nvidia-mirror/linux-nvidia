@@ -2782,6 +2782,7 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	struct tegra_vse_tag *priv_data_ptr;
 	int err = 0;
 	uint32_t cryptlen = 0;
+	uint32_t buflen = 0;
 
 	void *aad_buf = NULL;
 	void *src_buf = NULL;
@@ -2823,7 +2824,10 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 			}
 		} else {
 			if (gpcdma_dev != NULL) {
-				src_buf = dma_alloc_coherent(gpcdma_dev, cryptlen,
+				/* GPCDMA buffer needs to be 64 bytes aligned */
+				buflen = ALIGN(cryptlen, 64U);
+
+				src_buf = dma_alloc_coherent(gpcdma_dev, buflen,
 							&src_buf_addr, GFP_KERNEL);
 				if (!src_buf) {
 					err = -ENOMEM;
@@ -3011,7 +3015,7 @@ free_exit:
 					src_buf_addr);
 	} else {
 		if (src_buf && gpcdma_dev != NULL)
-			dma_free_coherent(gpcdma_dev, cryptlen, src_buf,
+			dma_free_coherent(gpcdma_dev, buflen, src_buf,
 					src_buf_addr);
 	}
 
