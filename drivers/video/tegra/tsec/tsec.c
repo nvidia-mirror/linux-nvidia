@@ -314,4 +314,5 @@ module_platform_driver(tsec_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nikesh Oswal <noswal@nvidia.com>");
+MODULE_DEVICE_TABLE(of, tsec_of_match);
 MODULE_DESCRIPTION("TSEC Driver");

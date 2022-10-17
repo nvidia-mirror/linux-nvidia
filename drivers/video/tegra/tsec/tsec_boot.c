@@ -52,6 +52,11 @@ struct tsec_device_priv_data {
 	void                   *plat_cb_ctx;
 };
 
+struct carveout_info {
+	u64 base;
+	u64 size;
+};
+
 /*
  * Platform specific APIs to be used by platform independent comms library
  */
@@ -157,7 +162,7 @@ static int tsec_read_img_and_desc(struct platform_device *dev,
 	rv_data->backdoor_img_size = fw_image->size;
 	rv_data->backdoor_img_va = dma_alloc_attrs(&dev->dev,
 		rv_data->backdoor_img_size, &rv_data->backdoor_img_iova,
-		GFP_KERNEL, DMA_ATTR_READ_ONLY | DMA_ATTR_FORCE_CONTIGUOUS);
+		GFP_KERNEL, DMA_ATTR_FORCE_CONTIGUOUS);
 	if (!rv_data->backdoor_img_va) {
 		dev_err(&dev->dev, "dma memory allocation failed");
 		err = -ENOMEM;
@@ -167,7 +172,14 @@ static int tsec_read_img_and_desc(struct platform_device *dev,
 	/* Copy the whole image taking endianness into account */
 	for (w = 0; w < fw_image->size/sizeof(u32); w++)
 		rv_data->backdoor_img_va[w] = le32_to_cpu(((__le32 *)fw_image->data)[w]);
+#if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
+#ifdef CONFIG_EXPORT_DCACHE_OPS
+	dcache_clean_inval_poc((unsigned long)rv_data->backdoor_img_va,
+		(unsigned long)rv_data->backdoor_img_va + rv_data->backdoor_img_size);
+#endif
+#else
 	__flush_dcache_area((void *)rv_data->backdoor_img_va, fw_image->size);
+#endif
 
 	/* Read the offsets from desc binary */
 	err = tsec_compute_ucode_offsets(dev, rv_data, fw_desc);
@@ -186,7 +198,7 @@ clean_up:
 	if (rv_data->backdoor_img_va) {
 		dma_free_attrs(&dev->dev, rv_data->backdoor_img_size,
 			rv_data->backdoor_img_va, rv_data->backdoor_img_iova,
-			DMA_ATTR_READ_ONLY | DMA_ATTR_FORCE_CONTIGUOUS);
+			DMA_ATTR_FORCE_CONTIGUOUS);
 		rv_data->backdoor_img_va = NULL;
 		rv_data->backdoor_img_iova = 0;
 	}
@@ -237,7 +249,7 @@ static int tsec_riscv_data_deinit(struct platform_device *dev)
 	if (rv_data->backdoor_img_va) {
 		dma_free_attrs(&dev->dev, rv_data->backdoor_img_size,
 			rv_data->backdoor_img_va, rv_data->backdoor_img_iova,
-			DMA_ATTR_READ_ONLY | DMA_ATTR_FORCE_CONTIGUOUS);
+			DMA_ATTR_FORCE_CONTIGUOUS);
 		rv_data->backdoor_img_va = NULL;
 		rv_data->backdoor_img_iova = 0;
 	}
@@ -250,8 +262,41 @@ static int tsec_riscv_data_deinit(struct platform_device *dev)
  * APIs to load firmware and boot tsec
  */
 
+static int get_carveout_info_4(
+	struct platform_device *dev, struct carveout_info *co_info)
+{
+#if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
+	int err;
+	phys_addr_t base;
+	u64 size;
+	struct tegra_mc *mc;
+
+	mc = devm_tegra_memory_controller_get(&dev->dev);
+	if (IS_ERR(mc))
+		return PTR_ERR(mc);
+	err = tegra_mc_get_carveout_info(mc, 4, &base, &size);
+	if (err)
+		return err;
+	co_info->base = (u64)base;
+	co_info->size = size;
+
+	return 0;
+#else
+	int err;
+	struct mc_carveout_info mc_co_info;
+
+	err = mc_get_carveout_info(&mc_co_info, NULL, MC_SECURITY_CARVEOUT4);
+	if (err)
+		return err;
+	co_info->base = mc_co_info.base;
+	co_info->size = mc_co_info.size;
+
+	return 0;
+#endif
+}
+
 static int get_carveout_info_lite42(
-	struct platform_device *dev, struct mc_carveout_info *co_info)
+	struct platform_device *dev, struct carveout_info *co_info)
 {
 #define LITE42_BASE                        (0x2c10000 + 0x7324)
 #define LITE42_SIZE                        (12)
@@ -261,8 +306,7 @@ static int get_carveout_info_lite42(
 
 	void __iomem *lit42_regs;
 
-	lit42_regs = __ioremap(LITE42_BASE, LITE42_SIZE,
-		pgprot_noncached(PAGE_KERNEL));
+	lit42_regs = ioremap(LITE42_BASE, LITE42_SIZE);
 	if (!lit42_regs) {
 		dev_err(&dev->dev, "lit42_regs VA mapping failed\n");
 		return -ENOMEM;
@@ -298,10 +342,10 @@ int tsec_finalize_poweron(struct platform_device *dev)
 	phys_addr_t img_pa, pa;
 	struct iommu_domain *domain;
 	void __iomem *cpuctl_addr, *retcode_addr, *mailbox0_addr;
-	struct mc_carveout_info img_co_info;
+	struct carveout_info img_co_info;
 	unsigned int img_co_gscid = 0x0;
 	struct tsec_device_data *pdata = platform_get_drvdata(dev);
-	struct mc_carveout_info ipc_co_info;
+	struct carveout_info ipc_co_info;
 	void __iomem *ipc_co_va = NULL;
 	dma_addr_t ipc_co_iova = 0;
 	dma_addr_t ipc_co_iova_with_streamid;
@@ -318,7 +362,7 @@ int tsec_finalize_poweron(struct platform_device *dev)
 	rv_data = (struct riscv_data *)pdata->riscv_data;
 
 	/* Get pa of memory having tsec fw image */
-	err = mc_get_carveout_info(&img_co_info, NULL, MC_SECURITY_CARVEOUT4);
+	err = get_carveout_info_4(dev, &img_co_info);
 	if (err) {
 		dev_err(&dev->dev, "Carveout memory allocation failed");
 		err = -ENOMEM;
@@ -346,7 +390,7 @@ int tsec_finalize_poweron(struct platform_device *dev)
 		goto clean_up;
 	}
 	dev_dbg(&dev->dev, "IPCCO base=0x%llx size=0x%llx\n", ipc_co_info.base, ipc_co_info.size);
-	ipc_co_va = __ioremap(ipc_co_info.base, ipc_co_info.size, pgprot_noncached(PAGE_KERNEL));
+	ipc_co_va = ioremap(ipc_co_info.base, ipc_co_info.size);
 	if (!ipc_co_va) {
 		dev_err(&dev->dev, "IPC Carveout memory VA mapping failed");
 		err = -ENOMEM;

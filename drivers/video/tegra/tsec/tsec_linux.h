@@ -31,11 +31,15 @@
 #include <linux/iommu.h>                   /* for dev_iommu_fwspec_get */
 #include <linux/iopoll.h>                  /* for readl_poll_timeout */
 #include <linux/dma-mapping.h>             /* for dma_map_page_attrs */
-#include <linux/platform/tegra/tegra_mc.h> /* for mc_get_carveout_info */
 #include <linux/pm.h>                      /* for dev_pm_ops */
 #include <linux/version.h>                 /* for KERNEL_VERSION */
 #include <linux/interrupt.h>               /* for enable_irq */
 #include <linux/firmware.h>                /* for request_firmware */
 #include <asm/cacheflush.h>                /* for __flush_dcache_area */
+#if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
+#include <soc/tegra/mc.h>                  /* for tegra_mc_get_carveout_info */
+#else
+#include <linux/platform/tegra/tegra_mc.h> /* for mc_get_carveout_info */
+#endif
 
 #endif /* TSEC_LINUX_H */
