@@ -199,10 +199,10 @@ struct hwpm_ip_aperture {
 	u32 element_index_mask;
 
 	/*
-	 * Element index in device tree entry
+	 * Index of the element within the IP instance
 	 * For perfmux entries, this index is passed to hwpm_ip_reg_op()
 	 */
-	u32 dt_index;
+	u32 element_index;
 
 	/* MMIO device tree aperture - only populated for perfmon */
 	void __iomem *dt_mmio;

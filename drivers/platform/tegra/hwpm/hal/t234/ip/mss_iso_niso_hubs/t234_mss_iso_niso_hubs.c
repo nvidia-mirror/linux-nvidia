@@ -22,7 +22,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_stati
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_msshub0",
 		.start_abs_pa = addr_map_rpg_pm_msshub0_base_r(),
@@ -37,7 +37,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmon_element_stati
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 1U,
+		.element_index = 1U,
 		.dt_mmio = NULL,
 		.name = "perfmon_msshub1",
 		.start_abs_pa = addr_map_rpg_pm_msshub1_base_r(),
@@ -56,7 +56,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 1U,
+		.element_index = 1U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc0_base_r(),
@@ -72,7 +72,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(1),
-		.dt_index = 2U,
+		.element_index = 2U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc1_base_r(),
@@ -88,7 +88,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(2),
-		.dt_index = 3U,
+		.element_index = 3U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc2_base_r(),
@@ -104,7 +104,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(3),
-		.dt_index = 4U,
+		.element_index = 4U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc3_base_r(),
@@ -120,7 +120,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(4),
-		.dt_index = 5U,
+		.element_index = 5U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc4_base_r(),
@@ -136,7 +136,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(5),
-		.dt_index = 6U,
+		.element_index = 6U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc5_base_r(),
@@ -152,7 +152,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(6),
-		.dt_index = 7U,
+		.element_index = 7U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc6_base_r(),
@@ -168,7 +168,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(7),
-		.dt_index = 8U,
+		.element_index = 8U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc7_base_r(),
@@ -184,7 +184,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_perfmux_element_stati
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(8),
-		.dt_index = 9U,
+		.element_index = 9U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mc8_base_r(),
@@ -203,7 +203,7 @@ static struct hwpm_ip_aperture t234_mss_iso_niso_hub_inst0_broadcast_element_sta
 	{
 		.element_type = IP_ELEMENT_BROADCAST,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mcb_base_r(),

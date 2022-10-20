@@ -85,7 +85,7 @@ static int ip_readl(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 
 			err = (*ip_ops_ptr->hwpm_ip_reg_op)(ip_ops_ptr->ip_dev,
 				TEGRA_SOC_HWPM_IP_REG_OP_READ,
-				aperture->dt_index, offset, val);
+				aperture->element_index, offset, val);
 			if (err < 0) {
 				tegra_hwpm_err(hwpm, "Aperture (0x%llx-0x%llx) "
 					"read offset(0x%llx) failed",
@@ -133,7 +133,7 @@ static int ip_writel(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 
 			err = (*ip_ops_ptr->hwpm_ip_reg_op)(ip_ops_ptr->ip_dev,
 				TEGRA_SOC_HWPM_IP_REG_OP_WRITE,
-				aperture->dt_index, offset, &val);
+				aperture->element_index, offset, &val);
 			if (err < 0) {
 				tegra_hwpm_err(hwpm, "Aperture (0x%llx-0x%llx) "
 					"write offset(0x%llx) val 0x%x failed",

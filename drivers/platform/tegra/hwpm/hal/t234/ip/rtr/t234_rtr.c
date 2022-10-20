@@ -23,7 +23,7 @@ static struct hwpm_ip_aperture t234_rtr_inst0_perfmux_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "rtr",
 		.start_abs_pa = addr_map_rtr_base_r(),
@@ -44,7 +44,7 @@ static struct hwpm_ip_aperture t234_rtr_inst1_perfmux_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "pma",
 		.start_abs_pa = addr_map_pma_base_r(),

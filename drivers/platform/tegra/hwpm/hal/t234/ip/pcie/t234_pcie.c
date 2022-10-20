@@ -22,7 +22,7 @@ static struct hwpm_ip_aperture t234_pcie_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie0",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c0_base_r(),
@@ -41,7 +41,7 @@ static struct hwpm_ip_aperture t234_pcie_inst1_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie1",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c1_base_r(),
@@ -60,7 +60,7 @@ static struct hwpm_ip_aperture t234_pcie_inst2_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie2",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c2_base_r(),
@@ -79,7 +79,7 @@ static struct hwpm_ip_aperture t234_pcie_inst3_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie3",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c3_base_r(),
@@ -98,7 +98,7 @@ static struct hwpm_ip_aperture t234_pcie_inst4_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie4",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c4_base_r(),
@@ -117,7 +117,7 @@ static struct hwpm_ip_aperture t234_pcie_inst5_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie5",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c5_base_r(),
@@ -136,7 +136,7 @@ static struct hwpm_ip_aperture t234_pcie_inst6_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie6",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c6_base_r(),
@@ -155,7 +155,7 @@ static struct hwpm_ip_aperture t234_pcie_inst7_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie7",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c7_base_r(),
@@ -174,7 +174,7 @@ static struct hwpm_ip_aperture t234_pcie_inst8_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie8",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c8_base_r(),
@@ -193,7 +193,7 @@ static struct hwpm_ip_aperture t234_pcie_inst9_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie9",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c9_base_r(),
@@ -212,7 +212,7 @@ static struct hwpm_ip_aperture t234_pcie_inst10_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(10),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pcie10",
 		.start_abs_pa = addr_map_rpg_pm_pcie_c10_base_r(),
@@ -231,7 +231,7 @@ static struct hwpm_ip_aperture t234_pcie_inst0_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c0_ctl_base_r(),
@@ -250,7 +250,7 @@ static struct hwpm_ip_aperture t234_pcie_inst1_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c1_ctl_base_r(),
@@ -269,7 +269,7 @@ static struct hwpm_ip_aperture t234_pcie_inst2_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(10),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c2_ctl_base_r(),
@@ -288,7 +288,7 @@ static struct hwpm_ip_aperture t234_pcie_inst3_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c3_ctl_base_r(),
@@ -307,7 +307,7 @@ static struct hwpm_ip_aperture t234_pcie_inst4_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c4_ctl_base_r(),
@@ -326,7 +326,7 @@ static struct hwpm_ip_aperture t234_pcie_inst5_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c5_ctl_base_r(),
@@ -345,7 +345,7 @@ static struct hwpm_ip_aperture t234_pcie_inst6_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c6_ctl_base_r(),
@@ -364,7 +364,7 @@ static struct hwpm_ip_aperture t234_pcie_inst7_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c7_ctl_base_r(),
@@ -383,7 +383,7 @@ static struct hwpm_ip_aperture t234_pcie_inst8_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c8_ctl_base_r(),
@@ -402,7 +402,7 @@ static struct hwpm_ip_aperture t234_pcie_inst9_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c9_ctl_base_r(),
@@ -421,7 +421,7 @@ static struct hwpm_ip_aperture t234_pcie_inst10_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pcie_c10_ctl_base_r(),

@@ -22,7 +22,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe0",
 		.start_abs_pa = addr_map_rpg_pm_mgbe0_base_r(),
@@ -41,7 +41,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst1_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe1",
 		.start_abs_pa = addr_map_rpg_pm_mgbe1_base_r(),
@@ -60,7 +60,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst2_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe2",
 		.start_abs_pa = addr_map_rpg_pm_mgbe2_base_r(),
@@ -79,7 +79,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst3_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_mgbe3",
 		.start_abs_pa = addr_map_rpg_pm_mgbe3_base_r(),
@@ -98,7 +98,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst0_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mgbe0_mac_rm_base_r(),
@@ -117,7 +117,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst1_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mgbe1_mac_rm_base_r(),
@@ -136,7 +136,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst2_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mgbe2_mac_rm_base_r(),
@@ -155,7 +155,7 @@ static struct hwpm_ip_aperture t234_mgbe_inst3_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_mgbe3_mac_rm_base_r(),

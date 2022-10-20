@@ -22,7 +22,7 @@ static struct hwpm_ip_aperture t234_scf_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_scf",
 		.start_abs_pa = addr_map_rpg_pm_scf_base_r(),

@@ -22,7 +22,7 @@ static struct hwpm_ip_aperture t234_pva_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pvav0",
 		.start_abs_pa = addr_map_rpg_pm_pva0_0_base_r(),
@@ -37,7 +37,7 @@ static struct hwpm_ip_aperture t234_pva_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 1U,
+		.element_index = 1U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pvav1",
 		.start_abs_pa = addr_map_rpg_pm_pva0_1_base_r(),
@@ -52,7 +52,7 @@ static struct hwpm_ip_aperture t234_pva_inst0_perfmon_element_static_array[
 	{
 		.element_type = HWPM_ELEMENT_PERFMON,
 		.element_index_mask = BIT(0),
-		.dt_index = 2U,
+		.element_index = 2U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pvac0",
 		.start_abs_pa = addr_map_rpg_pm_pva0_2_base_r(),
@@ -71,7 +71,7 @@ static struct hwpm_ip_aperture t234_pva_inst0_perfmux_element_static_array[
 	{
 		.element_type = IP_ELEMENT_PERFMUX,
 		.element_index_mask = BIT(0),
-		.dt_index = 0U,
+		.element_index = 0U,
 		.dt_mmio = NULL,
 		.name = {'\0'},
 		.start_abs_pa = addr_map_pva0_pm_base_r(),
