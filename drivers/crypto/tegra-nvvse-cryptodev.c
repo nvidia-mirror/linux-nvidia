@@ -331,7 +331,6 @@ static int tnvvse_crypto_sha_update(struct tnvvse_crypto_ctx *ctx,
 						__func__, sha_alg_names[sha_state->sha_type], ret);
 			goto stop_sha;
 		}
-
 		if (update_ctl->last_buffer && (size >= total)) {
 			ret = wait_async_op(&sha_state->sha_complete, crypto_ahash_final(req));
 			if (ret) {
@@ -1610,7 +1609,6 @@ static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 	}
 
 	filp->private_data = ctx;
-
 	return ret;
 
 free_sha_buf:
@@ -1669,12 +1667,12 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 
 	switch (ioctl_num) {
 	case NVVSE_IOCTL_CMDID_INIT_SHA:
+
 		ret = copy_from_user(&sha_init_ctl, (void __user *)arg, sizeof(sha_init_ctl));
 		if (ret) {
 			pr_err("%s(): Failed to copy_from_user sha_init_ctl:%d\n", __func__, ret);
 			goto out;
 		}
-
 		ret = tnvvse_crypto_sha_init(ctx, &sha_init_ctl);
 		break;
 
@@ -1684,7 +1682,6 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 			pr_err("%s(): Failed to copy_from_user sha_update_ctl:%d\n", __func__, ret);
 			goto out;
 		}
-
 		ret = tnvvse_crypto_sha_update(ctx, &sha_update_ctl);
 		break;
 
@@ -1695,7 +1692,6 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 			pr_err("%s(): Failed to copy_from_user sha_final_ctl:%d\n", __func__, ret);
 			goto out;
 		}
-
 		ret = tnvvse_crypto_sha_final(ctx, &sha_final_ctl);
 		break;
 

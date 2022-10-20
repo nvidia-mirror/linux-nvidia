@@ -414,8 +414,8 @@ struct tegra_virtual_se_aes_req_context {
 enum se_engine_id {
 	VIRTUAL_SE_AES0,
 	VIRTUAL_SE_AES1,
-	VIRTUAL_SE_SHA=3,
-	VIRTUAL_MAX_SE_ENGINE_NUM=5
+	VIRTUAL_SE_SHA = 2,
+	VIRTUAL_MAX_SE_ENGINE_NUM = 7
 };
 
 enum tegra_virtual_se_aes_iv_type {
@@ -646,7 +646,6 @@ static int tegra_hv_vse_safety_send_sha_data(struct tegra_virtual_se_dev *se_dev
 
 	ivc_tx = &ivc_req_msg->tx[0];
 	ivc_hdr = &ivc_req_msg->ivc_hdr;
-	ivc_hdr->engine = VIRTUAL_SE_SHA;
 	ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_SHA_HASH;
 
 	psha = &(ivc_tx->sha);
