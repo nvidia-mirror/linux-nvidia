@@ -58,23 +58,6 @@ static char *tegra_hwpm_get_devnode(struct device *dev, umode_t *mode)
 	return NULL;
 }
 
-static bool tegra_hwpm_read_support_soc_tools_prop(struct platform_device *pdev)
-{
-#if defined(CONFIG_ACPI)
-	/* This will be implemented in a follow-up patch */
-	return true;
-#else
-	struct device_node *np = pdev->dev.of_node;
-	bool allow_node = of_property_read_bool(np, "support-soc-tools");
-
-	if (!allow_node) {
-		tegra_hwpm_err(NULL, "support-soc-tools is absent");
-	}
-
-	return allow_node;
-#endif
-}
-
 static int tegra_hwpm_get_chip_info(struct tegra_hwpm_os_linux *hwpm_linux)
 {
 #if defined(CONFIG_TEGRA_HWPM_OOT)
@@ -105,12 +88,6 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 
 	if (!pdev) {
 		tegra_hwpm_err(NULL, "Invalid platform device");
-		ret = -ENODEV;
-		goto fail;
-	}
-
-	if (!tegra_hwpm_read_support_soc_tools_prop(pdev)) {
-		tegra_hwpm_err(NULL, "SOC HWPM not supported in this config");
 		ret = -ENODEV;
 		goto fail;
 	}
