@@ -227,6 +227,12 @@ static int esc_mods_set_num_vf(struct mods_client     *client,
 
 	LOG_ENT();
 
+	if (p->numvfs > 0xFFFFU) {
+		cl_error("invalid input numfs %u\n", p->numvfs);
+		err = -EINVAL;
+		goto error;
+	}
+
 	/* Get the PCI device structure for the specified device from kernel */
 	err = mods_find_pci_dev(client, &p->dev, &dev);
 	if (unlikely(err)) {
@@ -236,8 +242,7 @@ static int esc_mods_set_num_vf(struct mods_client     *client,
 				 p->dev.bus,
 				 p->dev.device,
 				 p->dev.function);
-		LOG_EXT();
-		return err;
+		goto error;
 	}
 
 	dpriv = pci_get_drvdata(dev);
@@ -263,7 +268,7 @@ static int esc_mods_set_num_vf(struct mods_client     *client,
 		goto error;
 	}
 
-	err = mods_pci_sriov_configure(dev, p->numvfs);
+	err = mods_pci_sriov_configure(dev, (u16)p->numvfs);
 
 error:
 	pci_dev_put(dev);
@@ -280,6 +285,12 @@ static int esc_mods_set_total_vf(struct mods_client     *client,
 
 	LOG_ENT();
 
+	if (p->numvfs > 0xFFFFU) {
+		cl_error("invalid input numfs %u\n", p->numvfs);
+		err = -EINVAL;
+		goto error;
+	}
+
 	/* Get the PCI device structure for the specified device from kernel */
 	err = mods_find_pci_dev(client, &p->dev, &dev);
 	if (unlikely(err)) {
@@ -289,8 +300,7 @@ static int esc_mods_set_total_vf(struct mods_client     *client,
 				 p->dev.bus,
 				 p->dev.device,
 				 p->dev.function);
-		LOG_EXT();
-		return -EINVAL;
+		goto error;
 	}
 
 	dpriv = pci_get_drvdata(dev);
@@ -316,7 +326,7 @@ static int esc_mods_set_total_vf(struct mods_client     *client,
 		goto error;
 	}
 
-	err = pci_sriov_set_totalvfs(dev, p->numvfs);
+	err = pci_sriov_set_totalvfs(dev, (u16)p->numvfs);
 
 	if (unlikely(err)) {
 		cl_error(
@@ -1017,12 +1027,12 @@ static int mods_krnl_close(struct inode *ip, struct file *fp)
 	mods_disable_all_devices(client);
 
 	{
-		unsigned long num_allocs = atomic_read(&client->num_allocs);
-		unsigned long num_pages  = atomic_read(&client->num_pages);
+		const int num_allocs = atomic_read(&client->num_allocs);
+		const int num_pages  = atomic_read(&client->num_pages);
 
 		if (num_allocs || num_pages) {
 			cl_error(
-				"not all allocations have been freed, allocs=%lu, pages=%lu\n",
+				"not all allocations have been freed, allocs=%d, pages=%d\n",
 				num_allocs, num_pages);
 			if (!final_err)
 				final_err = -ENOMEM;
@@ -1180,9 +1190,9 @@ static int map_system_mem(struct mods_client    *client,
 			map_size = (unsigned int)size_to_map;
 
 		cl_debug(DEBUG_MEM_DETAILED,
-			 "remap va 0x%lx pfn 0x%x size 0x%x pages %u\n",
+			 "remap va 0x%lx pfn 0x%lx size 0x%x pages %u\n",
 			 map_va,
-			 (unsigned int)(map_pa >> PAGE_SHIFT),
+			 (unsigned long)(map_pa >> PAGE_SHIFT),
 			 map_size,
 			 map_size >> PAGE_SHIFT);
 
@@ -1596,7 +1606,7 @@ struct mods_file_work {
 	const char        *path;
 	const char        *data;
 	u32                data_size;
-	int                err;
+	ssize_t            err;
 };
 
 static void sysfs_write_task(struct work_struct *w)
@@ -1678,7 +1688,7 @@ static int run_write_task(struct mods_client    *client,
 		cl_error("failed to write %.*s to %s\n",
 			 task->data_size, task->data, task->path);
 
-	return (task->err > 0) ? 0 : task->err;
+	return (task->err > 0) ? 0 : (int)task->err;
 }
 
 static int esc_mods_write_sysfs_node(struct mods_client     *client,
@@ -1778,12 +1788,18 @@ static int esc_mods_write_msr(struct mods_client *client, struct MODS_MSR *p)
 static int esc_mods_get_driver_stats(struct mods_client *client,
 				     struct MODS_GET_DRIVER_STATS *p)
 {
+	int num_allocs;
+	int num_pages;
+
 	LOG_ENT();
 
+	num_allocs = atomic_read(&client->num_allocs);
+	num_pages  = atomic_read(&client->num_pages);
+
 	memset(p, 0, sizeof(*p));
-	p->version = MODS_DRIVER_STATS_VERSION;
-	p->num_allocs = atomic_read(&client->num_allocs);
-	p->num_pages = atomic_read(&client->num_pages);
+	p->version    = MODS_DRIVER_STATS_VERSION;
+	p->num_allocs = (num_allocs < 0) ? ~0U : num_allocs;
+	p->num_pages  = (num_pages  < 0) ? ~0U : num_pages;
 
 	LOG_EXT();
 	return 0;

@@ -166,8 +166,11 @@ static void irq_reg_write(const struct irq_mask_info *m,
 {
 	if (m->mask_type == MODS_MASK_TYPE_IRQ_DISABLE64)
 		writeq(value, reg);
-	else
-		writel((u32)value, reg);
+	else {
+		const u32 val32 = (value > ~0U) ? 0 : value;
+
+		writel(val32, reg);
+	}
 }
 
 static u64 read_irq_state(const struct irq_mask_info *m)
@@ -330,6 +333,9 @@ static irqreturn_t mods_irq_handle(int irq, void *data)
 {
 	struct dev_irq_map *t        = (struct dev_irq_map *)data;
 	int                 serviced = false;
+
+	if (irq < 0)
+		return IRQ_RETVAL(false);
 
 	if (unlikely(!t))
 		mods_error_printk("received irq %d, but no context for it\n",
@@ -562,9 +568,14 @@ static int add_irq_map(struct mods_client         *client,
 	else if ((irq_type == MODS_IRQ_TYPE_INT) ||
 		 (irq_type == MODS_IRQ_TYPE_MSI) ||
 		 (irq_type == MODS_IRQ_TYPE_MSIX)) {
+		int dom = dev ? pci_domain_nr(dev->bus) : 0;
+
+		if (dom < 0)
+			dom = 0;
+
 		cl_debug(DEBUG_ISR,
 			 "dev %04x:%02x:%02x.%x registered %s IRQ 0x%x\n",
-			 dev ? pci_domain_nr(dev->bus) : 0U,
+			 dom,
 			 dev ? dev->bus->number : 0U,
 			 dev ? PCI_SLOT(dev->devfn) : 0U,
 			 dev ? PCI_FUNC(dev->devfn) : 0U,
@@ -659,7 +670,7 @@ void mods_cleanup_irq(void)
 
 	LOG_ENT();
 	for (i = 0; i < MODS_MAX_CLIENTS; i++) {
-		if (mp.client_flags & (1 << i))
+		if (mp.client_flags & (1U << i))
 			mods_free_client(i + 1);
 	}
 	LOG_EXT();
@@ -668,7 +679,7 @@ void mods_cleanup_irq(void)
 POLL_TYPE mods_irq_event_check(u8 client_id)
 {
 	struct irq_q_info *q = &client_from_id(client_id)->irq_queue;
-	unsigned int pos = (1 << (client_id - 1));
+	unsigned int pos = (1U << (client_id - 1));
 
 	if (!(mp.client_flags & pos))
 		return POLLERR; /* irq has quit */
@@ -681,8 +692,8 @@ POLL_TYPE mods_irq_event_check(u8 client_id)
 
 struct mods_client *mods_alloc_client(void)
 {
-	u8 idx;
-	u8 max_clients = 1;
+	unsigned int idx;
+	unsigned int max_clients = 1;
 
 	LOG_ENT();
 
@@ -691,7 +702,7 @@ struct mods_client *mods_alloc_client(void)
 		max_clients = MODS_MAX_CLIENTS;
 
 	for (idx = 1; idx <= max_clients; idx++) {
-		if (!test_and_set_bit(idx - 1, &mp.client_flags)) {
+		if (!test_and_set_bit(idx - 1U, &mp.client_flags)) {
 			struct mods_client *client = client_from_id(idx);
 
 			memset(client, 0, sizeof(*client));
@@ -841,7 +852,7 @@ void mods_free_client(u8 client_id)
 	memset(client, 0, sizeof(*client));
 
 	/* Indicate the client_id is free */
-	clear_bit(client_id - 1, &mp.client_flags);
+	clear_bit((unsigned int)client_id - 1U, &mp.client_flags);
 
 	cl_debug(DEBUG_IOCTL, "closed client\n");
 	LOG_EXT();
@@ -1287,26 +1298,39 @@ int esc_mods_register_irq_2(struct mods_client         *client,
 			    struct MODS_REGISTER_IRQ_2 *p)
 {
 	struct MODS_REGISTER_IRQ_4 irq_data = { {0} };
+#ifdef CONFIG_PCI
+	struct pci_dev *dev;
+	int             err;
+	resource_size_t size;
+#endif
 
 	irq_data.dev = p->dev;
 	irq_data.irq_count = 1;
 	irq_data.irq_flags = p->type;
 
 #ifdef CONFIG_PCI
-	{
-		/* Get the PCI device structure */
-		struct pci_dev *dev;
-		int             err;
+	/* Get the PCI device structure */
+	err = mods_find_pci_dev(client, &p->dev, &dev);
+	if (unlikely(err))
+		return err;
 
-		err = mods_find_pci_dev(client, &p->dev, &dev);
-		if (unlikely(err))
-			return err;
+	irq_data.aperture_addr = pci_resource_start(dev, 0);
 
-		irq_data.aperture_addr = pci_resource_start(dev, 0);
-		irq_data.aperture_size = pci_resource_len(dev, 0);
+	size = pci_resource_len(dev, 0);
 
-		pci_dev_put(dev);
+	pci_dev_put(dev);
+
+	if (size > ~0U) {
+		cl_error("BAR0 size of device %04x:%02x:%02x.%x is %llx and exceeds 32 bits\n",
+			 p->dev.domain,
+			 p->dev.bus,
+			 p->dev.device,
+			 p->dev.function,
+			 (unsigned long long)size);
+		return -EINVAL;
 	}
+
+	irq_data.aperture_size = (unsigned int)size;
 #endif
 
 	return esc_mods_register_irq_4(client, &irq_data);
@@ -1356,6 +1380,7 @@ int esc_mods_query_irq_3(struct mods_client      *client,
 			 struct MODS_QUERY_IRQ_3 *p)
 {
 	struct irq_q_info  *q        = NULL;
+	int                 err      = OK;
 	unsigned int        i        = 0;
 	unsigned long       flags    = 0;
 	unsigned int        cur_time = get_cur_time();
@@ -1378,11 +1403,24 @@ int esc_mods_query_irq_3(struct mods_client      *client,
 		struct pci_dev *dev   = q->data[index].dev;
 
 		if (dev) {
-			p->irq_list[i].dev.domain = pci_domain_nr(dev->bus);
+			const int dom = pci_domain_nr(dev->bus);
+
+			if (dom < 0 || dom > 0xFFFF) {
+				cl_error("unsupported domain %d\n", dom);
+				err = -EINVAL;
+				goto error;
+			}
+			p->irq_list[i].dev.domain = dom;
 			p->irq_list[i].dev.bus = dev->bus->number;
 			p->irq_list[i].dev.device = PCI_SLOT(dev->devfn);
 			p->irq_list[i].dev.function = PCI_FUNC(dev->devfn);
 		} else {
+			if (q->data[index].irq > 0xFFFFU) {
+				cl_error("unsupported IRQ %u\n",
+					 q->data[index].irq);
+				err = -EINVAL;
+				goto error;
+			}
 			p->irq_list[i].dev.domain = 0;
 			p->irq_list[i].dev.bus = q->data[index].irq;
 			p->irq_list[i].dev.device = 0xFFU;
@@ -1415,11 +1453,12 @@ int esc_mods_query_irq_3(struct mods_client      *client,
 	if (q->head != q->tail)
 		p->more = 1;
 
+error:
 	/* Unlock IRQ queue */
 	spin_unlock_irqrestore(&client->irq_lock, flags);
 
 	LOG_EXT();
-	return OK;
+	return err;
 }
 
 int esc_mods_query_irq_2(struct mods_client      *client,
@@ -1451,11 +1490,22 @@ int esc_mods_query_irq(struct mods_client    *client,
 		return retval;
 
 	for (i = 0; i < MODS_MAX_IRQS; i++) {
-		p->irq_list[i].dev.bus    = query_irq.irq_list[i].dev.bus;
-		p->irq_list[i].dev.device = query_irq.irq_list[i].dev.device;
-		p->irq_list[i].dev.function
-					  = query_irq.irq_list[i].dev.function;
-		p->irq_list[i].delay	  = query_irq.irq_list[i].delay;
+		struct mods_irq_3 *entry = &query_irq.irq_list[i];
+
+		if (entry->dev.device > 0xFFU) {
+			cl_error("unsupported device %02x\n",
+				 entry->dev.device);
+			return -EINVAL;
+		}
+		if (entry->dev.function > 0xFFU) {
+			cl_error("unsupported function %02x\n",
+				 entry->dev.function);
+			return -EINVAL;
+		}
+		p->irq_list[i].dev.bus      = entry->dev.bus;
+		p->irq_list[i].dev.device   = entry->dev.device;
+		p->irq_list[i].dev.function = entry->dev.function;
+		p->irq_list[i].delay	    = entry->delay;
 	}
 	p->more = query_irq.more;
 	return OK;
@@ -1548,14 +1598,24 @@ int esc_mods_map_irq(struct mods_client  *client,
 		}
 	}
 
+	if (p->index > 0x7FFFFFFFU) {
+		cl_error("unsupported index %u\n", p->index);
+		err = -EINVAL;
+		goto error;
+	}
 	p->irq = irq_of_parse_and_map(np, p->index);
 	err = of_irq_parse_one(np, p->index, &oirq);
 	if (err) {
 		cl_error("could not parse IRQ\n");
 		goto error;
 	}
+	if ((int)oirq.args[1] < 0) {
+		cl_error("unsupported IRQ %d\n", (int)oirq.args[1]);
+		err = -EINVAL;
+		goto error;
+	}
 
-	hwirq = oirq.args[1];
+	hwirq = (int)oirq.args[1];
 
 	/* Get the platform device handle */
 	pdev = of_find_device_by_node(np);
@@ -1567,12 +1627,13 @@ int esc_mods_map_irq(struct mods_client  *client,
 		struct resource *res_tke =
 			platform_get_resource(pdev, IORESOURCE_MEM, 2);
 		void __iomem    *wdt_tke = NULL;
-		int              wdt_index;
+		unsigned int     wdt_index = 0;
 
 		if (res_tke && res_src) {
 			wdt_tke = devm_ioremap(&pdev->dev, res_tke->start,
 					       resource_size(res_tke));
-			wdt_index = ((res_src->start >> 16) & 0xF) - 0xc;
+			wdt_index = (unsigned int)
+				(((res_src->start >> 16) & 0xFU) - 0xCU);
 		}
 
 		if (wdt_tke) {
