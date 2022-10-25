@@ -340,7 +340,7 @@ static int create_dma_map(struct mods_client   *client,
 	struct MODS_DMA_MAP *p_dma_map;
 	struct scatterlist  *sg;
 	const u32            num_chunks = get_num_chunks(p_mem_info);
-	u32                  alloc_size;
+	size_t               alloc_size;
 	u32                  i;
 	int                  err;
 
@@ -609,7 +609,7 @@ static int release_free_chunks(struct mods_client *client)
 		pages_freed += 1u << free_chunk->order;
 
 		__free_pages(free_chunk->p_page, free_chunk->order);
-		atomic_sub(1u << free_chunk->order, &client->num_pages);
+		atomic_sub(1 << free_chunk->order, &client->num_pages);
 
 		kfree(free_chunk);
 		atomic_dec(&client->num_allocs);
@@ -769,7 +769,7 @@ static struct page *alloc_chunk(struct mods_client   *client,
 	*need_cup = 1;
 
 	if (likely(p_page))
-		atomic_add(1u << order, &client->num_pages);
+		atomic_add(1 << order, &client->num_pages);
 
 	return p_page;
 }
@@ -1216,7 +1216,7 @@ static u32 estimate_num_chunks(u32 num_pages)
 	return num_chunks;
 }
 
-static inline u32 calc_mem_info_size_no_bitmap(u32 num_chunks)
+static inline size_t calc_mem_info_size_no_bitmap(u32 num_chunks)
 {
 	return sizeof(struct MODS_MEM_INFO) +
 		(num_chunks - 1) * sizeof(struct scatterlist);
