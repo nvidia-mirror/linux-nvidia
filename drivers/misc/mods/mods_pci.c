@@ -31,6 +31,9 @@
 #include <linux/property.h>
 #endif
 
+/* Address in config space is 8bit for base caps and 12bit for extended caps */
+#define MODS_MAX_PCI_CFG_ADDR 0xFFFU
+
 int mods_is_pci_dev(struct pci_dev        *dev,
 		    struct mods_pci_dev_2 *pcidev)
 {
@@ -105,6 +108,12 @@ static int find_pci_dev_impl(struct mods_client            *client,
 
 	LOG_ENT();
 
+	if (p->index > 0xFFFFU) {
+		cl_error("invalid device index %u\n", p->index);
+		LOG_EXT();
+		return -EINVAL;
+	}
+
 	cl_debug(DEBUG_PCI,
 		 "find pci dev %04x:%04x, index %u\n",
 		 p->vendor_id,
@@ -167,6 +176,12 @@ static int mods_find_pci_class_code(struct mods_client                *client,
 	int             index = -1;
 
 	LOG_ENT();
+
+	if (p->index > 0xFFFFU) {
+		cl_error("invalid device index %u\n", p->index);
+		LOG_EXT();
+		return -EINVAL;
+	}
 
 	cl_debug(DEBUG_PCI,
 		 "find pci class code %04x, index %u\n",
@@ -380,6 +395,12 @@ int esc_mods_pci_read_2(struct mods_client *client, struct MODS_PCI_READ_2 *p)
 		return err;
 	}
 
+	if (p->address > MODS_MAX_PCI_CFG_ADDR) {
+		cl_error("invalid pci config space address 0x%x\n", p->address);
+		LOG_EXT();
+		return -EINVAL;
+	}
+
 	p->data = 0;
 	switch (p->data_size) {
 	case 1: {
@@ -446,6 +467,19 @@ int esc_mods_pci_read(struct mods_client *client, struct MODS_PCI_READ *p)
 	int err;
 	struct MODS_PCI_READ_2 pci_read = { {0} };
 
+	if (p->bus_number > 0xFFU) {
+		cl_error("invalid bus number 0x%x\n", p->bus_number);
+		return -EINVAL;
+	}
+	if (p->device_number > 0xFFU) {
+		cl_error("invalid device number 0x%x\n", p->device_number);
+		return -EINVAL;
+	}
+	if (p->function_number > 0xFU) {
+		cl_error("invalid function number 0x%x\n", p->function_number);
+		return -EINVAL;
+	}
+
 	pci_read.pci_device.domain	= 0;
 	pci_read.pci_device.bus		= p->bus_number;
 	pci_read.pci_device.device	= p->device_number;
@@ -490,17 +524,32 @@ int esc_mods_pci_write_2(struct mods_client *client, struct MODS_PCI_WRITE_2 *p)
 		return err;
 	}
 
+	if (p->address > MODS_MAX_PCI_CFG_ADDR) {
+		cl_error("invalid pci config space address 0x%x\n", p->address);
+		LOG_EXT();
+		return -EINVAL;
+	}
+
 	switch (p->data_size) {
 	case 1:
-		pci_write_config_byte(dev, p->address, p->data);
+		if (p->data > 0xFFU) {
+			cl_error("invalid byte data 0x%x\n", p->data);
+			err = -EINVAL;
+		} else
+			pci_write_config_byte(dev, p->address, p->data);
 		break;
 	case 2:
-		pci_write_config_word(dev, p->address, p->data);
+		if (p->data > 0xFFFFU) {
+			cl_error("invalid word data 0x%x\n", p->data);
+			err = -EINVAL;
+		} else
+			pci_write_config_word(dev, p->address, p->data);
 		break;
 	case 4:
 		pci_write_config_dword(dev, p->address, p->data);
 		break;
 	default:
+		cl_error("invalid data size %u\n", p->data_size);
 		err = -EINVAL;
 		break;
 	}
@@ -514,6 +563,19 @@ int esc_mods_pci_write(struct mods_client    *client,
 		       struct MODS_PCI_WRITE *p)
 {
 	struct MODS_PCI_WRITE_2 pci_write = { {0} };
+
+	if (p->bus_number > 0xFFU) {
+		cl_error("invalid bus number 0x%x\n", p->bus_number);
+		return -EINVAL;
+	}
+	if (p->device_number > 0xFFU) {
+		cl_error("invalid device number 0x%x\n", p->device_number);
+		return -EINVAL;
+	}
+	if (p->function_number > 0xFU) {
+		cl_error("invalid function number 0x%x\n", p->function_number);
+		return -EINVAL;
+	}
 
 	pci_write.pci_device.domain	= 0;
 	pci_write.pci_device.bus	= p->bus_number;
@@ -529,7 +591,14 @@ int esc_mods_pci_write(struct mods_client    *client,
 int esc_mods_pci_bus_add_dev(struct mods_client              *client,
 			     struct MODS_PCI_BUS_ADD_DEVICES *scan)
 {
-	struct MODS_PCI_BUS_RESCAN rescan = { 0, scan->bus };
+	struct MODS_PCI_BUS_RESCAN rescan = { 0, 0 };
+
+	if (scan->bus > 0xFFU) {
+		cl_error("invalid bus number 0x%x\n", scan->bus);
+		return -EINVAL;
+	}
+
+	rescan.bus = (u16)scan->bus;
 
 	return esc_mods_pci_bus_rescan(client, &rescan);
 }
@@ -631,24 +700,37 @@ int esc_mods_pio_read(struct mods_client *client, struct MODS_PIO_READ *p)
 	return OK;
 }
 
-int esc_mods_pio_write(struct mods_client *client, struct MODS_PIO_WRITE  *p)
+int esc_mods_pio_write(struct mods_client *client, struct MODS_PIO_WRITE *p)
 {
+	int err = OK;
+
 	LOG_ENT();
+
 	switch (p->data_size) {
 	case 1:
-		outb(p->data, p->port);
+		if (p->data > 0xFFU) {
+			cl_error("invalid byte data 0x%x\n", p->data);
+			err = -EINVAL;
+		} else
+			outb(p->data, p->port);
 		break;
 	case 2:
-		outw(p->data, p->port);
+		if (p->data > 0xFFFFU) {
+			cl_error("invalid word data 0x%x\n", p->data);
+			err = -EINVAL;
+		} else
+			outw(p->data, p->port);
 		break;
 	case 4:
 		outl(p->data, p->port);
 		break;
 	default:
-		return -EINVAL;
+		cl_error("invalid data size %u\n", p->data_size);
+		err = -EINVAL;
 	}
+
 	LOG_EXT();
-	return OK;
+	return err;
 }
 
 int esc_mods_device_numa_info_3(struct mods_client             *client,
