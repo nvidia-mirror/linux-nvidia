@@ -36,7 +36,7 @@
 #include <linux/interrupt.h>               /* for enable_irq */
 #include <linux/firmware.h>                /* for request_firmware */
 #include <asm/cacheflush.h>                /* for __flush_dcache_area */
-#if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(5, 14, 0) <= LINUX_VERSION_CODE)
 #include <soc/tegra/mc.h>                  /* for tegra_mc_get_carveout_info */
 #else
 #include <linux/platform/tegra/tegra_mc.h> /* for mc_get_carveout_info */
