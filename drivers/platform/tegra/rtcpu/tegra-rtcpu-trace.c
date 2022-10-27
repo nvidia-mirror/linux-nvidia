@@ -102,6 +102,7 @@ struct tegra_rtcpu_trace {
 
 	/* eventlib */
 	struct platform_device *vi_platform_device;
+	struct platform_device *vi1_platform_device;
 	struct platform_device *isp_platform_device;
 
 	/* printk logging */
@@ -726,14 +727,19 @@ static void rtcpu_trace_vi_eventlib_event(struct tegra_rtcpu_trace *tracer,
 				struct camrtc_event_struct *event)
 {
 #ifdef CONFIG_EVENTLIB
-	struct nvhost_device_data *pdata;
+	struct nvhost_device_data *pdata = NULL;
 	struct nvhost_task_begin task_begin;
 	struct nvhost_task_end task_end;
 	u64 ts = 0;
+	u32 vi_unit_id = event->data.data32[6];
 
 	if (tracer->vi_platform_device == NULL)
 		return;
-	pdata = platform_get_drvdata(tracer->vi_platform_device);
+
+	if (vi_unit_id == 0)
+		pdata = platform_get_drvdata(tracer->vi_platform_device);
+	else if (vi_unit_id == 1)
+		pdata = platform_get_drvdata(tracer->vi1_platform_device);
 	if (pdata == NULL)
 		return;
 
@@ -1452,10 +1458,16 @@ struct tegra_rtcpu_trace *tegra_rtcpu_trace_create(struct device *dev,
 			tracer->isp_platform_device = NULL;
 		}
 		tracer->vi_platform_device =
-			camrtc_device_get_byname(camera_devices, "vi");
+			camrtc_device_get_byname(camera_devices, "vi0");
 		if (IS_ERR(tracer->vi_platform_device)) {
-			dev_info(dev, "no camera-device \"%s\"\n", "vi");
+			dev_info(dev, "no camera-device \"%s\"\n", "vi0");
 			tracer->vi_platform_device = NULL;
+		}
+		tracer->vi1_platform_device =
+			camrtc_device_get_byname(camera_devices, "vi1");
+		if (IS_ERR(tracer->vi1_platform_device)) {
+			dev_info(dev, "no camera-device \"%s\"\n", "vi1");
+			tracer->vi1_platform_device = NULL;
 		}
 	}
 #endif
@@ -1515,6 +1527,7 @@ void tegra_rtcpu_trace_destroy(struct tegra_rtcpu_trace *tracer)
 		return;
 	platform_device_put(tracer->isp_platform_device);
 	platform_device_put(tracer->vi_platform_device);
+	platform_device_put(tracer->vi1_platform_device);
 	of_node_put(tracer->of_node);
 	cancel_delayed_work_sync(&tracer->work);
 	flush_delayed_work(&tracer->work);
