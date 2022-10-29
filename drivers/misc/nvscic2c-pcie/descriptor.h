@@ -76,7 +76,7 @@ union descriptor_t {
 /* Generate a descriptor (auth token) */
 static inline u64
 gen_desc(u32 peer_board_id, u32 peer_soc_id, u32 peer_cntrlr_id, u32 ep_id,
-	 u32 handle_type, u32 handle_id)
+	 u32 handle_type, s32 handle_id)
 {
 	union descriptor_t desc;
 

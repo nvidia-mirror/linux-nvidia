@@ -157,7 +157,7 @@ memobj_free(struct kref *kref)
 }
 
 static int
-memobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+memobj_unmap(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct memobj_map_ref *map = NULL;
 
@@ -175,13 +175,13 @@ memobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
 }
 
 static int
-memobj_putref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+memobj_putref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	return memobj_unmap(vmap_ctx, obj_id);
 }
 
 static int
-memobj_getref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+memobj_getref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct memobj_map_ref *map = NULL;
 
@@ -305,7 +305,7 @@ syncobj_free(struct kref *kref)
 }
 
 static int
-syncobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+syncobj_unmap(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct syncobj_map_ref *map = NULL;
 
@@ -323,13 +323,13 @@ syncobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
 }
 
 static int
-syncobj_putref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+syncobj_putref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	return syncobj_unmap(vmap_ctx, obj_id);
 }
 
 static int
-syncobj_getref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+syncobj_getref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct memobj_map_ref *map = NULL;
 
@@ -420,7 +420,7 @@ importobj_free(struct kref *kref)
 }
 
 static int
-importobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+importobj_unmap(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct importobj_map_ref *map = NULL;
 	struct comm_msg msg = {0};
@@ -457,13 +457,13 @@ importobj_unmap(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
 }
 
 static int
-importobj_putref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+importobj_putref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	return importobj_unmap(vmap_ctx, obj_id);
 }
 
 static int
-importobj_getref(struct vmap_ctx_t *vmap_ctx, u32 obj_id)
+importobj_getref(struct vmap_ctx_t *vmap_ctx, s32 obj_id)
 {
 	struct memobj_map_ref *map = NULL;
 
