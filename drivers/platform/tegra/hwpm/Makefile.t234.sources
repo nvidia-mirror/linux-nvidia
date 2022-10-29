@@ -25,14 +25,31 @@ nvhwpm-t234-objs += hal/t234/ip/rtr/t234_rtr.o
 nvhwpm-t234-objs += hal/t234/ip/pma/t234_pma.o
 
 #
-# Define a Minimal IP config flag
-# Enable only MSS_Channel, NVDLA and PVA IPs
-# When CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE is set to y.
+# One of the HWPM components is a perfmux. Perfmux registers belong to the
+# IP domain. There are 2 ways of accessing perfmux registers
+# - option 1: implement HWPM <-> IP interface. IP drivers register with HWPM
+#             driver and share required function pointers
+# - option 2: map perfmux register address in HWPM driver
+# Option 1 is the preferred solution. However, IP drivers have yet to
+# implement the interface. Such IPs can be force enabled from HWPM driver
+# perspective (option 2). Marking an IP available forcefully requires the user
+# to unpowergate the IP before running any HWPM experiments.
 #
-CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE=y
-
-ifeq ($(CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE),y)
+# Enable CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE for internal builds.
+# Note: We should work towards removing force enable flag dependency.
+#
+ifeq ($(NV_BUILD_CONFIGURATION_IS_EXTERNAL),0)
 ccflags-y += -DCONFIG_T234_HWPM_ALLOW_FORCE_ENABLE
+endif
+
+#
+# Currently, PVA, DLA and MSS channel are the IPs supported
+# for performance metrics in external builds.
+# Define CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE flag.
+#
+ifeq ($(NV_BUILD_CONFIGURATION_IS_EXTERNAL),1)
+CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE=y
+ccflags-y += -DCONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE
 endif
 
 ifeq ($(CONFIG_TEGRA_GRHOST_NVDLA),y)
@@ -50,6 +67,7 @@ ccflags-y += -DCONFIG_T234_HWPM_IP_MSS_CHANNEL
 nvhwpm-t234-objs += hal/t234/ip/mss_channel/t234_mss_channel.o
 endif
 
+# Include other IPs if minimal build is not enabled.
 ifneq ($(CONFIG_TEGRA_HWPM_MINIMAL_IP_ENABLE),y)
 ccflags-y += -DCONFIG_T234_HWPM_IP_DISPLAY
 nvhwpm-t234-objs += hal/t234/ip/display/t234_display.o

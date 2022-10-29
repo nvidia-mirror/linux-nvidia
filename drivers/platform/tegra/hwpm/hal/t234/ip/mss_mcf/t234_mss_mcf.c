@@ -15,8 +15,8 @@
 
 #include <tegra_hwpm.h>
 #include <hal/t234/t234_regops_allowlist.h>
+#include <hal/t234/t234_perfmon_device_index.h>
 #include <hal/t234/hw/t234_addr_map_soc_hwpm.h>
-#include <t234_perfmon_device_index.h>
 
 static struct hwpm_ip_aperture t234_mss_mcf_inst0_perfmon_element_static_array[
 	T234_HWPM_IP_MSS_MCF_NUM_PERFMON_PER_INST] = {

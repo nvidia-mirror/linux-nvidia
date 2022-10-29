@@ -293,11 +293,17 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 	int ret = 0;
 
 	tegra_hwpm_fn(hwpm, " ");
-#if defined(CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE)
 
-#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
-	/* MSS CHANNEL */
 	if (tegra_hwpm_is_hypervisor_mode()) {
+		/* MSS CHANNEL */
+		/*
+		 * MSS channel driver cannot implement HWPM <-> IP
+		 * interface in AV + L config.
+		 * Since MSS channel is part of both POR and non-POR IPs,
+		 * this force enable is not limited by minimal config or
+		 * force enable flags.
+		 */
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
 		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
 			addr_map_mc0_base_r(),
 			T234_HWPM_IP_MSS_CHANNEL, true);
@@ -306,19 +312,21 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 				"T234_HWPM_IP_MSS_CHANNEL force enable failed");
 			return ret;
 		}
-	}
 #endif
+	}
 
+#if defined(CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE)
+
+	/* MSS GPU HUB */
 #if defined(CONFIG_T234_HWPM_IP_MSS_GPU_HUB)
-		/* MSS GPU HUB */
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
-			addr_map_mss_nvlink_1_base_r(),
-			T234_HWPM_IP_MSS_GPU_HUB, true);
-		if (ret != 0) {
-			tegra_hwpm_err(hwpm,
-				"T234_HWPM_IP_MSS_GPU_HUB force enable failed");
-			return ret;
-		}
+	ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
+		addr_map_mss_nvlink_1_base_r(),
+		T234_HWPM_IP_MSS_GPU_HUB, true);
+	if (ret != 0) {
+		tegra_hwpm_err(hwpm,
+			"T234_HWPM_IP_MSS_GPU_HUB force enable failed");
+		return ret;
+	}
 #endif
 
 	if (tegra_hwpm_is_platform_silicon()) {
@@ -344,8 +352,9 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 		}
 #endif
 */
-#if defined(CONFIG_T234_HWPM_IP_ISP)
 		/* ISP */
+/*
+#if defined(CONFIG_T234_HWPM_IP_ISP)
 		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
 			addr_map_isp_thi_base_r(),
 			T234_HWPM_IP_ISP, true);
@@ -355,6 +364,7 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 			return ret;
 		}
 #endif
+*/
 
 		/* MGBE */
 /*
@@ -369,9 +379,9 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 		}
 #endif
 */
-
-#if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		/* NVDEC */
+/*
+#if defined(CONFIG_T234_HWPM_IP_NVDEC)
 		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
 			addr_map_nvdec_base_r(),
 			T234_HWPM_IP_NVDEC, true);
@@ -381,6 +391,7 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 			return ret;
 		}
 #endif
+*/
 
 		/* PCIE */
 /*
@@ -426,22 +437,7 @@ int t234_hwpm_force_enable_ips(struct tegra_soc_hwpm *hwpm)
 #endif
 */
 	}
-#endif
-		/*
-		 * SCF is an independent IP with a single perfmon only.
-		 * SCF should not be part of force enable config flag.
-		 */
-#if defined(CONFIG_T234_HWPM_IP_SCF)
-		/* SCF */
-		ret = tegra_hwpm_set_fs_info_ip_ops(hwpm, NULL,
-			addr_map_rpg_pm_scf_base_r(),
-			T234_HWPM_IP_SCF, true);
-		if (ret != 0) {
-			tegra_hwpm_err(hwpm,
-				"T234_HWPM_IP_SCF force enable failed");
-			return ret;
-		}
-#endif
+#endif /* CONFIG_T234_HWPM_ALLOW_FORCE_ENABLE */
 
 	return ret;
 }

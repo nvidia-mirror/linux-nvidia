@@ -58,6 +58,7 @@ static struct hwpm_ip_aperture t234_pva_inst0_perfmon_element_static_array[
 		.element_index = 2U,
 		.dt_mmio = NULL,
 		.name = "perfmon_pvac0",
+		.device_index = T234_PVAC0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_pva0_2_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_pva0_2_limit_r(),
 		.start_pa = 0ULL,
