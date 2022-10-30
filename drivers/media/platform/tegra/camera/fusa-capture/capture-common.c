@@ -126,11 +126,39 @@ static inline enum dma_data_direction flag_dma_direction(
  * @returns	Physical address of scatterlist mapping
  */
 static inline dma_addr_t mapping_iova(
-	const struct capture_mapping *pin)
+	const struct capture_mapping *pin,
+	uint64_t mem_offset)
 {
-	dma_addr_t addr = sg_dma_address(pin->sgt->sgl);
+	dma_addr_t iova = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+	iova = (sg_dma_address(pin->sgt->sgl) != 0) ? sg_dma_address(pin->sgt->sgl) :
+		sg_phys(pin->sgt->sgl);
+	iova += mem_offset;
+#else
+	struct scatterlist *sg;
+	uint64_t mem_offset_adjusted = mem_offset;
+	int i;
 
-	return (addr != 0) ? addr : sg_phys(pin->sgt->sgl);
+	/* Traverse the scatterlist and adjust the offset
+	 * as per the page block. This is needed in case
+	 * where memory spans across multiple pages and
+	 * is non-contiguous
+	 */
+	for_each_sgtable_dma_sg(pin->sgt, sg, i) {
+		if (mem_offset_adjusted < sg_dma_len(sg)) {
+			iova = (sg_dma_address(sg) == 0) ? sg_phys(sg) : sg_dma_address(sg);
+			iova += mem_offset_adjusted;
+			if (iova < mem_offset_adjusted) {
+				/** It means iova has wrapped */
+				return 0;
+			}
+			break;
+		}
+		mem_offset_adjusted -=  sg_dma_len(sg);
+	}
+#endif
+
+	return iova;
 }
 
 /**
@@ -476,14 +504,18 @@ int capture_common_pin_and_get_iova(struct capture_buffer_table *buf_ctx,
 
 	buf = mapping_buf(map);
 	size = buf->size;
-	iova = mapping_iova(map);
-
 	if (mem_offset >= size) {
 		pr_err("%s: offset is out of bounds\n", __func__);
 		return -EINVAL;
 	}
 
-	*meminfo_base_address = iova + mem_offset;
+	iova = mapping_iova(map, mem_offset);
+	if (iova == 0) {
+		pr_err("%s: Invalid iova\n", __func__);
+		return -EINVAL;
+	}
+
+	*meminfo_base_address = iova;
 	*meminfo_size = size - mem_offset;
 
 	unpins->data[unpins->num_unpins] = map;
