@@ -19,10 +19,13 @@
 #ifndef NVHOST_SYNCPT_UNIT_INTERFACE_H
 #define NVHOST_SYNCPT_UNIT_INTERFACE_H
 
+#include <linux/scatterlist.h>
+
 struct platform_device;
 struct nvhost_syncpt;
 
 struct nvhost_syncpt_unit_interface {
+	struct scatterlist sg;
 	dma_addr_t start;
 	uint32_t syncpt_page_size;
 };
