@@ -32,6 +32,12 @@ struct tsec_device_data t23x_tsec_data = {
 	.riscv_image_bin	= "tegra23x/nvhost_tsec_riscv.fw",
 };
 
+struct tsec_device_data t239_tsec_data = {
+	.rate = {192000000, 0, 204000000},
+	.riscv_desc_bin		= "tegra239/nvhost_tsec_desc.fw",
+	.riscv_image_bin	= "tegra239/nvhost_tsec_riscv.fw",
+};
+
 /*
  * TSEC Register Access APIs
  */
@@ -264,6 +270,8 @@ const struct dev_pm_ops tsec_module_pm_ops = {
 static const struct of_device_id tsec_of_match[] = {
 	{ .compatible = "nvidia,tegra234-tsec",
 		.data = (struct tsec_device_data *)&t23x_tsec_data },
+	{ .compatible = "nvidia,tegra239-tsec",
+		.data = (struct nvhost_device_data *)&t239_tsec_data },
 	{ },
 };
 

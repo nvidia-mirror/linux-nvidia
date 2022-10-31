@@ -777,11 +777,6 @@ static struct of_device_id tegra_tsec_of_match[] = {
 	{ .name = "tsecb",
 		.compatible = "nvidia,tegra194-tsec",
 		.data = (struct nvhost_device_data *)&t19_tsecb_info },
-#ifdef CONFIG_TEGRA_T239_GRHOST
-	{ .name = "tsec",
-		.compatible = "nvidia,tegra239-tsec",
-		.data = (struct nvhost_device_data *)&t239_tsec_info },
-#endif
 	{ },
 };
 
