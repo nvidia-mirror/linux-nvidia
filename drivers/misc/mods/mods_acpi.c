@@ -137,10 +137,9 @@ static int acpi_get_dev_children(struct mods_client *client,
 				 acpi_handle         dev_handle,
 				 void               *out_data)
 {
-	int                 err     = OK;
-	acpi_status         status;
-	struct acpi_device *device  = NULL;
-	struct acpi_dev_check_context adcc = {
+	int                           err    = OK;
+	struct acpi_device           *device = NULL;
+	struct acpi_dev_check_context adcc   = {
 		.client		= client,
 		.fptr		= fptr,
 		.out_data	= out_data,
@@ -150,17 +149,14 @@ static int acpi_get_dev_children(struct mods_client *client,
 
 #ifdef MODS_HAS_ACPI_FETCH
 	device = acpi_fetch_acpi_dev(dev_handle);
-	status = device ? 0 : -EINVAL;
+	err = device ? 0 : -EINVAL;
 #else
-	status = acpi_bus_get_device(dev_handle, &device);
+	err = acpi_bus_get_device(dev_handle, &device);
 #endif
-	if (ACPI_FAILURE(status) || !device) {
+	if (unlikely(err))
 		cl_error("ACPI: device for fetching device children not found\n");
-		LOG_EXT();
-		return -EINVAL;
-	}
-
-	err = acpi_dev_each_child_node(device, acpi_dev_check_one, &adcc);
+	else
+		err = acpi_dev_each_child_node(device, acpi_dev_check_one, &adcc);
 
 	LOG_EXT();
 	return err;
