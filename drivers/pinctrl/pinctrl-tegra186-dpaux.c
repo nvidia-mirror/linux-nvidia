@@ -71,9 +71,9 @@ struct tegra_dpaux_pinctl {
 	struct pinctrl_dev *pinctrl;
 
 	const struct pinctrl_pin_desc *pins;
-	unsigned npins;
+	int npins;
 	const struct tegra_dpaux_function *functions;
-	unsigned int nfunctions;
+	int nfunctions;
 	const struct tegra_dpaux_pingroup *groups;
 	unsigned ngroups;
 	int powergate_id;
