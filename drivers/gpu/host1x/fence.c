@@ -72,7 +72,7 @@ const struct dma_fence_ops host1x_syncpt_fence_ops = {
 	.enable_signaling = host1x_syncpt_fence_enable_signaling,
 };
 
-void host1x_fence_signal(struct host1x_syncpt_fence *f)
+void host1x_fence_signal(struct host1x_syncpt_fence *f, ktime_t ts)
 {
 	if (atomic_xchg(&f->signaling, 1)) {
 		/*
@@ -91,7 +91,7 @@ void host1x_fence_signal(struct host1x_syncpt_fence *f)
 		dma_fence_put(&f->base);
 	}
 
-	dma_fence_signal_locked(&f->base);
+	dma_fence_signal_timestamp_locked(&f->base, ts);
 	dma_fence_put(&f->base);
 }
 

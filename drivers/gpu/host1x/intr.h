@@ -8,6 +8,8 @@
 #ifndef __HOST1X_INTR_H
 #define __HOST1X_INTR_H
 
+#include <linux/timekeeping.h>
+
 struct host1x;
 struct host1x_syncpt_fence;
 
@@ -23,7 +25,7 @@ void host1x_intr_start(struct host1x *host);
 /* Disable host1x sync point interrupt */
 void host1x_intr_stop(struct host1x *host);
 
-void host1x_intr_handle_interrupt(struct host1x *host, unsigned int id);
+void host1x_intr_handle_interrupt(struct host1x *host, unsigned int id, ktime_t ts);
 
 void host1x_intr_add_fence_locked(struct host1x *host, struct host1x_syncpt_fence *fence);
 

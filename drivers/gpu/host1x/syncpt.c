@@ -9,6 +9,7 @@
 #include <linux/device.h>
 #include <linux/dma-fence.h>
 #include <linux/slab.h>
+#include <linux/timekeeping.h>
 
 #include <trace/events/host1x.h>
 
@@ -211,14 +212,15 @@ int host1x_syncpt_incr(struct host1x_syncpt *sp)
 EXPORT_SYMBOL(host1x_syncpt_incr);
 
 /**
- * host1x_syncpt_wait() - wait for a syncpoint to reach a given value
+ * host1x_syncpt_wait_ts() - wait for a syncpoint to reach a given value
  * @sp: host1x syncpoint
  * @thresh: threshold
  * @timeout: maximum time to wait for the syncpoint to reach the given value
  * @value: return location for the syncpoint value
+ * @ts: return location for completion timestamp
  */
-int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
-		       u32 *value)
+int host1x_syncpt_wait_ts(struct host1x_syncpt *sp, u32 thresh, long timeout, u32 *value,
+			  ktime_t *ts)
 {
 	struct dma_fence *fence;
 	long wait_err;
@@ -227,6 +229,8 @@ int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
 
 	if (value)
 		*value = host1x_syncpt_load(sp);
+	if (ts)
+		*ts = ktime_get();
 
 	if (host1x_syncpt_is_expired(sp, thresh))
 		return 0;
@@ -243,10 +247,13 @@ int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
 	wait_err = dma_fence_wait_timeout(fence, true, timeout);
 	if (wait_err == 0)
 		host1x_fence_cancel(fence);
-	dma_fence_put(fence);
 
 	if (value)
 		*value = host1x_syncpt_load(sp);
+	if (ts)
+		*ts = fence->timestamp;
+
+	dma_fence_put(fence);
 
 	if (wait_err == 0)
 		return -EAGAIN;
@@ -254,6 +261,19 @@ int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
 		return wait_err;
 	else
 		return 0;
+}
+EXPORT_SYMBOL(host1x_syncpt_wait_ts);
+
+/**
+ * host1x_syncpt_wait() - wait for a syncpoint to reach a given value
+ * @sp: host1x syncpoint
+ * @thresh: threshold
+ * @timeout: maximum time to wait for the syncpoint to reach the given value
+ * @value: return location for the syncpoint value
+ */
+int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout, u32 *value)
+{
+	return host1x_syncpt_wait_ts(sp, thresh, timeout, value, NULL);
 }
 EXPORT_SYMBOL(host1x_syncpt_wait);
 

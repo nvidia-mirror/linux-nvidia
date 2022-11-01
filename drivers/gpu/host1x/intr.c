@@ -72,7 +72,7 @@ bool host1x_intr_remove_fence(struct host1x *host, struct host1x_syncpt_fence *f
 	return true;
 }
 
-void host1x_intr_handle_interrupt(struct host1x *host, unsigned int id)
+void host1x_intr_handle_interrupt(struct host1x *host, unsigned int id, ktime_t ts)
 {
 	struct host1x_syncpt *sp = &host->syncpt[id];
 	struct host1x_syncpt_fence *fence, *tmp;
@@ -89,7 +89,7 @@ void host1x_intr_handle_interrupt(struct host1x *host, unsigned int id)
 		}
 
 		list_del_init(&fence->list);
-		host1x_fence_signal(fence);
+		host1x_fence_signal(fence, ts);
 	}
 
 	/* Re-enable interrupt if necessary */

@@ -1057,6 +1057,13 @@ struct drm_tegra_syncpoint_wait {
 	__u32 value;
 
 	__u32 padding;
+
+	/**
+	 * @timestamp: [out]
+	 *
+	 * CLOCK_MONOTONIC timestamp in nanoseconds taken when the wait completes.
+	 */
+	__u64 timestamp;
 };
 
 #define DRM_IOCTL_TEGRA_CHANNEL_OPEN DRM_IOWR(DRM_COMMAND_BASE + 0x10, struct drm_tegra_channel_open)

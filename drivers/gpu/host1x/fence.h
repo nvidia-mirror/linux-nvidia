@@ -25,6 +25,6 @@ struct host1x_fence_list {
 	struct list_head list;
 };
 
-void host1x_fence_signal(struct host1x_syncpt_fence *fence);
+void host1x_fence_signal(struct host1x_syncpt_fence *fence, ktime_t ts);
 
 #endif

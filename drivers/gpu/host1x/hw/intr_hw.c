@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/io.h>
+#include <linux/timekeeping.h>
 
 #include "../intr.h"
 #include "../dev.h"
@@ -18,6 +19,9 @@ static irqreturn_t syncpt_thresh_isr(int irq, void *dev_id)
 	struct host1x *host = dev_id;
 	unsigned long reg;
 	unsigned int i, id;
+	ktime_t ts;
+
+	ts = ktime_get();
 
 	for (i = 0; i < DIV_ROUND_UP(host->info->nb_pts, 32); i++) {
 		reg = host1x_sync_readl(host,
@@ -29,7 +33,7 @@ static irqreturn_t syncpt_thresh_isr(int irq, void *dev_id)
 			HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(i));
 
 		for_each_set_bit(id, &reg, 32)
-			host1x_intr_handle_interrupt(host, i * 32 + id);
+			host1x_intr_handle_interrupt(host, i * 32 + id, ts);
 	}
 
 	return IRQ_HANDLED;

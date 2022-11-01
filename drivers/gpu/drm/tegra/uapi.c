@@ -345,6 +345,8 @@ int tegra_drm_ioctl_syncpoint_wait(struct drm_device *drm, void *data, struct dr
 	struct drm_tegra_syncpoint_wait *args = data;
 	signed long timeout_jiffies;
 	struct host1x_syncpt *sp;
+	ktime_t ts;
+	int err;
 
 	if (args->padding != 0)
 		return -EINVAL;
@@ -355,5 +357,11 @@ int tegra_drm_ioctl_syncpoint_wait(struct drm_device *drm, void *data, struct dr
 
 	timeout_jiffies = drm_timeout_abs_to_jiffies(args->timeout_ns);
 
-	return host1x_syncpt_wait(sp, args->threshold, timeout_jiffies, &args->value);
+	err = host1x_syncpt_wait_ts(sp, args->threshold, timeout_jiffies, &args->value, &ts);
+	if (err)
+		return err;
+
+	args->timestamp = ktime_to_ns(ts);
+
+	return 0;
 }

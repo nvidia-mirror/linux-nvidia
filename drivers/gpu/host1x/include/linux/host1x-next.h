@@ -10,6 +10,7 @@
 #include <linux/dma-direction.h>
 #include <linux/dma-fence.h>
 #include <linux/spinlock.h>
+#include <linux/timekeeping.h>
 #include <linux/types.h>
 
 enum host1x_class {
@@ -211,6 +212,8 @@ u32 host1x_syncpt_read_max(struct host1x_syncpt *sp);
 u32 host1x_syncpt_read(struct host1x_syncpt *sp);
 int host1x_syncpt_incr(struct host1x_syncpt *sp);
 u32 host1x_syncpt_incr_max(struct host1x_syncpt *sp, u32 incrs);
+int host1x_syncpt_wait_ts(struct host1x_syncpt *sp, u32 thresh, long timeout,
+			  u32 *value, ktime_t *ts);
 int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
 		       u32 *value);
 struct host1x_syncpt *host1x_syncpt_request(struct host1x_client *client,
