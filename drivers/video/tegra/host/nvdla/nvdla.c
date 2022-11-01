@@ -978,6 +978,7 @@ err_alloc_window_size_mem:
 err_alloc_utilization_rate_mem:
 	nvdla_free_cmd_memory(pdev);
 err_alloc_cmd_mem:
+	nvhost_syncpt_unit_interface_deinit(pdev);
 err_mss_init:
 	nvdla_queue_deinit(nvdla_dev->pool);
 err_queue_init:
@@ -1012,6 +1013,7 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 	tegra_soc_hwpm_ip_unregister(&hwpm_ip_ops);
 #endif
 
+	nvhost_syncpt_unit_interface_deinit(pdev);
 	nvdla_queue_deinit(nvdla_dev->pool);
 	nvhost_client_device_release(pdev);
 	nvhost_module_deinit(pdev);
