@@ -173,10 +173,7 @@ static int tsec_read_img_and_desc(struct platform_device *dev,
 	for (w = 0; w < fw_image->size/sizeof(u32); w++)
 		rv_data->backdoor_img_va[w] = le32_to_cpu(((__le32 *)fw_image->data)[w]);
 #if (KERNEL_VERSION(5, 14, 0) <= LINUX_VERSION_CODE)
-#ifdef CONFIG_EXPORT_DCACHE_OPS
-	dcache_clean_inval_poc((unsigned long)rv_data->backdoor_img_va,
-		(unsigned long)rv_data->backdoor_img_va + rv_data->backdoor_img_size);
-#endif
+	arch_invalidate_pmem(rv_data->backdoor_img_va, rv_data->backdoor_img_size);
 #else
 	__flush_dcache_area((void *)rv_data->backdoor_img_va, fw_image->size);
 #endif
