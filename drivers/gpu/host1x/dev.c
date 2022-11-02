@@ -388,6 +388,12 @@ static const struct host1x_sid_entry tegra234_sid_table[] = {
 		.offset = 0x34,
 		.limit = 0x34,
 	},
+	{
+		/* TSEC MMIO */
+		.base = 0x16a8,
+		.offset = 0x30,
+		.limit = 0x34,
+	},
 };
 
 static const struct host1x_info host1x08_info = {
