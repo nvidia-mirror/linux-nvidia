@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -41,6 +41,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/spinlock.h>
 #include <linux/clocksource.h>
+#include <linux/tegra_prod.h>
 #include <linux/platform/tegra/ptp-notifier.h>
 #include <linux/mailbox_client.h>
 #ifdef CONFIG_CLK_SRC_TEGRA18_US_TIMER

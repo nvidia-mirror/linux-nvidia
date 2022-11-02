@@ -298,6 +298,7 @@ struct ttcan_controller {
 	struct list_head rx_q1;
 	struct list_head rx_b;
 	struct list_head tx_evt;
+	struct tegra_prod *prod_list;
 	void __iomem *base;	/* controller regs space should be remapped. */
 	void __iomem *xbase;    /* extra registers are mapped */
 	void __iomem *mram_vbase;
@@ -505,7 +506,7 @@ void ttcan_set_tx_cancel_request(struct ttcan_controller *ttcan, u32 txbcr);
 u32 ttcan_read_tx_cancelled_reg(struct ttcan_controller *ttcan);
 u32 ttcan_read_psr(struct ttcan_controller *ttcan);
 int ttcan_read_rx_buffer(struct ttcan_controller *ttcan);
-int ttcan_set_bitrate(struct ttcan_controller *ttcan);
+int ttcan_set_bitrate(struct mttcan_priv *priv);
 int ttcan_tx_req_pending(struct ttcan_controller *ttcan);
 int ttcan_tx_buff_req_pending(struct ttcan_controller *ttcan, u8 index);
 

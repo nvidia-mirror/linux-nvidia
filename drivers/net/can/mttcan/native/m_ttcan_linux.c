@@ -997,7 +997,7 @@ static int mttcan_do_set_bittiming(struct net_device *dev)
 	if (priv->can.ctrlmode & CAN_CTRLMODE_FD_NON_ISO)
 		priv->ttcan->bt_config.fd_flags |= CAN_FD_NON_ISO_FLAG;
 
-	err = ttcan_set_bitrate(priv->ttcan);
+	err = ttcan_set_bitrate(priv);
 	if (err) {
 		netdev_err(priv->dev, "Unable to set bitrate\n");
 		return err;
@@ -1853,6 +1853,12 @@ static int mttcan_probe(struct platform_device *pdev)
 	ret = mttcan_hw_init(priv);
 	if (ret)
 		goto exit_free_device;
+
+	priv->ttcan->prod_list = devm_tegra_prod_get(&pdev->dev);
+	if (IS_ERR_OR_NULL(priv->ttcan->prod_list)) {
+		dev_dbg(&pdev->dev, "Prod-setting not available\n");
+		priv->ttcan->prod_list = NULL;
+	}
 
 	ret = register_mttcan_dev(dev);
 	if (ret) {

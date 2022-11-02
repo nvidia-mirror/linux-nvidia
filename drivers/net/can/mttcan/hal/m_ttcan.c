@@ -23,6 +23,8 @@
 #include <linux/delay.h>
 
 #define MTTCAN_INIT_TIMEOUT 1000
+#define MTTCAN_SPEED_5MBPS  5000000
+#define MTTCAN_SPEED_8MBPS  8333333
 
 void ttcan_print_version(struct ttcan_controller *ttcan)
 {
@@ -303,14 +305,38 @@ inline u32 ttcan_read_ecr(struct ttcan_controller *ttcan)
 	return ttcan_read32(ttcan, ADR_MTTCAN_ECR);
 }
 
-int ttcan_set_bitrate(struct ttcan_controller *ttcan)
+static void tegra_mttcan_config_prod_settings(struct mttcan_priv *priv)
 {
+	struct ttcan_controller *ttcan = priv->ttcan;
+	char *prod_name;
+	int ret;
+
+	switch (ttcan->bt_config.data.bitrate) {
+	case MTTCAN_SPEED_5MBPS:
+		prod_name = "prod_c_can_5m";
+		break;
+	case MTTCAN_SPEED_8MBPS:
+		prod_name = "prod_c_can_8m";
+		break;
+	default:
+		prod_name = "prod_c_can_2m_1m";
+		break;
+	}
+
+	ret = tegra_prod_set_by_name(&ttcan->base, prod_name,
+				     ttcan->prod_list);
+	if (ret == 0)
+		dev_dbg(priv->device, "setting prod: %s\n", prod_name);
+}
+
+int ttcan_set_bitrate(struct mttcan_priv *priv)
+{
+	struct ttcan_controller *ttcan = priv->ttcan;
 	unsigned int temp_reg;
 	int ret = 0;
 	u32 cccr_reg;
 	u32 nbtp_reg;
 	u32 dbtp_reg;
-	u32 tdcr_reg;
 
 	nbtp_reg = ((ttcan->bt_config.nominal.phase_seg2 - 1) <<
 		    MTT_NBTP_NTSEG2_SHIFT) & MTT_NBTP_NTSEG2_MASK;
@@ -323,12 +349,12 @@ int ttcan_set_bitrate(struct ttcan_controller *ttcan)
 	nbtp_reg |= (ttcan->bt_config.nominal.brp - 1) <<
 	    MTT_NBTP_NBRP_SHIFT & MTT_NBTP_NBRP_MASK;
 
-	pr_debug("%s NBTP(0x%x) value (0x%x)\n", __func__, ADR_MTTCAN_NBTP,
+	dev_dbg(priv->device, "%s NBTP(0x%x) value (0x%x)\n", __func__, ADR_MTTCAN_NBTP,
 		nbtp_reg);
 	ret = ttcan_write32_check(ttcan, ADR_MTTCAN_NBTP, nbtp_reg,
 		MTTCAN_NBTP_MSK);
 	if (ret) {
-		pr_err("%s: Normal bitrate configuration failed\n", __func__);
+		dev_err(priv->device, "%s: Normal bitrate configuration failed\n", __func__);
 		return ret;
 	}
 
@@ -347,28 +373,18 @@ int ttcan_set_bitrate(struct ttcan_controller *ttcan)
 		dbtp_reg |= (ttcan->bt_config.data.tdc << MTT_DBTP_TDC_SHIFT) &
 		    MTT_DBTP_TDC_MASK;
 
-		tdcr_reg = (ttcan->bt_config.data.tdc_offset <<
-			MTT_TDCR_TDCO_SHIFT) & MTT_TDCR_TDCO_MASK;
-
-		tdcr_reg |= ttcan->tdc_offset;
-
-		pr_debug("%s DBTP(0x%x) value (0x%x)\n", __func__,
+		dev_dbg(priv->device, "%s DBTP(0x%x) value (0x%x)\n", __func__,
 			ADR_MTTCAN_DBTP, dbtp_reg);
 		ret = ttcan_write32_check(ttcan, ADR_MTTCAN_DBTP,
 					dbtp_reg, MTTCAN_DBTP_MSK);
 		if (ret) {
-			pr_err("%s: Fast bitrate configuration failed\n",
+			dev_err(priv->device, "%s: Fast bitrate configuration failed\n",
 			       __func__);
 			return ret;
 		}
 
-		ret = ttcan_write32_check(ttcan, ADR_MTTCAN_TDCR,
-					tdcr_reg, MTTCAN_TDCR_MSK);
-		if (ret) {
-			pr_err("%s: Fast bitrate configuration failed\n",
-			       __func__);
-			return ret;
-		}
+		if (ttcan->prod_list)
+			tegra_mttcan_config_prod_settings(priv);
 
 		temp_reg = cccr_reg = ttcan_read32(ttcan, ADR_MTTCAN_CCCR);
 		if (ttcan->bt_config.fd_flags & CAN_FD_FLAG)
@@ -390,7 +406,7 @@ int ttcan_set_bitrate(struct ttcan_controller *ttcan)
 			ret = ttcan_write32_check(ttcan, ADR_MTTCAN_CCCR,
 				cccr_reg, MTTCAN_CCCR_MSK);
 			if (ret) {
-				pr_err("%s: Error in enabling FD\n", __func__);
+				dev_err(priv->device, "%s: Error in enabling FD\n", __func__);
 				return ret;
 			}
 		}
