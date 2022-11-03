@@ -411,7 +411,13 @@ void nvmap_heap_free(struct nvmap_heap_block *b)
 	mutex_lock(&h->lock);
 
 	lb = container_of(b, struct list_block, block);
-	nvmap_flush_heap_block(NULL, b, lb->size, lb->mem_prot);
+	if (!nvmap_dev->co_cache_flush_at_alloc) {
+		/*
+		 * For carveouts, if cache flush is done at buffer allocation time
+		 * then no need to do it during buffer release time.
+		 */
+		nvmap_flush_heap_block(NULL, b, lb->size, lb->mem_prot);
+	}
 	do_heap_free(b);
 	/*
 	 * If this HEAP has pm_ops defined and powering off the
@@ -507,11 +513,17 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 #ifdef NVMAP_CONFIG_DEBUG_MAPS
 	h->device_names = RB_ROOT;
 #endif /* NVMAP_CONFIG_DEBUG_MAPS */
-	if (!co->no_cpu_access && co->usage_mask != NVMAP_HEAP_CARVEOUT_VPR
-		&& nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV,
-				base, base + len, true, true)) {
-		dev_err(parent, "cache flush failed\n");
-		goto fail;
+	if (!nvmap_dev->co_cache_flush_at_alloc) {
+		/*
+		 * For carveouts, if cache flush is done at buffer allocation time
+		 * then no need to do it during carveout creation time.
+		 */
+		if (!co->no_cpu_access && co->usage_mask != NVMAP_HEAP_CARVEOUT_VPR
+			&& nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV,
+					base, base + len, true, true)) {
+			dev_err(parent, "cache flush failed\n");
+			goto fail;
+		}
 	}
 	wmb();
 
