@@ -37,7 +37,7 @@ static struct dentry *mods_debugfs_dir;
 #include <soc/tegra/kfuse.h>
 #endif
 
-#ifdef CONFIG_TEGRA_DC
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_TEGRA_DC)
 #include <video/tegra_dc_ext_kernel.h>
 #include <../drivers/video/tegra/dc/dc_config.h>
 #include <../drivers/video/tegra/dc/dsi.h>
@@ -528,7 +528,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 #endif
 	struct dentry *retval;
 	int err = 0;
-#ifdef CONFIG_TEGRA_DC
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_TEGRA_DC)
 	unsigned int dc_idx;
 	int nheads = tegra_dc_get_numof_dispheads();
 	int client_reg_rc = 0;
@@ -558,9 +558,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 			return client_reg_rc;
 		}
 	}
-#endif
 
-#ifdef CONFIG_TEGRA_DC
 	if (nheads <= 0 && !skip_tegradc_debug_nodes) {
 		pr_err("%s: max heads:%d cannot be negative or zero\n",
 			__func__, nheads);
@@ -628,7 +626,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 	}
 #endif
 
-#ifdef CONFIG_TEGRA_DC
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_TEGRA_DC)
 	if (!skip_tegradc_debug_nodes) {
 		for (dc_idx = 0; dc_idx < nheads; dc_idx++) {
 			struct dentry *dc_debugfs_dir;
