@@ -409,7 +409,14 @@ static bool bio_req_sanity_check(struct vblk_dev *vblkdev,
 		return false;
 	}
 
-	if (req_bytes > (uint64_t)vsc_req->mempool_len) {
+	/* Check if the req_bytes > mempool_len only if IOVA is enabled and the
+	 * operations are not DISCARD and SECURE_ERASE. Mempool is not used
+	 * for DISCARD and SECURE_ERASE operations.
+	 */
+	if ((vblkdev->config.blk_config.use_vm_address == 0) &&
+			(req_op(vsc_req->req) != REQ_OP_DISCARD) &&
+			(req_op(vsc_req->req) != REQ_OP_SECURE_ERASE) &&
+			(req_bytes > (uint64_t)vsc_req->mempool_len)) {
 		dev_err(vblkdev->device, "Req bytes %llx greater than %x!\n",
 			req_bytes, vsc_req->mempool_len);
 		return false;
