@@ -58,6 +58,13 @@ static struct sg_table *nvhost_syncpt_map_dmabuf(
 		goto free_sgt;
 	}
 
+	/* Syncpoint shim region is not page-aligned with system PAGE_SIZE */
+	if (!PAGE_ALIGNED(data->shim_pa) || !PAGE_ALIGNED(data->size)) {
+		dev_err(attachment->dev, "syncpoint shim is not page-aligned\n");
+		ret = -EINVAL;
+		goto free_sgt;
+	}
+
 	sg_set_page(sgt->sgl, phys_to_page(data->shim_pa), data->size, 0);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
 	ret = dma_map_sgtable(attachment->dev, sgt, direction,
