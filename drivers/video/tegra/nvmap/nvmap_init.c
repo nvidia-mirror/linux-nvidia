@@ -683,14 +683,12 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 #else
 		if (err & DMA_MEMORY_NOMAP) {
 #endif
-			dev_info(dev,
-				 "%s :dma coherent mem declare %pa,%zu\n",
+			pr_info("%s :dma coherent mem declare %pa,%zu\n",
 				 co->name, &co->base, co->size);
 			co->init_done = true;
 			err = 0;
 		} else
-			dev_err(dev,
-				"%s :dma coherent mem declare fail %pa,%zu,err:%d\n",
+			pr_err("%s :dma coherent mem declare fail %pa,%zu,err:%d\n",
 				co->name, &co->base, co->size, err);
 	} else {
 #ifdef NVMAP_CONFIG_VPR_RESIZE
@@ -710,7 +708,7 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 		err = dma_declare_coherent_resizable_cma_memory(
 				co->dma_dev, co->dma_info);
 		if (err)
-			dev_err(dev, "%s coherent memory declaration failed\n",
+			pr_err("%s coherent memory declaration failed\n",
 				     co->name);
 		else
 #endif

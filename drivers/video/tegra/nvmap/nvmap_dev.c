@@ -1425,13 +1425,6 @@ int __init nvmap_probe(struct platform_device *pdev)
 	mutex_init(&dev->tags_lock);
 	mutex_init(&dev->carveout_lock);
 
-	e = misc_register(&dev->dev_user);
-	if (e) {
-		dev_err(&pdev->dev, "unable to register miscdevice %s\n",
-			dev->dev_user.name);
-		goto fail;
-	}
-
 	nvmap_debug_root = debugfs_create_dir("nvmap", NULL);
 	nvmap_dev->debug_root = nvmap_debug_root;
 	if (IS_ERR_OR_NULL(nvmap_debug_root))
@@ -1503,11 +1496,15 @@ int __init nvmap_probe(struct platform_device *pdev)
 	}
 #endif /* CVNAS_BUILTIN */
 
+	e = misc_register(&dev->dev_user);
+	if (e) {
+		dev_err(&pdev->dev, "unable to register miscdevice %s\n",
+			dev->dev_user.name);
+		goto fail_sci_ipc;
+	}
 	goto finish;
-#ifdef CVNAS_BUILTIN
 fail_sci_ipc:
 	nvmap_sci_ipc_exit();
-#endif /* CVNAS_BUILTIN */
 fail_heaps:
 	debugfs_remove_recursive(nvmap_dev->debug_root);
 	for (i = 0; i < dev->nr_carveouts; i++) {

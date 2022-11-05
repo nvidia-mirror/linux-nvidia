@@ -442,7 +442,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 
 	h = kzalloc(sizeof(*h), GFP_KERNEL);
 	if (!h) {
-		dev_err(parent, "%s: out of memory\n", __func__);
+		pr_err("%s: out of memory\n", __func__);
 		return NULL;
 	}
 
@@ -460,7 +460,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 		h->cma_dev = co->cma_dev;
 #endif
 #else
-		dev_err(parent, "invalid resize config for carveout %s\n",
+		pr_err("invalid resize config for carveout %s\n",
 				co->name);
 		goto fail;
 #endif
@@ -480,12 +480,10 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 #else
 		if (err & DMA_MEMORY_NOMAP) {
 #endif
-			dev_info(parent,
-				"%s :dma coherent mem declare %pa,%zu\n",
+			pr_info("%s :dma coherent mem declare %pa,%zu\n",
 				co->name, &base, len);
 		} else {
-			dev_err(parent,
-				"%s: dma coherent declare fail %pa,%zu\n",
+			pr_err("%s: dma coherent declare fail %pa,%zu\n",
 				co->name, &base, len);
 			goto fail;
 		}
@@ -521,7 +519,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 		if (!co->no_cpu_access && co->usage_mask != NVMAP_HEAP_CARVEOUT_VPR
 			&& nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV,
 					base, base + len, true, true)) {
-			dev_err(parent, "cache flush failed\n");
+			pr_err("cache flush failed\n");
 			goto fail;
 		}
 	}
@@ -533,7 +531,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 	if (co->no_cpu_access)
 		nvmap_dev->cpu_access_mask &= ~co->usage_mask;
 
-	dev_info(parent, "created heap %s base 0x%px size (%zuKiB)\n",
+	pr_info("created heap %s base 0x%px size (%zuKiB)\n",
 		co->name, (void *)(uintptr_t)base, len/1024);
 	return h;
 fail:
