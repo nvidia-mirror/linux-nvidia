@@ -37,6 +37,13 @@ ifneq ($(CONFIG_DMA_SHARED_BUFFER),y)
 $(error CONFIG_DMA_SHARED_BUFFER is not set)
 endif
 
+# Check if CONFIG_ARCH_HAS_PMEM_API enabled for OOT/Kstable kernel
+# CONFIG_ARCH_HAS_PMEM_API is needed for arch_invalidate_pmem
+ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
+ifneq ($(CONFIG_ARCH_HAS_PMEM_API),y)
+$(error CONFIG_ARCH_HAS_PMEM_API is not set)
+endif
+endif
 ################################################################################
 # Section 2
 # This config is used to include the memory management driver for the

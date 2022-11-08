@@ -31,6 +31,9 @@
 
 #include <linux/nvmap.h>
 #include <trace/events/nvmap.h>
+#ifdef NVMAP_UPSTREAM_KERNEL
+#include <linux/libnvdimm.h>
+#endif /* NVMAP_UPSTREAM_KERNEL */
 
 #include "nvmap_priv.h"
 
@@ -122,7 +125,11 @@ void __nvmap_kunmap(struct nvmap_handle *h, unsigned int pagenum,
 
 	if (h->flags != NVMAP_HANDLE_UNCACHEABLE &&
 	    h->flags != NVMAP_HANDLE_WRITE_COMBINE) {
+#ifdef NVMAP_UPSTREAM_KERNEL
+		arch_invalidate_pmem(addr, PAGE_SIZE);
+#else
 		__dma_flush_area(addr, PAGE_SIZE);
+#endif
 		outer_flush_range(paddr, paddr + PAGE_SIZE); /* FIXME */
 	}
 	iounmap((void __iomem *)addr);
