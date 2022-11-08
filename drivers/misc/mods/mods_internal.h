@@ -755,4 +755,14 @@ int mods_ffa_abi_register(void);
 void mods_ffa_abi_unregister(void);
 #endif
 
+#if defined(CONFIG_TEGRA_IVC)
+int esc_mods_bpmp_uphy_lane_eom_scan(struct mods_client *client,
+				     struct MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS *p);
+int mods_bpmpipc_init(struct mods_client *client,
+		      u64 db_phys_addr,
+		      u64 req_phys_addr,
+		      u64 resp_phys_addr);
+void mods_bpmpipc_cleanup(void);
+#endif
+
 #endif	/* _MODS_INTERNAL_H_  */

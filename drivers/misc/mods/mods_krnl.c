@@ -1035,6 +1035,10 @@ static int mods_krnl_close(struct inode *ip, struct file *fp)
 		final_err = err;
 #endif
 
+#if defined(CONFIG_TEGRA_IVC)
+	mods_bpmpipc_cleanup();
+#endif
+
 	mods_disable_all_devices(client);
 
 	{
@@ -2713,6 +2717,14 @@ static long mods_krnl_ioctl(struct file  *fp,
 		MODS_IOCTL(MODS_ESC_MODS_GET_DRIVER_STATS,
 			   esc_mods_get_driver_stats, MODS_GET_DRIVER_STATS);
 		break;
+
+#ifdef CONFIG_TEGRA_IVC
+	case MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN:
+		MODS_IOCTL(MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN,
+			   esc_mods_bpmp_uphy_lane_eom_scan,
+			   MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS);
+		break;
+#endif
 
 	default:
 		cl_error(

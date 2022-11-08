@@ -1927,6 +1927,26 @@ struct MODS_PROXIMITY_TO_NUMA_NODE {
 	__s32 numa_node;
 };
 
+/* Used by MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN
+ *
+ * Get EOM data of UPHY lane from bpmp
+ */
+struct MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS {
+	/* IN */
+	/* the address of bpmp db/req/resp is various for different
+	 * chip/socket, the value of them will be passed from user.
+	 */
+	__u64 db_phys_addr;
+	__u64 req_phys_addr;
+	__u64 resp_phys_addr;
+	__u32 brick;
+	__u32 lane;
+	__u32 pcie_gen5;
+
+	/* OUT */
+	__u32 data;
+};
+
 #pragma pack(pop)
 
 #define MODS_IOC_MAGIC 'x'
@@ -2133,5 +2153,8 @@ struct MODS_PROXIMITY_TO_NUMA_NODE {
 #define MODS_ESC_PROXIMITY_TO_NUMA_NODE MODSIO(WR, 143, MODS_PROXIMITY_TO_NUMA_NODE)
 #define MODS_ESC_MODS_SEND_IPI MODSIO(W, 144, MODS_SEND_IPI)
 #define MODS_ESC_FFA_CMD MODSIO(WR, 145, MODS_FFA_PARAMS)
+#define MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN MODSIO(WR, 146, \
+						MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS)
+
 
 #endif /* _UAPI_MODS_H_  */
