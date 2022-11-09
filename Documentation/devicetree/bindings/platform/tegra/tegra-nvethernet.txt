@@ -199,6 +199,14 @@ Required properties:
 - nvidia,pad_calibration:	Specifies if pad calibration should be allowed
 				or not. Set to 1 to allow or 0 to disallow
 				pad calibration mode. Default is 1 (allowed).
+- nvidia,pad_auto_cal_pu_offset: Specifies eqos ETHER_QOS_AUTO_CAL_CONFIG_0
+				reg, pad calibration 2's complement offset
+				for pull-up value. Allowed range 0x0-0x1F.
+				Default is 0 (allowed).
+- nvidia,pad_auto_cal_pd_offset: Specifies eqos ETHER_QOS_AUTO_CAL_CONFIG_0
+				reg, pad calibration 2's complement offset
+				for pull-down value. Allowed range 0x0-0x1F.
+				Default is 0 (allowed).
 - nvidia,max-platform-mtu:	Maximum MTU size supported for a platform.
 				currently it is set to 9000 for embedded
 				platforms. if DT entry is not
