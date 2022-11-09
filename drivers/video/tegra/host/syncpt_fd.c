@@ -11,6 +11,7 @@
 
 #include "dev.h"
 #include "nvhost_syncpt.h"
+#include "syncpt_fd.h"
 
 struct nvhost_syncpt_fd_data {
 	struct nvhost_master *master;

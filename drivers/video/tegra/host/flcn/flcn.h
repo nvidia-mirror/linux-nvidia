@@ -79,6 +79,8 @@ static inline void set_flcn(struct platform_device *dev, struct flcn *flcn)
 {
 	nvhost_set_falcon_data(dev, flcn);
 }
+
+extern struct platform_driver nvhost_flcn_driver;
 int flcn_setup_ucode_image(struct platform_device *dev,
 			   struct flcn *v,
 			   const struct firmware *ucode_fw,

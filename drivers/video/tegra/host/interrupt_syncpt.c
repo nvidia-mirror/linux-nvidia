@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2018, NVIDIA Corporation. All rights reserved. */
+/* Copyright (c) 2018-2022, NVIDIA Corporation. All rights reserved. */
 
 #include <linux/mutex.h>
 #include <linux/of.h>
@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/nvhost.h>
 #include <linux/nvhost_t194.h>
+#include <linux/nvhost_interrupt_syncpt.h>
 
 #include "nvhost_intr.h"
 #include "host1x/host1x.h"

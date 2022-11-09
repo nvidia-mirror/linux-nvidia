@@ -41,6 +41,7 @@
 #include "host1x/host1x.h"
 #include "nvhost_intr.h"
 #include "nvhost_syncpt.h"
+#include "nvhost_sync_v2.h"
 
 struct nvhost_dma_fence {
 	struct dma_fence base;

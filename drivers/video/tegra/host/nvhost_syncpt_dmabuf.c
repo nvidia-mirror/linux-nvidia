@@ -13,6 +13,7 @@
 #include "host1x/host1x.h"
 #include "nvhost_syncpt.h"
 #include "syncpt_fd.h"
+#include "nvhost_syncpt_dmabuf.h"
 
 #define SYNCPT_FULL 0xFFFFFFFFU
 

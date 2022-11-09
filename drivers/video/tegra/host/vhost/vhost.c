@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Virtualization Host functions for HOST1X
  *
- * Copyright (c) 2014-2021, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -78,39 +78,6 @@ int vhost_virt_moduleid(int moduleid)
 		return TEGRA_VHOST_MODULE_OFA;
 	default:
 		pr_err("module %d not virtualized\n", moduleid);
-		return -1;
-	}
-}
-
-int vhost_moduleid_virt_to_hw(int moduleid)
-{
-	switch (moduleid) {
-	case TEGRA_VHOST_MODULE_HOST:
-		return NVHOST_MODULE_NONE;
-	case TEGRA_VHOST_MODULE_ISP:
-		return NVHOST_MODULE_ISP;
-	case TEGRA_VHOST_MODULE_ISPB:
-		return NVHOST_MODULE_ISPB;
-	case TEGRA_VHOST_MODULE_VI:
-		return NVHOST_MODULE_VI;
-	case TEGRA_VHOST_MODULE_VI2:
-		return NVHOST_MODULE_VI2;
-	case TEGRA_VHOST_MODULE_MSENC:
-		return NVHOST_MODULE_MSENC;
-	case TEGRA_VHOST_MODULE_VIC:
-		return NVHOST_MODULE_VIC;
-	case TEGRA_VHOST_MODULE_NVDEC:
-		return NVHOST_MODULE_NVDEC;
-	case TEGRA_VHOST_MODULE_NVJPG:
-		return NVHOST_MODULE_NVJPG;
-	case TEGRA_VHOST_MODULE_NVCSI:
-		return NVHOST_MODULE_NVCSI;
-	case TEGRA_VHOST_MODULE_NVJPG1:
-		return NVHOST_MODULE_NVJPG1;
-	case TEGRA_VHOST_MODULE_OFA:
-		return NVHOST_MODULE_OFA;
-	default:
-		pr_err("unknown virtualized module %d\n", moduleid);
 		return -1;
 	}
 }

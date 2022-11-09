@@ -70,6 +70,11 @@
 #include "t239/t239.h"
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+#include <uapi/linux/eventpoll.h>
+typedef unsigned int __poll_t;
+#endif
+
 #define DRIVER_NAME		"host1x"
 
 #define SP_TEST_VAL		0xdeadbeef
@@ -428,10 +433,10 @@ struct nvhost_event_poll_fd_rec {
 	struct kref ref;
 };
 
-static unsigned int nvhost_event_poll(struct file *filp, poll_table *wait)
+static __poll_t nvhost_event_poll(struct file *filp, poll_table *wait)
 {
 	struct nvhost_event_poll_fd_rec *private_data = filp->private_data;
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 
 	poll_wait(filp, &private_data->wq, wait);
 

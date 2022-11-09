@@ -1,7 +1,7 @@
 /*
  * Host1x Application Specific Virtual Memory
  *
- * Copyright (c) 2015-2018, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,6 +19,7 @@
 #ifndef IOMMU_CONTEXT_DEV_H
 #define IOMMU_CONTEXT_DEV_H
 
+extern struct platform_driver nvhost_iommu_context_dev_driver;
 struct platform_device *iommu_context_dev_allocate(void *identifier, struct device *dev);
 void iommu_context_dev_release(struct platform_device *pdev);
 
