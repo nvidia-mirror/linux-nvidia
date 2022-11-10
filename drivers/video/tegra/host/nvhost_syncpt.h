@@ -166,13 +166,13 @@ u32 nvhost_syncpt_read(struct nvhost_syncpt *sp, u32 id);
 int nvhost_syncpt_incr(struct nvhost_syncpt *sp, u32 id);
 
 int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id, u32 thresh,
-			u32 timeout, u32 *value, struct nvhost_timespec *ts,
+			unsigned long timeout, u32 *value, struct nvhost_timespec *ts,
 			bool interruptible);
 
 static inline int nvhost_syncpt_wait(struct nvhost_syncpt *sp, u32 id, u32 thresh)
 {
 	return nvhost_syncpt_wait_timeout(sp, id, thresh,
-					  (u32)MAX_SCHEDULE_TIMEOUT,
+					  MAX_SCHEDULE_TIMEOUT,
 					  NULL, NULL, true);
 }
 

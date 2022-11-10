@@ -235,12 +235,13 @@ static bool syncpt_update_min_is_expired(
  * Main entrypoint for syncpoint value waits.
  */
 int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
-			u32 thresh, u32 timeout, u32 *value,
+			u32 thresh, unsigned long timeout, u32 *value,
 			struct nvhost_timespec *ts, bool interruptible)
 {
 	void *ref = NULL;
 	struct nvhost_waitlist *waiter = NULL;
-	int err = 0, check_count = 0, low_timeout = 0;
+	int err = 0, check_count = 0;
+	unsigned long low_timeout = 0;
 	u32 val, old_val, new_val;
 	struct nvhost_master *host;
 	bool syncpt_poll = false;
@@ -385,7 +386,7 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 			new_val = syncpt_op().update_min(sp, id);
 			if (old_val == new_val) {
 				dev_warn(&syncpt_to_dev(sp)->dev->dev,
-					"%s: syncpoint id %d (%s) stuck waiting %d, timeout=%d\n",
+					"%s: syncpoint id %d (%s) stuck waiting %d, timeout=%lu\n",
 					 current->comm, id,
 					 syncpt_op().name(sp, id),
 					 thresh, timeout);
@@ -393,7 +394,7 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 			} else {
 				old_val = new_val;
 				dev_info(&syncpt_to_dev(sp)->dev->dev,
-					"%s: syncpoint id %d (%s) progressing slowly %d, timeout=%d\n",
+					"%s: syncpoint id %d (%s) progressing slowly %d, timeout=%lu\n",
 					 current->comm, id,
 					 syncpt_op().name(sp, id),
 					 thresh, timeout);
@@ -401,7 +402,7 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 			if (check_count == MAX_STUCK_CHECK_COUNT) {
 				if (low_timeout) {
 					dev_warn(&syncpt_to_dev(sp)->dev->dev,
-						"is timeout %d too low?\n",
+						"is timeout %lu too low?\n",
 						low_timeout);
 				}
 				nvhost_debug_dump(syncpt_to_dev(sp));

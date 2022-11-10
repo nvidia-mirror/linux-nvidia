@@ -187,7 +187,7 @@ static int nvhost_ioctl_ctrl_syncpt_incr(struct nvhost_ctrl_userctx *ctx,
 static int nvhost_ioctl_ctrl_syncpt_waitex(struct nvhost_ctrl_userctx *ctx,
 	struct nvhost_ctrl_syncpt_waitex_args *args)
 {
-	u32 timeout;
+	unsigned long timeout;
 	int err;
 	if (!nvhost_syncpt_is_valid_hw_pt_nospec(&ctx->dev->syncpt,
 						 &args->id)) {
@@ -197,12 +197,9 @@ static int nvhost_ioctl_ctrl_syncpt_waitex(struct nvhost_ctrl_userctx *ctx,
 	}
 
 	if (args->timeout == NVHOST_NO_TIMEOUT)
-		/* FIXME: MAX_SCHEDULE_TIMEOUT is ulong which can be bigger
-                   than u32 so we should fix nvhost_syncpt_wait_timeout to
-                   take ulong not u32. */
-		timeout = (u32)MAX_SCHEDULE_TIMEOUT;
+		timeout = MAX_SCHEDULE_TIMEOUT;
 	else
-		timeout = (u32)msecs_to_jiffies(args->timeout);
+		timeout = msecs_to_jiffies(args->timeout);
 
 	err = nvhost_syncpt_wait_timeout(&ctx->dev->syncpt, args->id,
 					args->thresh, timeout, &args->value,
@@ -216,16 +213,16 @@ static int nvhost_ioctl_ctrl_syncpt_waitex(struct nvhost_ctrl_userctx *ctx,
 static int nvhost_ioctl_ctrl_syncpt_waitmex(struct nvhost_ctrl_userctx *ctx,
 	struct nvhost_ctrl_syncpt_waitmex_args *args)
 {
-	u32 timeout;
+	unsigned long timeout;
 	int err;
 	struct nvhost_timespec nvts;
 	if (!nvhost_syncpt_is_valid_hw_pt_nospec(&ctx->dev->syncpt, &args->id))
 		return -EINVAL;
 
 	if (args->timeout == NVHOST_NO_TIMEOUT)
-		timeout = (u32)MAX_SCHEDULE_TIMEOUT;
+		timeout = MAX_SCHEDULE_TIMEOUT;
 	else
-		timeout = (u32)msecs_to_jiffies(args->timeout);
+		timeout = msecs_to_jiffies(args->timeout);
 
 	err = nvhost_syncpt_wait_timeout(&ctx->dev->syncpt, args->id,
 					args->thresh, timeout, &args->value,
