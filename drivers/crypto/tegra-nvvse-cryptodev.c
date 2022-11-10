@@ -1565,6 +1565,25 @@ out:
 	return ret;
 }
 
+static int tnvvse_crypto_get_ivc_db(struct tegra_nvvse_get_ivc_db *get_ivc_db)
+{
+	struct crypto_dev_to_ivc_map *hv_vse_db;
+	int ret = 0;
+	int i;
+
+	hv_vse_db = tegra_hv_vse_get_db();
+	if (hv_vse_db == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < MAX_NUMBER_MISC_DEVICES; i++) {
+		get_ivc_db->ivc_id[i] = hv_vse_db[i].ivc_id;
+		get_ivc_db->se_engine[i] = hv_vse_db[i].se_engine;
+		get_ivc_db->node_id[i] = hv_vse_db[i].node_id;
+	}
+
+	return ret;
+}
+
 static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 {
 	struct tnvvse_crypto_ctx *ctx;
@@ -1652,6 +1671,7 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 	struct tegra_nvvse_aes_drng_ctl aes_drng_ctl;
 	struct tegra_nvvse_aes_gmac_init_ctl aes_gmac_init_ctl;
 	struct tegra_nvvse_aes_gmac_sign_verify_ctl aes_gmac_sign_verify_ctl;
+	struct tegra_nvvse_get_ivc_db get_ivc_db;
 	int ret = 0;
 
 	/*
@@ -1804,6 +1824,21 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 			goto out;
 		}
 		ret = tnvvse_crypto_get_aes_drng(ctx, &aes_drng_ctl);
+		break;
+
+	case NVVSE_IOCTL_CMDID_GET_IVC_DB:
+		ret = tnvvse_crypto_get_ivc_db(&get_ivc_db);
+		if (ret) {
+			pr_err("%s(): Failed to get ivc database get_ivc_db:%d\n", __func__, ret);
+			goto out;
+		}
+
+		ret = copy_to_user((void __user *)arg, &get_ivc_db, sizeof(get_ivc_db));
+		if (ret) {
+			pr_err("%s(): Failed to copy_to_user get_ivc_db:%d\n", __func__, ret);
+			goto out;
+		}
+
 		break;
 
 	default:

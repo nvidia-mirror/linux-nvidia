@@ -22,6 +22,7 @@
 #include <asm-generic/ioctl.h>
 
 #define TEGRA_NVVSE_IOC_MAGIC				0x98
+#define MAX_NUMBER_MISC_DEVICES				40U
 
 /* Command ID for various IO Control */
 #define TEGRA_NVVSE_CMDID_AES_SET_KEY			1
@@ -34,6 +35,7 @@
 #define TEGRA_NVVSE_CMDID_AES_GMAC_INIT			9
 #define TEGRA_NVVSE_CMDID_AES_GMAC_SIGN_VERIFY		10
 #define TEGRA_NVVSE_CMDID_AES_CMAC_SIGN_VERIFY		11
+#define TEGRA_NVVSE_CMDID_GET_IVC_DB			12
 
 /** Defines the length of the AES-CBC Initial Vector */
 #define TEGRA_NVVSE_AES_IV_LEN				16U
@@ -363,6 +365,20 @@ struct tegra_nvvse_aes_cmac_sign_verify_ctl {
 #define NVVSE_IOCTL_CMDID_AES_CMAC_SIGN_VERIFY _IOWR(TEGRA_NVVSE_IOC_MAGIC, \
 						TEGRA_NVVSE_CMDID_AES_CMAC_SIGN_VERIFY, \
 						struct  tegra_nvvse_aes_cmac_sign_verify_ctl)
+
+/**
+ * brief Holds IVC databse
+ */
+struct tegra_nvvse_get_ivc_db {
+	/** HoldsIVC Queue Id */
+	uint32_t ivc_id[MAX_NUMBER_MISC_DEVICES];
+	/** Holds SE Engine Type */
+	uint32_t se_engine[MAX_NUMBER_MISC_DEVICES];
+	/** Holds Crypto Dev Node Id */
+	uint32_t node_id[MAX_NUMBER_MISC_DEVICES];
+};
+#define NVVSE_IOCTL_CMDID_GET_IVC_DB _IOW(TEGRA_NVVSE_IOC_MAGIC, TEGRA_NVVSE_CMDID_GET_IVC_DB, \
+						struct tegra_nvvse_get_ivc_db)
 
 /**
   * \brief Holds AES generated RNG IO control params

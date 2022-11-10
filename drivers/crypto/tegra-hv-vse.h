@@ -138,4 +138,8 @@ struct tegra_virtual_se_req_context {
 	/*Crypto dev instance*/
 	uint32_t node_id;
 };
+
+/* API to get ivc db from hv_vse driver */
+struct crypto_dev_to_ivc_map *tegra_hv_vse_get_db(void);
+
 #endif /*__TEGRA_HV_VSE_H*/
