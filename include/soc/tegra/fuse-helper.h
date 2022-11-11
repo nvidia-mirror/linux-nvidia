@@ -4,6 +4,7 @@
  */
 
 #include <linux/version.h>
+#include <linux/sys_soc.h>
 #include <soc/tegra/fuse.h>
 
 #define FUSE_SKU_INFO	0x10
@@ -19,18 +20,47 @@ static inline u32 tegra_get_sku_id(void)
 
 #ifdef CONFIG_TEGRA_FUSE_UPSTREAM
 
-/*
- * For upstream the following functions to determine if the
- * platform is silicon and simulator are not supported and
- * so for now, always assume that we are silicon.
- */
 static inline bool tegra_platform_is_silicon(void)
 {
-	return true;
+	const struct soc_device_attribute tegra_soc_attrs[] = {
+		{ .revision = "Silicon*" },
+		{/* sentinel */}
+	};
+
+	if (soc_device_match(tegra_soc_attrs))
+		return true;
+
+	return false;
 }
 
 static inline bool tegra_platform_is_sim(void)
 {
+	return !tegra_platform_is_silicon();
+}
+
+static inline bool tegra_platform_is_fpga(void)
+{
+	const struct soc_device_attribute tegra_soc_attrs[] = {
+		{ .revision = "*FPGA" },
+		{/* sentinel */}
+	};
+
+	if (soc_device_match(tegra_soc_attrs))
+		return true;
+
+	return false;
+}
+
+static inline bool tegra_platform_is_vdk(void)
+{
+	const struct soc_device_attribute tegra_soc_attrs[] = {
+		{ .revision = "VDK" },
+		{/* sentinel */}
+	};
+
+	if (soc_device_match(tegra_soc_attrs))
+		return true;
+
 	return false;
 }
 
