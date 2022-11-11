@@ -394,6 +394,42 @@ static const struct host1x_sid_entry tegra234_sid_table[] = {
 		.offset = 0x30,
 		.limit = 0x34,
 	},
+	{
+		/* VI MMIO */
+		.base = 0x16b8,
+		.offset = 0x800,
+		.limit = 0x800,
+	},
+	{
+		/* VI_THI MMIO */
+		.base = 0x16c0,
+		.offset = 0x30,
+		.limit = 0x34,
+	},
+	{
+		/* ISP MMIO */
+		.base = 0x1680,
+		.offset = 0x800,
+		.limit = 0x800,
+	},
+	{
+		/* ISP_THI MMIO */
+		.base = 0x16c8,
+		.offset = 0x30,
+		.limit = 0x34,
+	},
+	{
+		/* VI2 MMIO */
+		.base = 0x16f0,
+		.offset = 0x800,
+		.limit = 0x800,
+	},
+	{
+		/* VI2_THI MMIO */
+		.base = 0x16f8,
+		.offset = 0x30,
+		.limit = 0x34,
+	},
 };
 
 static const struct host1x_info host1x08_info = {
