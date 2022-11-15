@@ -41,8 +41,8 @@
 
 /* Format of input buffer */
 /* IP ID : Instance ID : Error Code : Reporter ID : Error Attribute */
-/* "0x0000:0x0000:0x0000:0x0000:0x00000000" */
-#define ERR_RPT_LEN 39U
+/* "0x0000:0x0000:0x00000000:0x0000:0x00000000" */
+#define ERR_RPT_LEN 43U
 
 #define NUM_INPUTS 5U
 
@@ -262,7 +262,7 @@ static ssize_t hsierrrptinj_inject(struct file *file, const char __user *buf, si
 			count++;
 			break;
 		case 2: /* Error Code */
-			pr_debug("tegra-hsierrrptinj: HSI Error ID: 0x%04lx\n", val);
+			pr_debug("tegra-hsierrrptinj: HSI Error ID: 0x%08lx\n", val);
 			error_report.error_code = val;
 			count++;
 			break;
@@ -342,7 +342,7 @@ done:
 
 	pr_err("tegra-hsierrrptinj: IP ID: 0x%04x\n", ip_id);
 	pr_err("tegra-hsierrrptinj: Instance: 0x%04x\n", instance_id);
-	pr_err("tegra-hsierrrptinj: HSI Error ID: 0x%04x\n", error_report.error_code);
+	pr_err("tegra-hsierrrptinj: HSI Error ID: 0x%08x\n", error_report.error_code);
 	pr_err("tegra-hsierrrptinj: Timestamp: %u\n", error_report.timestamp);
 
 	return ret;
