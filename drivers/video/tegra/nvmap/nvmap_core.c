@@ -84,11 +84,8 @@ void *__nvmap_kmap(struct nvmap_handle *h, unsigned int pagenum)
 						h->pgalloc.pages[pagenum]));
 		else
 			paddr = h->carveout->base + pagenum * PAGE_SIZE;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
-		addr = ioremap_prot(phys_addr, PAGE_SIZE, pgprot_val(prot));
-#else
+
 		addr = __ioremap(paddr, PAGE_SIZE, prot);
-#endif
 		if (addr == NULL)
 			goto out;
 		kaddr = (unsigned long)addr;
