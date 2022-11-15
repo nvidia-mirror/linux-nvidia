@@ -95,11 +95,13 @@ static struct dma_declare_info vpr_dma_info = {
 };
 #endif
 
-__weak const struct of_device_id nvmap_of_ids[] = {
-        { .compatible = "nvidia,carveouts" },
-        { .compatible = "nvidia,carveouts-t18x" },
+const struct of_device_id nvmap_of_ids[] = {
+	{ .compatible = "nvidia,carveouts" },
+	{ .compatible = "nvidia,carveouts-t18x" },
+	{ .compatible = "nvidia,carveouts-t19x" },
         { }
 };
+MODULE_DEVICE_TABLE(of, nvmap_of_ids);
 
 static struct nvmap_platform_carveout nvmap_carveouts[] = {
 	[0] = {
@@ -910,10 +912,7 @@ static struct platform_driver __refdata nvmap_driver = {
 	.driver = {
 		.name	= "tegra-carveouts",
 		.owner	= THIS_MODULE,
-#ifndef NVMAP_LOADABLE_MODULE
 		.of_match_table = nvmap_of_ids,
-#endif /* !NVMAP_LOADABLE_MODULE */
-		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.suppress_bind_attrs = true,
 	},
 };
@@ -926,33 +925,11 @@ static int __init nvmap_init_driver(void)
 	if (e)
 		goto fail;
 
-#ifdef NVMAP_LOADABLE_MODULE
-	if (!(of_machine_is_compatible("nvidia,tegra186") ||
-	    of_machine_is_compatible("nvidia,tegra194") ||
-	    of_machine_is_compatible("nvidia,tegra234") ||
-	    of_machine_is_compatible("nvidia,tegra239") ||
-	    of_machine_is_compatible("nvidia,tegra23x") ||
-	    of_machine_is_compatible("nvidia,tegra232"))) {
-		nvmap_heap_deinit();
-		return -ENODEV;
-	}
-#endif /* NVMAP_LOADABLE_MODULE */
 	e = platform_driver_register(&nvmap_driver);
 	if (e) {
 		nvmap_heap_deinit();
 		goto fail;
 	}
-
-#ifdef NVMAP_LOADABLE_MODULE
-	if (!nvmap_is_carveout_node_present()) {
-		pdev = platform_device_register_simple("tegra-carveouts", -1, NULL, 0);
-		if (IS_ERR(pdev)) {
-			platform_driver_unregister(&nvmap_driver);
-			nvmap_heap_deinit();
-			return PTR_ERR(pdev);
-		}
-	}
-#endif /* NVMAP_LOADABLE_MODULE */
 
 fail:
 	return e;

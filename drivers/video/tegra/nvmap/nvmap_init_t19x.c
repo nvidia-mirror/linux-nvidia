@@ -27,15 +27,6 @@
 
 #include "nvmap_priv.h"
 
-bool nvmap_version_t19x;
-
-const struct of_device_id nvmap_of_ids[] = {
-	{ .compatible = "nvidia,carveouts" },
-	{ .compatible = "nvidia,carveouts-t18x" },
-	{ .compatible = "nvidia,carveouts-t19x" },
-	{ }
-};
-
 int nvmap_register_cvsram_carveout(struct device *dma_dev,
 		phys_addr_t base, size_t size, int (*busy)(void),
 		int (*idle)(void))
