@@ -44,6 +44,10 @@
 
 #include "nvsciipc.h"
 
+#if defined(CONFIG_ANDROID)
+#define SYSTEM_GID 1000
+#endif /* CONFIG_ANDROID */
+
 /* enable it to debug auth API via ioctl.
  * enable LINUX_DEBUG_KMD_API in test_nvsciipc_nvmap tool either.
  */
@@ -409,11 +413,19 @@ static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
 	int ret = 0;
 	int i;
 
+#if defined(CONFIG_ANDROID)
+	if ((current_cred()->uid.val != SYSTEM_GID) &&
+	(current_cred()->uid.val != 0)) {
+		ERR("no permission to set db\n");
+		return -EPERM;
+	}
+#else
 	/* check root user */
 	if (current_cred()->uid.val != 0) {
 		ERR("no permission to set db\n");
 		return -EPERM;
 	}
+#endif /* CONFIG_ANDROID */
 
 	if ((ctx->num_eps != 0) || (ctx->set_db_f == true)) {
 		ERR("nvsciipc db is set already\n");
