@@ -83,12 +83,12 @@ struct hsm_error_report_frame {
  * PSC   - 1
  * I2C   = 10
  * QSPI  - 2
- * SDMMC - 2
+ * SDMMC - 5
  * TSEC  - 1
  * THERM - 1
  * SMMU  - 1
  */
-static unsigned int ip_instances[NUM_IPS] = {1, 1, 1, 4, 11, 1, 10, 2, 2, 1, 1, 1};
+static unsigned int ip_instances[NUM_IPS] = {1, 1, 1, 4, 11, 1, 10, 2, 5, 1, 1, 1};
 
 /* This directory entry will point to `/sys/kernel/debug/tegra_hsierrrptinj`. */
 static struct dentry *hsierrrptinj_debugfs_root;

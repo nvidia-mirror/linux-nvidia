@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -22,6 +22,7 @@
 enum vs_req_type {
 	VS_DATA_REQ = 1,
 	VS_CONFIGINFO_REQ = 2,
+	VS_ERR_INJECT = 3,
 	VS_UNKNOWN_CMD = 0xffffffff,
 };
 
@@ -69,6 +70,16 @@ enum blk_cmd_op {
 
 #pragma pack(push)
 #pragma pack(1)
+
+struct vs_error_inject_request {
+	union {
+		uint32_t error_id;
+	};
+};
+
+struct vs_error_inject_response {
+	int32_t status;
+};
 
 struct vs_blk_request {
 	uint64_t blk_offset;		/* Offset into storage device in terms
@@ -212,11 +223,13 @@ struct vs_request {
 	union {
 		struct vs_blkdev_request blkdev_req;
 		struct vs_mtddev_request mtddev_req;
+		struct vs_error_inject_request error_inject_req;
 	};
 	int32_t status;
 	union {
 		struct vs_blkdev_response blkdev_resp;
 		struct vs_mtddev_response mtddev_resp;
+		struct vs_error_inject_response error_inject_resp;
 		struct vs_config_info config_info;
 	};
 };

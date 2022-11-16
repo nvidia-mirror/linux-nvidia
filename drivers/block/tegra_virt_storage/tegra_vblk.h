@@ -102,6 +102,13 @@ struct vblk_dev {
 	uint32_t inflight_ioctl_reqs;
 	uint32_t max_requests;
 	uint32_t max_ioctl_requests;
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	uint32_t epl_id;
+	uint32_t epl_reporter_id;
+	uint32_t instance_id;
+	uint32_t hsierror_status;
+	struct completion hsierror_handle;
+#endif
 	struct mutex req_lock;
 	struct mutex ivc_lock;
 	enum vblk_queue_state queue_state;
