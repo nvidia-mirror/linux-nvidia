@@ -2057,12 +2057,14 @@ int esc_mods_get_mapped_phys_addr_3(struct mods_client                 *client,
 int esc_mods_virtual_to_phys(struct mods_client              *client,
 			     struct MODS_VIRTUAL_TO_PHYSICAL *p)
 {
-	struct MODS_GET_PHYSICAL_ADDRESS get_phys_addr;
-	struct list_head                *head;
-	struct list_head                *iter;
-	int                              err;
+	struct MODS_GET_PHYSICAL_ADDRESS_3 range;
+	struct list_head                  *head;
+	struct list_head                  *iter;
+	int                                err;
 
 	LOG_ENT();
+
+	memset(&range, 0, sizeof(range));
 
 	err = mutex_lock_interruptible(&client->mtx);
 	if (unlikely(err)) {
@@ -2074,7 +2076,7 @@ int esc_mods_virtual_to_phys(struct mods_client              *client,
 
 	list_for_each(iter, head) {
 		struct SYS_MAP_MEMORY *p_map_mem;
-		u64		       begin, end;
+		u64                    begin, end;
 		u64                    phys_offs;
 
 		p_map_mem = list_entry(iter, struct SYS_MAP_MEMORY, list);
@@ -2107,19 +2109,19 @@ int esc_mods_virtual_to_phys(struct mods_client              *client,
 					     &phys_offs) != OK)
 				break;
 
-			get_phys_addr.memory_handle =
+			range.memory_handle =
 				(u64)(size_t)p_map_mem->p_mem_info;
-			get_phys_addr.offset = virt_offs + phys_offs;
+			range.offset = virt_offs + phys_offs;
 
 			mutex_unlock(&client->mtx);
 
-			err = esc_mods_get_phys_addr(client, &get_phys_addr);
+			err = get_addr_range(client, &range, NULL);
 			if (err) {
 				LOG_EXT();
 				return err;
 			}
 
-			p->physical_address = get_phys_addr.physical_address;
+			p->physical_address = range.physical_address;
 
 			cl_debug(DEBUG_MEM_DETAILED,
 				 "get phys: map %p virt 0x%llx -> 0x%llx\n",
