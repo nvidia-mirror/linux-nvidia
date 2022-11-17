@@ -63,6 +63,7 @@
 #define GCM_PT_MAX_LEN			(16*1024*1024 - 1) /* 16MB */
 #define GCM_AAD_MAX_LEN			(16*1024*1024 - 1) /* 16MB */
 #define GMAC_MAX_LEN			(16*1024*1024 - 1) /* 16MB */
+#define TSEC_MAX_LEN			(8U * 1024U)	/* 8KB */
 
 /** Defines the Maximum Random Number length supported */
 #define NVVSE_MAX_RANDOM_NUMBER_LEN_SUPPORTED		512U
@@ -73,8 +74,6 @@
  */
 #define NVVSE_MAX_ALLOCATED_SHA_RESULT_BUFF_SIZE	256U
 
-
-#define MAX_NUMBER_MISC_DEVICES		40U
 #define MISC_DEVICE_NAME_LEN		32U
 static struct miscdevice *g_misc_devices[MAX_NUMBER_MISC_DEVICES];
 
@@ -429,6 +428,156 @@ stop_sha:
 	return ret;
 }
 
+static int tnvvse_crypto_tsec_get_keyload_status(struct tnvvse_crypto_ctx *ctx,
+				struct tegra_nvvse_tsec_get_keyload_status *tsec_keyload_status)
+{
+	return tegra_hv_vse_safety_tsec_get_keyload_status(ctx->node_id,
+			&tsec_keyload_status->err_code);
+}
+
+static int tnvvtsec_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
+				struct tegra_nvvse_aes_cmac_sign_verify_ctl *aes_cmac_ctl)
+{
+	struct crypto_ahash *tfm;
+	char *result, *src_buffer;
+	const char *driver_name;
+	struct ahash_request *req;
+	struct tnvvse_crypto_completion sha_complete;
+	struct tegra_virtual_se_aes_cmac_context *cmac_ctx;
+	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
+	struct tnvvse_cmac_req_data priv_data;
+	int ret = -ENOMEM;
+	struct scatterlist sg[1];
+	uint32_t total = 0;
+	uint8_t *hash_buff;
+
+	result = kzalloc(64, GFP_KERNEL);
+	if (!result)
+		return -ENOMEM;
+
+	tfm = crypto_alloc_ahash("cmac-tsec(aes)", 0, 0);
+	if (IS_ERR(tfm)) {
+		ret = PTR_ERR(tfm);
+		pr_err("%s(): Failed to allocate ahash for cmac-tsec(aes): %d\n", __func__, ret);
+		goto free_result;
+	}
+
+	cmac_ctx = crypto_ahash_ctx(tfm);
+	cmac_ctx->node_id = ctx->node_id;
+
+	driver_name = crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm));
+	if (driver_name == NULL) {
+		pr_err("%s(): get_driver_name for cmac-tsec(aes) returned NULL", __func__);
+		ret = -EINVAL;
+		goto free_tfm;
+	}
+
+	req = ahash_request_alloc(tfm, GFP_KERNEL);
+	if (!req) {
+		pr_err("%s(): Failed to allocate request for cmac-tsec(aes)\n", __func__);
+		goto free_tfm;
+	}
+
+	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+				   tnvvse_crypto_complete, &sha_complete);
+
+	init_completion(&sha_complete.restart);
+	sha_complete.req_err = 0;
+
+	crypto_ahash_clear_flags(tfm, ~0U);
+
+	if (aes_cmac_ctl->cmac_type == TEGRA_NVVSE_AES_CMAC_SIGN)
+		priv_data.request_type = CMAC_SIGN;
+	else
+		priv_data.request_type = CMAC_VERIFY;
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
+						aes_cmac_ctl->key_slot);
+	if (ret >= AES_KEYSLOT_NAME_SIZE) {
+		pr_err("%s(): Buffer overflow while setting key for cmac-tsec(aes): %d\n",
+				__func__, ret);
+		ret = -EINVAL;
+		goto free_req;
+	}
+
+	req->priv = &priv_data;
+	priv_data.result = 0;
+	ret = crypto_ahash_setkey(tfm, key_as_keyslot, aes_cmac_ctl->key_length);
+	if (ret) {
+		pr_err("%s(): Failed to set keys for cmac-tsec(aes): %d\n", __func__, ret);
+		ret = -EINVAL;
+		goto free_req;
+	}
+
+	ret = wait_async_op(&sha_complete, crypto_ahash_init(req));
+	if (ret) {
+		pr_err("%s(): Failed to initialize ahash: %d\n", __func__, ret);
+		ret = -EINVAL;
+		goto free_req;
+	}
+
+	if (aes_cmac_ctl->cmac_type == TEGRA_NVVSE_AES_CMAC_VERIFY) {
+		/* Copy digest */
+		ret = copy_from_user((void *)result,
+				(void __user *)aes_cmac_ctl->cmac_buffer,
+						TEGRA_NVVSE_AES_CMAC_LEN);
+		if (ret) {
+			pr_err("%s(): Failed to copy_from_user: %d\n", __func__, ret);
+			ret = -EINVAL;
+			goto free_req;
+		}
+	}
+
+	total = aes_cmac_ctl->data_length;
+	src_buffer = aes_cmac_ctl->src_buffer;
+
+	if (total > TSEC_MAX_LEN) {
+		pr_err("%s(): Unsupported buffer size: %u\n", __func__, total);
+		ret = -EINVAL;
+		goto free_req;
+	}
+
+	hash_buff = kcalloc(total, sizeof(uint8_t), GFP_KERNEL);
+	if (hash_buff == NULL) {
+		ret = -ENOMEM;
+		goto free_req;
+	}
+
+	ret = copy_from_user((void *)hash_buff, (void __user *)src_buffer, total);
+	if (ret) {
+		pr_err("%s(): Failed to copy_from_user: %d\n", __func__, ret);
+		goto free_xbuf;
+	}
+
+	sg_init_one(&sg[0], hash_buff, total);
+	ahash_request_set_crypt(req, sg, result, total);
+
+	ret = wait_async_op(&sha_complete, crypto_ahash_finup(req));
+	if (ret) {
+		pr_err("%s(): Failed to ahash_finup: %d\n", __func__, ret);
+		goto free_xbuf;
+	}
+
+	if (aes_cmac_ctl->cmac_type == TEGRA_NVVSE_AES_CMAC_SIGN) {
+		ret = copy_to_user((void __user *)aes_cmac_ctl->cmac_buffer, (const void *)result,
+								crypto_ahash_digestsize(tfm));
+		if (ret)
+			pr_err("%s(): Failed to copy_to_user: %d\n", __func__, ret);
+	} else {
+		aes_cmac_ctl->result = priv_data.result;
+	}
+
+free_xbuf:
+	kfree(hash_buff);
+free_req:
+	ahash_request_free(req);
+free_tfm:
+	crypto_free_ahash(tfm);
+free_result:
+	kfree(result);
+
+	return ret;
+}
+
 static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 				struct tegra_nvvse_aes_cmac_sign_verify_ctl *aes_cmac_ctl)
 {
@@ -465,7 +614,6 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 		pr_err("%s(): Failed to get_driver_name for cmac-vse(aes) returned NULL", __func__);
 		goto free_tfm;
 	}
-	pr_debug("%s(): Algo name cmac(aes), driver name %s\n", __func__, driver_name);
 
 	req = ahash_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -495,7 +643,7 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 						aes_cmac_ctl->key_slot);
 	if (ret >= AES_KEYSLOT_NAME_SIZE) {
 		pr_err("%s(): Buffer overflow while setting key for cmac-vse(aes): %d\n",
-						__func__, ret);
+				__func__, ret);
 		ret = -EINVAL;
 		goto free_xbuf;
 	}
@@ -528,6 +676,7 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 	hash_buff = xbuf[0];
 	total = aes_cmac_ctl->data_length;
 	src_buffer = aes_cmac_ctl->src_buffer;
+
 	while (true) {
 		size = (total < PAGE_SIZE) ? total : PAGE_SIZE;
 		ret = copy_from_user((void *)hash_buff, (void __user *)src_buffer, size);
@@ -953,34 +1102,33 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 
 	crypto_skcipher_clear_flags(tfm, ~0);
 
-	if (!aes_enc_dec_ctl->skip_key) {
-		ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-			       aes_enc_dec_ctl->key_slot);
-		if (ret >= AES_KEYSLOT_NAME_SIZE) {
-			pr_err("%s(): Buffer overflow while preparing key for %s: %d\n",
-						__func__, aes_algo[aes_enc_dec_ctl->aes_mode], ret);
-			ret = -EINVAL;
-			goto free_req;
-		}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
+			   aes_enc_dec_ctl->key_slot);
+	if (ret >= AES_KEYSLOT_NAME_SIZE) {
+		pr_err("%s(): Buffer overflow while preparing key for %s: %d\n",
+					__func__, aes_algo[aes_enc_dec_ctl->aes_mode], ret);
+		ret = -EINVAL;
+		goto free_req;
+	}
 
-		klen = strlen(key_as_keyslot);
-		if(klen != 16) {
-			pr_err("%s(): key length is invalid, length %d, key %s\n", __func__, klen, key_as_keyslot);
-			ret = -EINVAL;
-			goto free_req;
-		}
-		/* Null key is only allowed in SE driver */
-		if (!strstr(driver_name, "tegra")) {
-			ret = -EINVAL;
-			pr_err("%s(): Failed to identify as tegra se driver\n", __func__);
-			goto free_req;
-		}
+	klen = strlen(key_as_keyslot);
+	if (klen != 16) {
+		pr_err("%s(): key length is invalid, length %d, key %s\n", __func__, klen,
+			key_as_keyslot);
+		ret = -EINVAL;
+		goto free_req;
+	}
+	/* Null key is only allowed in SE driver */
+	if (!strstr(driver_name, "tegra")) {
+		ret = -EINVAL;
+		pr_err("%s(): Failed to identify as tegra se driver\n", __func__);
+		goto free_req;
+	}
 
-		ret = crypto_skcipher_setkey(tfm, key_as_keyslot, aes_enc_dec_ctl->key_length);
-		if (ret < 0) {
-			pr_err("%s(): Failed to set key: %d\n", __func__, ret);
-			goto free_req;
-		}
+	ret = crypto_skcipher_setkey(tfm, key_as_keyslot, aes_enc_dec_ctl->key_length);
+	if (ret < 0) {
+		pr_err("%s(): Failed to set key: %d\n", __func__, ret);
+		goto free_req;
 	}
 
 	ret = alloc_bufs(xbuf);
@@ -1232,21 +1380,19 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 
 	crypto_aead_clear_flags(tfm, ~0);
 
-	if (!aes_enc_dec_ctl->skip_key) {
-		ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-				aes_enc_dec_ctl->key_slot);
-		if (ret >= AES_KEYSLOT_NAME_SIZE) {
-			pr_err("%s(): Buffer overflow while preparing key for gcm(aes): %d\n",
-						__func__, ret);
-			ret = -EINVAL;
-			goto free_req;
-		}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
+			aes_enc_dec_ctl->key_slot);
+	if (ret >= AES_KEYSLOT_NAME_SIZE) {
+		pr_err("%s(): Buffer overflow while preparing key for gcm(aes): %d\n",
+					__func__, ret);
+		ret = -EINVAL;
+		goto free_req;
+	}
 
-		ret = crypto_aead_setkey(tfm, key_as_keyslot, aes_enc_dec_ctl->key_length);
-		if (ret < 0) {
-			pr_err("%s(): Failed to set key: %d\n", __func__, ret);
-			goto free_req;
-		}
+	ret = crypto_aead_setkey(tfm, key_as_keyslot, aes_enc_dec_ctl->key_length);
+	if (ret < 0) {
+		pr_err("%s(): Failed to set key: %d\n", __func__, ret);
+		goto free_req;
 	}
 
 	ret = crypto_aead_setauthsize(tfm, aes_enc_dec_ctl->tag_length);
@@ -1672,6 +1818,7 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 	struct tegra_nvvse_aes_gmac_init_ctl aes_gmac_init_ctl;
 	struct tegra_nvvse_aes_gmac_sign_verify_ctl aes_gmac_sign_verify_ctl;
 	struct tegra_nvvse_get_ivc_db get_ivc_db;
+	struct tegra_nvvse_tsec_get_keyload_status tsec_keyload_status;
 	int ret = 0;
 
 	/*
@@ -1839,6 +1986,44 @@ static long tnvvse_crypto_dev_ioctl(struct file *filp,
 			goto out;
 		}
 
+		break;
+
+	case NVVSE_IOCTL_CMDID_TSEC_SIGN_VERIFY:
+		arg_aes_cmac_sign_verify_ctl = (void __user *)arg;
+		ret = copy_from_user(&aes_cmac_sign_verify_ctl, (void __user *)arg,
+					sizeof(aes_cmac_sign_verify_ctl));
+		if (ret) {
+			pr_err("%s(): Failed to copy_from_user tsec_sign_verify:%d\n",
+						__func__, ret);
+			goto out;
+		}
+		ret = tnvvtsec_crypto_aes_cmac_sign_verify(ctx, &aes_cmac_sign_verify_ctl);
+		if (ret)
+			goto out;
+
+		if (aes_cmac_sign_verify_ctl.cmac_type == TEGRA_NVVSE_AES_CMAC_VERIFY) {
+			ret = copy_to_user(&arg_aes_cmac_sign_verify_ctl->result,
+						&aes_cmac_sign_verify_ctl.result,
+								sizeof(uint8_t));
+			if (ret)
+				pr_err("%s(): Failed to copy_to_user:%d\n", __func__, ret);
+		}
+		break;
+
+	case NVVSE_IOCTL_CMDID_TSEC_GET_KEYLOAD_STATUS:
+		ret = tnvvse_crypto_tsec_get_keyload_status(ctx, &tsec_keyload_status);
+		if (ret) {
+			pr_err("%s(): Failed to get keyload status:%d\n", __func__, ret);
+			goto out;
+		}
+
+		ret = copy_to_user((void __user *)arg, &tsec_keyload_status,
+				sizeof(tsec_keyload_status));
+		if (ret) {
+			pr_err("%s(): Failed to copy_to_user tsec_keyload_status:%d\n",
+					__func__, ret);
+			goto out;
+		}
 		break;
 
 	default:

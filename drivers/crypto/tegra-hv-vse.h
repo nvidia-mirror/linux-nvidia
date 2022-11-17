@@ -77,7 +77,7 @@ struct tegra_virtual_se_aes_context {
 	uint32_t node_id;
 };
 
-/* Security Engine AES CMAC context */
+/* Security Engine/TSEC AES CMAC context */
 struct tegra_virtual_se_aes_cmac_context {
 	unsigned int digest_size;
 	u8 *hash_result;		/* Intermediate hash result */
@@ -141,5 +141,8 @@ struct tegra_virtual_se_req_context {
 
 /* API to get ivc db from hv_vse driver */
 struct crypto_dev_to_ivc_map *tegra_hv_vse_get_db(void);
+
+/* API to get tsec keyload status from vse driver */
+int tegra_hv_vse_safety_tsec_get_keyload_status(uint32_t node_id, uint32_t *err_code);
 
 #endif /*__TEGRA_HV_VSE_H*/

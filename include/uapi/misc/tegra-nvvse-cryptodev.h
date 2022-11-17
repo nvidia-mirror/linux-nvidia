@@ -22,7 +22,7 @@
 #include <asm-generic/ioctl.h>
 
 #define TEGRA_NVVSE_IOC_MAGIC				0x98
-#define MAX_NUMBER_MISC_DEVICES				40U
+#define MAX_NUMBER_MISC_DEVICES				46U
 
 /* Command ID for various IO Control */
 #define TEGRA_NVVSE_CMDID_AES_SET_KEY			1
@@ -36,6 +36,8 @@
 #define TEGRA_NVVSE_CMDID_AES_GMAC_SIGN_VERIFY		10
 #define TEGRA_NVVSE_CMDID_AES_CMAC_SIGN_VERIFY		11
 #define TEGRA_NVVSE_CMDID_GET_IVC_DB			12
+#define TEGRA_NVVSE_CMDID_TSEC_SIGN_VERIFY		13
+#define TEGRA_NVVSE_CMDID_TSEC_GET_KEYLOAD_STATUS	14
 
 /** Defines the length of the AES-CBC Initial Vector */
 #define TEGRA_NVVSE_AES_IV_LEN				16U
@@ -365,6 +367,20 @@ struct tegra_nvvse_aes_cmac_sign_verify_ctl {
 #define NVVSE_IOCTL_CMDID_AES_CMAC_SIGN_VERIFY _IOWR(TEGRA_NVVSE_IOC_MAGIC, \
 						TEGRA_NVVSE_CMDID_AES_CMAC_SIGN_VERIFY, \
 						struct  tegra_nvvse_aes_cmac_sign_verify_ctl)
+#define NVVSE_IOCTL_CMDID_TSEC_SIGN_VERIFY _IOWR(TEGRA_NVVSE_IOC_MAGIC, \
+						TEGRA_NVVSE_CMDID_TSEC_SIGN_VERIFY, \
+						struct  tegra_nvvse_aes_cmac_sign_verify_ctl)
+
+/**
+ * brief Holds Error code corresponding to TSEC keyload status
+ */
+struct tegra_nvvse_tsec_get_keyload_status {
+	/* NVVSE Error code  */
+	uint32_t err_code;
+};
+#define NVVSE_IOCTL_CMDID_TSEC_GET_KEYLOAD_STATUS _IOW(TEGRA_NVVSE_IOC_MAGIC, \
+						TEGRA_NVVSE_CMDID_TSEC_GET_KEYLOAD_STATUS, \
+						struct tegra_nvvse_tsec_get_keyload_status)
 
 /**
  * brief Holds IVC databse
