@@ -1402,6 +1402,7 @@ static const struct of_device_id host1x_drm_subdevs[] = {
 	{ .compatible = "nvidia,tegra234-nvenc", },
 	{ .compatible = "nvidia,tegra234-nvjpg", },
 	{ .compatible = "nvidia,tegra234-ofa", },
+	{ .compatible = "nvidia,tegra234-host1x-virtual-engine", },
 	{ /* sentinel */ }
 };
 
@@ -1429,6 +1430,7 @@ static struct platform_driver * const drivers[] = {
 	&tegra_nvenc_driver,
 	&tegra_nvjpg_driver,
 	&tegra_ofa_driver,
+	&tegra_virt_engine_driver,
 };
 
 static int __init host1x_drm_init(void)
