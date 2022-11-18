@@ -498,6 +498,10 @@ int capture_common_setup_progress_status_notifier(
 	uint32_t mem_offset)
 {
 	struct dma_buf *dmabuf;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	struct dma_buf_map map;
+	int err;
+#endif
 	void *va;
 
 	/* take reference for the userctx */
@@ -517,7 +521,12 @@ int capture_common_setup_progress_status_notifier(
 	}
 
 	/* map handle and clear error notifier struct */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	err = dma_buf_vmap(dmabuf, &map);
+	va = err ? NULL : map.vaddr;
+#else
 	va = dma_buf_vmap(dmabuf);
+#endif
 	if (!va) {
 		dma_buf_put(dmabuf);
 		pr_err("%s: Cannot map notifier handle\n", __func__);
@@ -537,10 +546,17 @@ int capture_common_release_progress_status_notifier(
 {
 	struct dma_buf *dmabuf = progress_status_notifier->buf;
 	void *va = progress_status_notifier->va;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	struct dma_buf_map map = DMA_BUF_MAP_INIT_VADDR(va);
+#endif
 
 	if (dmabuf != NULL) {
 		if (va != NULL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+			dma_buf_vunmap(dmabuf, &map);
+#else
 			dma_buf_vunmap(dmabuf, va);
+#endif
 
 		dma_buf_put(dmabuf);
 	}
@@ -587,6 +603,9 @@ int capture_common_pin_memory(
 {
 	struct dma_buf *buf;
 	struct dma_buf_attachment *attach;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	struct dma_buf_map map;
+#endif
 	struct sg_table *sgt;
 	int err = 0;
 
@@ -611,7 +630,12 @@ int capture_common_pin_memory(
 	if (sg_dma_address(sgt->sgl) == 0)
 		sg_dma_address(sgt->sgl) = sg_phys(sgt->sgl);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	err = dma_buf_vmap(buf, &map);
+	unpin_data->va = err ? NULL : map.vaddr;
+#else
 	unpin_data->va = dma_buf_vmap(buf);
+#endif
 
 	if (unpin_data->va == NULL) {
 		pr_err("%s: failed to map pinned memory\n", __func__);
@@ -633,8 +657,16 @@ fail:
 void capture_common_unpin_memory(
 	struct capture_common_buf *unpin_data)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	struct dma_buf_map map = DMA_BUF_MAP_INIT_VADDR(unpin_data->va);
+#endif
+
 	if (unpin_data->va)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+		dma_buf_vunmap(unpin_data->buf, &map);
+#else
 		dma_buf_vunmap(unpin_data->buf, unpin_data->va);
+#endif
 
 	if (unpin_data->sgt != NULL)
 		dma_buf_unmap_attachment(unpin_data->attach, unpin_data->sgt,
