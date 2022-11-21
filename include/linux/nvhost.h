@@ -466,6 +466,9 @@ int flcn_reload_fw(struct platform_device *pdev);
 int nvhost_flcn_prepare_poweroff(struct platform_device *pdev);
 int nvhost_flcn_finalize_poweron(struct platform_device *dev);
 
+/* public api to return platform_device ptr to the default host1x instance */
+struct platform_device *nvhost_get_default_device(void);
+
 /* common runtime pm and power domain APIs */
 int nvhost_module_init(struct platform_device *ndev);
 void nvhost_module_deinit(struct platform_device *dev);
@@ -509,6 +512,8 @@ int nvhost_intr_register_notifier(struct platform_device *pdev,
 
 /* public host1x sync-point management APIs */
 #ifdef CONFIG_TEGRA_HOST1X
+
+struct host1x *nvhost_get_host1x(struct platform_device *pdev);
 
 static inline struct flcn *get_flcn(struct platform_device *pdev)
 {
@@ -676,9 +681,6 @@ bool nvhost_module_powered_ext(struct platform_device *dev);
 int nvhost_module_busy_ext(struct platform_device *dev);
 /* This power OFF only host1x and doesn't power OFF module */
 void nvhost_module_idle_ext(struct platform_device *dev);
-
-/* public api to return platform_device ptr to the default host1x instance */
-struct platform_device *nvhost_get_default_device(void);
 
  /* Public PM nvhost APIs. */
 /* This power ON both host1x and module */
