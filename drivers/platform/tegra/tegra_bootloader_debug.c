@@ -329,7 +329,7 @@ static int __init tegra_bootloader_debuginit(void)
 	if (IS_ERR_OR_NULL(bl_debug_node)) {
 		pr_err("%s: failed to create debugfs entries: %ld\n",
 			module_name, PTR_ERR(bl_debug_node));
-		goto out_err;
+		goto ignore_debugfs_failure;
 	}
 
 	pr_info("%s: created %s directory\n", module_name, dir_name);
@@ -340,7 +340,7 @@ static int __init tegra_bootloader_debuginit(void)
 	if (IS_ERR_OR_NULL(bl_debug_verify_reg_node)) {
 		pr_err("%s: failed to create debugfs entries: %ld\n",
 			module_name, PTR_ERR(bl_debug_verify_reg_node));
-		goto out_err;
+		goto ignore_debugfs_failure;
 	}
 
 	bl_debug_verify_reg_node = debugfs_create_file(gr_file_mb2, S_IRUGO,
@@ -349,7 +349,7 @@ static int __init tegra_bootloader_debuginit(void)
 	if (IS_ERR_OR_NULL(bl_debug_verify_reg_node)) {
 		pr_err("%s: failed to create debugfs entries: %ld\n",
 			module_name, PTR_ERR(bl_debug_verify_reg_node));
-		goto out_err;
+		goto ignore_debugfs_failure;
 	}
 
 	bl_debug_verify_reg_node = debugfs_create_file(gr_file_cpu_bl, S_IRUGO,
@@ -358,7 +358,7 @@ static int __init tegra_bootloader_debuginit(void)
 	if (IS_ERR_OR_NULL(bl_debug_verify_reg_node)) {
 		pr_err("%s: failed to create debugfs entries: %ld\n",
 			module_name, PTR_ERR(bl_debug_verify_reg_node));
-		goto out_err;
+		goto ignore_debugfs_failure;
 	}
 
 	tegra_bl_mapped_debug_data_start =
@@ -372,7 +372,7 @@ static int __init tegra_bootloader_debuginit(void)
 		if (!ptr_bl_debug_data_start) {
 			pr_err("%s: Failed to map tegra_bl_debug_data_start%08x\n",
 			   __func__, (unsigned int)tegra_bl_debug_data_start);
-			goto out_err;
+			goto ignore_debugfs_failure;
 		}
 
 		pr_info("Remapped tegra_bl_debug_data_start(0x%llx)"
@@ -392,7 +392,7 @@ static int __init tegra_bootloader_debuginit(void)
 		if (IS_ERR_OR_NULL(bl_debug_boot_cfg)) {
 			pr_err("%s: failed to create debugfs entries: %ld\n",
 				__func__, PTR_ERR(bl_debug_boot_cfg));
-			goto out_err;
+			goto ignore_debugfs_failure;
 		}
 
 		tegra_bl_mapped_boot_cfg_start =
@@ -406,11 +406,13 @@ static int __init tegra_bootloader_debuginit(void)
 				pr_err("%s: Failed to map tegra_bl_prof_start %08x\n",
 					__func__,
 					(unsigned int)tegra_bl_bcp_start);
-				goto out_err;
+				goto ignore_debugfs_failure;
 			}
 			tegra_bl_mapped_boot_cfg_start = (__force void *)ptr_bl_boot_cfg_start;
 		}
 	}
+
+ignore_debugfs_failure:
 #endif /* CONFIG_DEBUG_FS */
 	boot_profiler_kobj = kobject_create_and_add(dir_name, kernel_kobj);
 	if (IS_ERR_OR_NULL(boot_profiler_kobj)) {
