@@ -329,7 +329,6 @@ static int
 setup_extcfg(struct platform_device *pdev, struct psc_debug_dev *dbg,
 	struct dentry *root)
 {
-	struct device_node *np = pdev->dev.of_node;
 	struct resource *res;
 	void __iomem *base;
 	u32 value;
@@ -345,13 +344,13 @@ setup_extcfg(struct platform_device *pdev, struct psc_debug_dev *dbg,
 
 	dev_info(&pdev->dev, "ext_cfg base:%p\n", base);
 
-	if (!of_property_read_u8_array(np, NV(sidtable),
+	if (!device_property_read_u8_array(&pdev->dev, NV(sidtable),
 				(u8 *)&value, sizeof(value))) {
 		dev_dbg(&pdev->dev, "sidtable:%08x\n", value);
 		writel(value, base + EXT_CFG_SIDTABLE); /* PSC_EXT_CFG_SIDTABLE_VM0_0 */
 	}
 
-	if (!of_property_read_u32(np, NV(sidconfig), &value)) {
+	if (!device_property_read_u32(&pdev->dev, NV(sidconfig), &value)) {
 		dev_dbg(&pdev->dev, "sidcfg:%08x\n", value);
 		writel(value, base + EXT_CFG_SIDCONFIG);    /* PSC_EXT_CFG_SIDCONFIG_VM0_0 */
 	}
