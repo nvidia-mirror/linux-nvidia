@@ -58,9 +58,6 @@
  */
 #define HEARTBEAT		120
 
-/* Watchdog configured to this time before reset during shutdown */
-#define SHUTDOWN_TIMEOUT	150
-
 /* Bit numbers for status flags */
 #define WDT_ENABLED		0
 #define WDT_ENABLED_ON_INIT	1
@@ -464,7 +461,10 @@ static int tegra_wdt_t18x_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	ret = of_property_read_u32(np, "nvidia,shutdown-timeout", &pval);
-	twdt_t18x->shutdown_timeout = (ret) ? SHUTDOWN_TIMEOUT : pval;
+	if (ret)
+		dev_info(&pdev->dev, "shutdown timeout disabled\n");
+	else
+		twdt_t18x->shutdown_timeout = pval;
 
 	twdt_t18x->soc = of_device_get_match_data(&pdev->dev);
 	if (!twdt_t18x->soc) {
@@ -733,6 +733,9 @@ static void tegra_wdt_t18x_shutdown(struct platform_device *pdev)
 	struct tegra_wdt_t18x *twdt_t18x = platform_get_drvdata(pdev);
 
 	if (twdt_t18x->shutdown_timeout) {
+		dev_dbg(twdt_t18x->dev,
+			"Watchdog%d: setting shutdown timeout as %d seconds",
+			twdt_t18x->wdt.id, twdt_t18x->shutdown_timeout);
 		twdt_t18x->wdt.timeout = twdt_t18x->shutdown_timeout;
 		__tegra_wdt_t18x_ping(twdt_t18x);
 		return;
