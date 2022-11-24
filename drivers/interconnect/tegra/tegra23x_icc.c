@@ -57,26 +57,25 @@ static int tegra23x_cap_set(struct tegra_icc_provider *tp,
 	struct mrq_bwmgr_int_request bwmgr_req = {0};
 	struct mrq_bwmgr_int_response bwmgr_resp = {0};
 
-	/* Determine what the rounded rate should be */
-	if (cap_kbps) {
-		clk_fwk_ret = clk_set_max_rate(tp->dram_clk, UINT_MAX);
-		if (clk_fwk_ret) {
-			pr_err("clk_set_max_rate failed %d\n", clk_fwk_ret);
-			return clk_fwk_ret;
-		}
+	/* Remove existing cap by increasing max rate to bpmp Fmax */
+	clk_fwk_ret = clk_set_max_rate(tp->dram_clk, UINT_MAX);
+	if (clk_fwk_ret) {
+		pr_err("clk_set_max_rate failed %d\n", clk_fwk_ret);
+		return clk_fwk_ret;
+	}
 
-		cap_req = cap_kbps;
-		cap_req = emc_bw_to_freq(cap_req);
-		cap_req = (UINT_MAX / 1000) <= cap_req ? UINT_MAX / 1000 : cap_req;
-		round_rate_ret = clk_round_rate(tp->dram_clk, cap_req * 1000);
-		if (round_rate_ret < 0) {
-			pr_err("clk_round_rate fail %ld\n", round_rate_ret);
-			cap_req = UINT_MAX;
-		} else {
-			cap_req = (unsigned long) round_rate_ret;
-		}
-	} else {
+	/* Note: the cap_kbps 0 is considered an uncapped request */
+	cap_req = emc_bw_to_freq(cap_kbps) * 1000;
+	if (!cap_req || cap_req > UINT_MAX)
 		cap_req = UINT_MAX;
+
+	/* Determine what the rounded rate should be */
+	round_rate_ret = clk_round_rate(tp->dram_clk, cap_req);
+	if (round_rate_ret < 0) {
+		pr_err("clk_round_rate fail %ld\n", round_rate_ret);
+		cap_req = UINT_MAX;
+	} else {
+		cap_req = (unsigned long)round_rate_ret;
 	}
 
 	/* Issue cap-set requests to clk-fwk and bpmp */
