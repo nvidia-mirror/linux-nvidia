@@ -478,7 +478,7 @@ u32 nvmap_page_pool_fill_lots(struct nvmap_page_pool *pool,
 
 ulong nvmap_page_pool_get_unused_pages(void)
 {
-	int total = 0;
+	unsigned long total = 0;
 
 	if (!nvmap_dev)
 		return 0;
