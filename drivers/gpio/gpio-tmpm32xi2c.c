@@ -26,9 +26,9 @@
 #endif
 #include <linux/mfd/tmpm32xi2c.h>
 
-#define TMPM_MAX_PORT		112
-#define TMPM_MAX_INTR_PORT	8
-#define TMPM_BANK_SZ		8
+#define TMPM_MAX_PORT		112U
+#define TMPM_MAX_INTR_PORT	8U
+#define TMPM_BANK_SZ		8U
 
 #define TMPM_MAX_BANK		(TMPM_MAX_PORT / TMPM_BANK_SZ)
 #define TMPM_MAX_INTR_BANK	(TMPM_MAX_INTR_PORT / TMPM_BANK_SZ)
@@ -40,10 +40,20 @@
 #define TMPM_GET_BANK(_A, _pos)		(_A[(_pos) / TMPM_BANK_SZ])
 #define TMPM_GET_BANKOFFSET(_pos)	((_pos) % TMPM_BANK_SZ)
 
-#define TMPM_SET_BIT_U8(_A, _pos) \
-	(_A[(_pos) / TMPM_BANK_SZ] |= ((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
-#define TMPM_CLR_BIT_U8(_A, _pos) \
-	(_A[(_pos) / TMPM_BANK_SZ] &= ~((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
+#define TMPM_SET_BIT_U8(_A, _pos) 					\
+	({								\
+		int val = ((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos));	\
+		if (val <= U8_MAX)					\
+			_A[(_pos) / TMPM_BANK_SZ] |= val;		\
+	})
+
+#define TMPM_CLR_BIT_U8(_A, _pos) 					\
+	({								\
+		int val = ~((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos));	\
+		if (val <= U8_MAX)					\
+			_A[(_pos) / TMPM_BANK_SZ] &= val;		\
+	})
+
 #define TMPM_TEST_BIT_U8(_A, _pos) \
 	(_A[(_pos) / TMPM_BANK_SZ] & ((u8)1U << (u8)TMPM_GET_BANKOFFSET(_pos)))
 
@@ -112,10 +122,40 @@ static inline bool tmpm32xi2c_gpio_safe_cast_u64_to_u16(u64 op, u16 *ret_val)
 {
 	bool ret = false;
 
-	if (op > (u64)((u16)(~((u16)0U)))) {
+	if (op > (u64)U16_MAX) {
 		WARN_ON(true);
 	} else {
 		*ret_val = (u16)op;
+		ret = true;
+	}
+
+	return ret;
+}
+
+static inline bool tmpm32xi2c_gpio_safe_cast_s32_to_u32(int op,
+							unsigned int *ret_val)
+{
+	bool ret = false;
+
+	if (op < 0) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (unsigned int)op;
+		ret = true;
+	}
+
+	return ret;
+}
+
+static inline bool tmpm32xi2c_gpio_safe_cast_u32_to_s32(unsigned int op,
+							int *ret_val)
+{
+	bool ret = false;
+
+	if (op > (unsigned int)S32_MAX) {
+		WARN_ON(true);
+	} else {
+		*ret_val = (int)op;
 		ret = true;
 	}
 
@@ -132,12 +172,22 @@ static int tmpm32xi2c_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
 {
 	struct tmpm32xi2c_gpio_data *data = gc_to_tmpm32xi2c_gpio(gc);
 
-	if (TMPM_TEST_BIT_U8(data->irq_available, offset))
+	if (TMPM_TEST_BIT_U8(data->irq_available, offset)) {
+		unsigned int val;
+		int irq;
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
-		return (int)irq_find_mapping(gc->irq.domain, offset);
+		val = irq_find_mapping(gc->irq.domain, offset);
 #else
-		return (int)irq_find_mapping(gc->irqdomain, offset);
+		val = irq_find_mapping(gc->irqdomain, offset);
 #endif
+		if (!tmpm32xi2c_gpio_safe_cast_u32_to_s32(val, &irq)) {
+			dev_err(data->dev,
+				"Failed to cast type of irq from u32 to s32\n");
+			return -EOVERFLOW;
+		}
+		return irq;
+	}
 
 	dev_dbg(data->dev, "%s: offset[%u] is not available for irq\n",
 		 __func__, offset);
@@ -381,7 +431,7 @@ static irqreturn_t tmpm32xi2c_gpio_irq_handler(int irq, void *devid)
 				(struct tmpm32xi2c_gpio_data *)devid;
 	unsigned int nhandled = 0;
 	unsigned int gpio_irq = 0;
-	uint8_t level;
+	unsigned long level;
 	int pendings;
 	int i;
 
@@ -391,17 +441,22 @@ static irqreturn_t tmpm32xi2c_gpio_irq_handler(int irq, void *devid)
 
 	for (i = 0; i < TMPM_MAX_INTR_BANK; i++) {
 		while (data->irq_pending[i]) {
-			level = (uint8_t)__ffs(data->irq_pending[i]);
+			level = __ffs(data->irq_pending[i]);
+			if (level < 8U) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
-			gpio_irq = irq_find_mapping(data->gc.irq.domain,
-						    TMPM_GET_GPIO_NUM(level));
+				gpio_irq = irq_find_mapping(data->gc.irq.domain,
+							    TMPM_GET_GPIO_NUM(level));
 #else
-			gpio_irq = irq_find_mapping(data->gc.irqdomain,
-						    TMPM_GET_GPIO_NUM(level));
+				gpio_irq = irq_find_mapping(data->gc.irqdomain,
+							    TMPM_GET_GPIO_NUM(level));
 #endif
-			handle_nested_irq(gpio_irq);
-			data->irq_pending[i] &= ~((uint8_t)1U << level);
-			nhandled++;
+				handle_nested_irq(gpio_irq);
+				data->irq_pending[i] &= ~((uint8_t)1U << level);
+				if ((U32_MAX - nhandled) >= 1U)
+					nhandled++;
+			} else {
+				break;
+			}
 		}
 	}
 	data->irq_is_pending = 0;
@@ -415,7 +470,7 @@ tmpm32xi2c_gpio_update_irq_mask_reg(struct tmpm32xi2c_gpio_data *data)
 	struct tmpm32xi2c_chip *chip = dev_get_drvdata(data->dev->parent);
 	uint8_t tx_mask[] = { CMD_INT_MASK, 0x0 /*value*/ };
 	uint8_t irq_mask_cache;
-	uint8_t level;
+	unsigned long level;
 	uint8_t new_irqs;
 	int i;
 
@@ -424,12 +479,16 @@ tmpm32xi2c_gpio_update_irq_mask_reg(struct tmpm32xi2c_gpio_data *data)
 		new_irqs = ~irq_mask_cache & data->reg_direction_intr[i];
 
 		while (new_irqs) {
-			level = (uint8_t)__ffs(new_irqs);
-			mutex_lock(&data->lock);
-			__tmpm32xi2c_gpio_direction_input(
-					data, TMPM_GET_GPIO_NUM(level));
-			mutex_unlock(&data->lock);
-			new_irqs &= ~((uint8_t)1U << level);
+			level = __ffs(new_irqs);
+			if (level < 8U) {
+				mutex_lock(&data->lock);
+				__tmpm32xi2c_gpio_direction_input(
+						data, TMPM_GET_GPIO_NUM(level));
+				mutex_unlock(&data->lock);
+				new_irqs &= ~((uint8_t)1U << level);
+			} else {
+				break;
+			}
 		}
 
 		if (irq_mask_cache != data->irq_mask[i]) {
@@ -524,6 +583,7 @@ static int tmpm32xi2c_gpio_irq_setup(struct tmpm32xi2c_gpio_data *data,
 	struct tmpm32xi2c_chip *chip = dev_get_drvdata(data->dev->parent);
 	uint32_t gpio_num = 0;
 	unsigned long irq_flags;
+	unsigned int irq;
 	int i;
 	int ret;
 
@@ -548,13 +608,20 @@ static int tmpm32xi2c_gpio_irq_setup(struct tmpm32xi2c_gpio_data *data,
 	}
 
 	irq_flags = IRQF_ONESHOT | IRQF_SHARED | IRQF_EARLY_RESUME;
-	ret = devm_request_threaded_irq(data->dev, (uint32_t)data->irq, NULL,
+
+	if (!tmpm32xi2c_gpio_safe_cast_s32_to_u32(data->irq, &irq)) {
+		dev_err(data->dev,
+			"Failed to cast type of irq from s32 to u32\n");
+		return -EOVERFLOW;
+	}
+
+	ret = devm_request_threaded_irq(data->dev, irq, NULL,
 					tmpm32xi2c_gpio_irq_handler,
 					data->irq_flags | irq_flags,
 					dev_name(data->dev), data);
 	if (ret < 0) {
 		dev_err(data->dev,
-			"Failed to request irq%d, %d\n", data->irq, ret);
+			"Failed to request irq%u, %d\n", irq, ret);
 		return ret;
 	}
 
@@ -601,12 +668,12 @@ static int tmpm32xi2c_gpio_probe(struct platform_device *pdev)
 	data->gc.set = tmpm32xi2c_gpio_set_value;
 	data->gc.can_sleep = true;
 	data->gc.base = -1;
-	data->gc.ngpio = id->driver_data;
 	if (!tmpm32xi2c_gpio_safe_cast_u64_to_u16(id->driver_data, &ngpio)) {
 		dev_err(&pdev->dev,
 			"Failed to cast type of driver_data from u64 to u16\n");
 		return -EOVERFLOW;
 	}
+	data->gc.ngpio = ngpio;
 	data->gc.label = pdev->name;
 	data->gc.parent = &pdev->dev;
 	data->gc.owner = THIS_MODULE;
@@ -651,15 +718,21 @@ static int tmpm32xi2c_gpio_suspend(struct device *dev)
 {
 	struct tmpm32xi2c_gpio_data *data = dev_get_drvdata(dev);
 	int ret = 0;
+	unsigned int irq;
 
-	disable_irq(data->irq);
+	if (!tmpm32xi2c_gpio_safe_cast_s32_to_u32(data->irq, &irq)) {
+		dev_err(dev, "Failed to cast type of irq from s32 to u32\n");
+		return -EOVERFLOW;
+	}
+
+	disable_irq(irq);
 
 	if (device_may_wakeup(dev)) {
-		ret = enable_irq_wake((uint32_t)data->irq);
+		ret = enable_irq_wake(irq);
 		if (ret < 0)
 			dev_err(dev,
-				"Failed to enable irq wake for irq%d, %d\n",
-				data->irq, ret);
+				"Failed to enable irq wake for irq%u, %d\n",
+				irq, ret);
 	}
 
 	return ret;
@@ -668,17 +741,23 @@ static int tmpm32xi2c_gpio_suspend(struct device *dev)
 static int tmpm32xi2c_gpio_resume(struct device *dev)
 {
 	struct tmpm32xi2c_gpio_data *data = dev_get_drvdata(dev);
+	unsigned int irq;
+
+	if (!tmpm32xi2c_gpio_safe_cast_s32_to_u32(data->irq, &irq)) {
+		dev_err(dev, "Failed to cast type of irq from s32 to u32\n");
+		return -EOVERFLOW;
+	}
 
 	if (device_may_wakeup(dev))
-		disable_irq_wake(data->irq);
+		disable_irq_wake(irq);
 
-	enable_irq((uint32_t)data->irq);
+	enable_irq(irq);
 
 	/* If there is any pending irq, invoke the irq handler. */
 	if (tmpm32xi2c_gpio_irq_pending(data)) {
 		local_irq_disable();
 		data->irq_is_pending = 1;
-		generic_handle_irq(data->irq);
+		generic_handle_irq(irq);
 		local_irq_enable();
 	}
 
