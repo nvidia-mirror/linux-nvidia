@@ -1368,7 +1368,7 @@ int __init nvmap_probe(struct platform_device *pdev)
 	struct nvmap_platform_data *plat;
 	struct nvmap_device *dev;
 	struct dentry *nvmap_debug_root;
-	unsigned int i;
+	int i;
 	int e;
 	int generic_carveout_present = 0;
 	ulong start_time = sched_clock();
