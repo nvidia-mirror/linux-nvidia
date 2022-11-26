@@ -38,7 +38,7 @@ struct nvmap_sci_ipc {
 
 struct free_sid_node {
 	struct list_head list;
-	u32 sid;
+	u64 sid;
 };
 
 /* An rb-tree root node for holding sci_ipc_id of clients */
