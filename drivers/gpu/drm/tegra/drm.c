@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/file.h>
 #include <linux/host1x-next.h>
 #include <linux/idr.h>
 #include <linux/iommu.h>
@@ -1084,6 +1085,44 @@ void tegra_drm_free(struct tegra_drm *tegra, size_t size, void *virt,
 
 	free_pages((unsigned long)virt, get_order(size));
 }
+
+struct host1x_syncpt *tegra_drm_get_syncpt(int fd, u32 syncpt_id)
+{
+	struct tegra_drm_file *fpriv;
+	struct host1x_syncpt *syncpt;
+	struct file *drm_file;
+	int err;
+
+	drm_file = fget(fd);
+	if (!drm_file)
+		return ERR_PTR(-EINVAL);
+
+	if (drm_file->f_op != &tegra_drm_fops) {
+		err = -EINVAL;
+		goto fput;
+	}
+
+	fpriv = ((struct drm_file *)drm_file->private_data)->driver_priv;
+	mutex_lock(&fpriv->lock);
+
+	syncpt = xa_load(&fpriv->syncpoints, syncpt_id);
+	if (!syncpt) {
+		err = -EINVAL;
+		mutex_unlock(&fpriv->lock);
+		goto fput;
+	}
+
+	syncpt = host1x_syncpt_get(syncpt);
+	mutex_unlock(&fpriv->lock);
+
+	return syncpt;
+
+fput:
+	fput(drm_file);
+
+	return ERR_PTR(err);
+}
+EXPORT_SYMBOL_GPL(tegra_drm_get_syncpt);
 
 static bool host1x_drm_wants_iommu(struct host1x_device *dev)
 {
