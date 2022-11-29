@@ -624,3 +624,12 @@ FAIL:
 	return err;
 }
 EXPORT_SYMBOL_COMMS(tsec_comms_set_init_cb);
+
+void tsec_comms_clear_init_cb(void)
+{
+	tsec_plat_acquire_comms_mutex();
+	s_callbacks[RM_GSP_UNIT_INIT].cb_func = NULL;
+	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx  = NULL;
+	tsec_plat_release_comms_mutex();
+}
+EXPORT_SYMBOL_COMMS(tsec_comms_clear_init_cb);

@@ -61,6 +61,16 @@ void tsec_comms_drain_msg(bool invoke_cb);
  */
 int tsec_comms_set_init_cb(callback_func_t cb_func, void *cb_ctx);
 
+/* @brief: Clear callback for init message
+ *
+ * usage: When DisplayRM is unloaded it would call this API to
+ * clear the init callback it previousy set.
+ *
+ * params[in]:  NONE
+ * params[out]: NONE
+ */
+void tsec_comms_clear_init_cb(void);
+
 /* @brief: Send the command upon receiving it by putting it into the
  * tsec queue. Also sets appropriate callback to be called when
  * response arrives.
