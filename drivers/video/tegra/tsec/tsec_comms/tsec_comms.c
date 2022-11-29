@@ -33,11 +33,6 @@
 #define TSEC_MAX_MSG_SIZE           (128)
 
 #define DO_IPC_OVER_GSC_CO  (1)
-/*
- * Uncomment below when RM is running on CCPLEX and GSC has been
- * configured via BCT files to allow access via CCPLEX to GSC-CO
- */
-// #define TSEC_RM_ON_DCE (1)
 
 #ifdef DO_IPC_OVER_GSC_CO
 #define TSEC_BOOT_POLL_TIME_US     (100000)
@@ -210,12 +205,11 @@ static int ipc_write(u32 head, u8 *pSrc, u32 num_bytes)
 {
 	return ipc_txfr(head, pSrc, num_bytes, false);
 }
-#ifdef TSEC_RM_ON_DCE
+
 static int ipc_read(u32 tail, u8 *pdst, u32 num_bytes)
 {
 	return ipc_txfr(tail, pdst, num_bytes, true);
 }
-#endif
 
 #ifdef DO_IPC_OVER_GSC_CO
 static u32 tsec_get_boot_flag(void)
@@ -229,7 +223,7 @@ static u32 tsec_get_boot_flag(void)
 		return bootInfo->bootFlag;
 	}
 }
-#ifdef TSEC_RM_ON_DCE
+
 static void tsec_reset_boot_flag(void)
 {
 	struct TSEC_BOOT_INFO *bootInfo = (struct TSEC_BOOT_INFO *)(s_ipc_gscco_base);
@@ -239,7 +233,6 @@ static void tsec_reset_boot_flag(void)
 	else
 		bootInfo->bootFlag = 0;
 }
-#endif
 #endif
 
 static void invoke_init_cb(void *unused)
@@ -260,9 +253,6 @@ static void invoke_init_cb(void *unused)
 
 void tsec_comms_drain_msg(bool invoke_cb)
 {
-#ifndef TSEC_RM_ON_DCE
-	return;
-#else
 	int i;
 	u32 tail = 0;
 	u32 head = 0;
@@ -403,8 +393,6 @@ FAIL:
 
 EXIT:
 	return;
-
-#endif /* TSEC_RM_ON_DCE */
 }
 
 void tsec_comms_initialize(u64 ipc_co_va, u64 ipc_co_va_size)
