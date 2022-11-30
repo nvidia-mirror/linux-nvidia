@@ -77,10 +77,15 @@ static int nvhost_scale_make_freq_table(struct nvhost_device_profile *profile)
 	unsigned long rate      = clk_round_rate(profile->clk, min_freq + 1);
 	unsigned long clk_step  = rate - min_freq;
 	size_t cnt = 0;
-	size_t num_freqs = clk_step ? ((max_freq - min_freq) / clk_step) + 1 :
-					    1;
+	size_t num_freqs = 0;
 
-	num_freqs = ((max_freq - min_freq) % clk_step) ? num_freqs + 1 : num_freqs;
+	if (clk_step == 0) {
+		num_freqs = 1;
+	} else {
+		num_freqs = ((max_freq - min_freq) / clk_step) + 1;
+
+		num_freqs = ((max_freq - min_freq) % clk_step) ? num_freqs + 1 : num_freqs;
+	}
 
 	/* check if clk scaling is available */
 	if (min_freq <= 0 || max_freq <= 0)
