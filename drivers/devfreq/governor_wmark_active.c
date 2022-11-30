@@ -33,6 +33,8 @@ struct wmark_gov_param {
 	unsigned int		load_target;
 	unsigned int		load_max;
 	unsigned int		smooth;
+	unsigned int		high_wmark_margin;
+	unsigned int		low_wmark_margin;
 	bool			freq_boost_en;
 };
 
@@ -48,6 +50,8 @@ struct wmark_gov_info {
 	struct kobj_attribute	load_target_attr;
 	struct kobj_attribute	load_max_attr;
 	struct kobj_attribute	smooth_attr;
+	struct kobj_attribute	high_wmark_margin_attr;
+	struct kobj_attribute	low_wmark_margin_attr;
 	struct kobj_attribute	freq_boost_en_attr;
 
 	spinlock_t		param_lock;
@@ -70,13 +74,22 @@ struct wmark_gov_info {
 static unsigned long freqlist_up(struct wmark_gov_info *wmarkinfo,
 			unsigned long curr_freq)
 {
+	unsigned long flags;
 	int i, pos;
+	int margin;
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	if (wmarkinfo->param.high_wmark_margin > INT_MAX)
+		margin = wmarkinfo->freq_count - 1;
+	else
+		margin = wmarkinfo->param.high_wmark_margin;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
 
 	for (i = 0; i < wmarkinfo->freq_count; i++)
 		if (wmarkinfo->freqlist[i] > curr_freq)
 			break;
 
-	pos = min(wmarkinfo->freq_count - 1, i);
+	pos = min(wmarkinfo->freq_count - 1, i + margin);
 
 	return wmarkinfo->freqlist[pos];
 }
@@ -84,13 +97,22 @@ static unsigned long freqlist_up(struct wmark_gov_info *wmarkinfo,
 static unsigned long freqlist_down(struct wmark_gov_info *wmarkinfo,
 			unsigned long curr_freq)
 {
+	unsigned long flags;
 	int i, pos;
+	int margin;
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	if (wmarkinfo->param.low_wmark_margin > INT_MAX)
+		margin = wmarkinfo->freq_count - 1;
+	else
+		margin = wmarkinfo->param.low_wmark_margin;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
 
 	for (i = wmarkinfo->freq_count - 1; i >= 0; i--)
 		if (wmarkinfo->freqlist[i] < curr_freq)
 			break;
 
-	pos = max(0, i);
+	pos = max(0, i - margin);
 	return wmarkinfo->freqlist[pos];
 }
 
@@ -418,6 +440,99 @@ static ssize_t smooth_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t high_wmark_margin_show(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      char *buf)
+{
+	struct wmark_gov_info *wmarkinfo = NULL;
+	ssize_t res;
+	unsigned int val;
+	unsigned long flags;
+
+	wmarkinfo = container_of(attr,
+			struct wmark_gov_info,
+			high_wmark_margin_attr);
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	val = wmarkinfo->param.high_wmark_margin;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
+
+	res = snprintf(buf, PAGE_SIZE, "%u\n", val);
+	if (res >= PAGE_SIZE)
+		return -EINVAL;
+
+	return res;
+}
+
+static ssize_t high_wmark_margin_store(struct kobject *kobj,
+				       struct kobj_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct wmark_gov_info *wmarkinfo = NULL;
+	unsigned int val = 0;
+	unsigned long flags;
+
+	wmarkinfo = container_of(attr,
+			struct wmark_gov_info,
+			high_wmark_margin_attr);
+
+	if (kstrtou32(buf, 0, &val) < 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	wmarkinfo->param.high_wmark_margin = val;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
+
+	return count <= INT_MAX ? count : -EINVAL;
+
+}
+
+static ssize_t low_wmark_margin_show(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      char *buf)
+{
+	struct wmark_gov_info *wmarkinfo = NULL;
+	ssize_t res;
+	unsigned int val;
+	unsigned long flags;
+
+	wmarkinfo = container_of(attr,
+			struct wmark_gov_info,
+			low_wmark_margin_attr);
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	val = wmarkinfo->param.low_wmark_margin;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
+
+	res = snprintf(buf, PAGE_SIZE, "%u\n", val);
+	if (res >= PAGE_SIZE)
+		return -EINVAL;
+
+	return res;
+}
+
+static ssize_t low_wmark_margin_store(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct wmark_gov_info *wmarkinfo = NULL;
+	unsigned int val = 0;
+	unsigned long flags;
+
+	wmarkinfo = container_of(attr,
+			struct wmark_gov_info,
+			low_wmark_margin_attr);
+
+	if (kstrtou32(buf, 0, &val) < 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&wmarkinfo->param_lock, flags);
+	wmarkinfo->param.low_wmark_margin = val;
+	spin_unlock_irqrestore(&wmarkinfo->param_lock, flags);
+
+	return count <= INT_MAX ? count : -EINVAL;
+}
+
 static ssize_t freq_boost_en_show(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
@@ -501,6 +616,16 @@ static int devfreq_watermark_debug_start(struct devfreq *df)
 	if (sysfs_create_file(&df->dev.parent->kobj, &attr->attr))
 		goto err_create_smooth_sysfs_entry;
 
+	attr = &wmarkinfo->high_wmark_margin_attr;
+	INIT_SYSFS_ATTR_RW(high_wmark_margin);
+	if (sysfs_create_file(&df->dev.parent->kobj, &attr->attr))
+		goto err_create_high_wmark_margin_sysfs_entry;
+
+	attr = &wmarkinfo->low_wmark_margin_attr;
+	INIT_SYSFS_ATTR_RW(low_wmark_margin);
+	if (sysfs_create_file(&df->dev.parent->kobj, &attr->attr))
+		goto err_create_low_wmark_margin_sysfs_entry;
+
 	attr = &wmarkinfo->freq_boost_en_attr;
 	INIT_SYSFS_ATTR_RW(freq_boost_en);
 	if (sysfs_create_file(&df->dev.parent->kobj, &attr->attr))
@@ -509,6 +634,12 @@ static int devfreq_watermark_debug_start(struct devfreq *df)
 	return 0;
 
 err_create_freq_boost_en_sysfs_entry:
+	sysfs_remove_file(&df->dev.parent->kobj,
+			&wmarkinfo->low_wmark_margin_attr.attr);
+err_create_low_wmark_margin_sysfs_entry:
+	sysfs_remove_file(&df->dev.parent->kobj,
+			&wmarkinfo->high_wmark_margin_attr.attr);
+err_create_high_wmark_margin_sysfs_entry:
 	sysfs_remove_file(&df->dev.parent->kobj,
 			&wmarkinfo->smooth_attr.attr);
 err_create_smooth_sysfs_entry:
@@ -531,6 +662,10 @@ static void devfreq_watermark_debug_stop(struct devfreq *df)
 
 	sysfs_remove_file(&df->dev.parent->kobj,
 			&wmarkinfo->freq_boost_en_attr.attr);
+	sysfs_remove_file(&df->dev.parent->kobj,
+			&wmarkinfo->high_wmark_margin_attr.attr);
+	sysfs_remove_file(&df->dev.parent->kobj,
+			&wmarkinfo->low_wmark_margin_attr.attr);
 	sysfs_remove_file(&df->dev.parent->kobj,
 			&wmarkinfo->smooth_attr.attr);
 	sysfs_remove_file(&df->dev.parent->kobj,
