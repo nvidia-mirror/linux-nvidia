@@ -59,7 +59,7 @@ static struct device_node *find_clocks_node(const char *name)
 	pp = of_find_node_by_name(NULL, node_name);
 
 	if (!pp) {
-		mods_error_printk("'mods-simple-bus' node not found in device tree\n");
+		mods_warning_printk("'mods-simple-bus' node not found in device tree\n");
 		return pp;
 	}
 
@@ -76,7 +76,7 @@ void mods_init_clock_api(void)
 
 	mods_np = find_clocks_node("mods-clocks");
 	if (!mods_np) {
-		mods_error_printk("'mods-clocks' node not found in device tree\n");
+		mods_warning_printk("'mods-clocks' node not found in device tree\n");
 		goto err;
 	}
 
@@ -257,7 +257,7 @@ int esc_mods_get_clock_handle(struct mods_client *client,
 
 	mods_np = find_clocks_node("mods-clocks");
 	if (!mods_np || !of_device_is_available(mods_np)) {
-		cl_error("'mods-clocks' node not found in device tree\n");
+		cl_warn("'mods-clocks' node not found in device tree\n");
 		goto err;
 	}
 	pp = of_find_property(mods_np, "clock-names", NULL);
@@ -296,7 +296,7 @@ int esc_mods_get_rst_handle(struct mods_client *client,
 
 	mods_np = find_clocks_node("mods-clocks");
 	if (!mods_np || !of_device_is_available(mods_np)) {
-		cl_error("'mods-clocks' node not found in device tree\n");
+		cl_warn("'mods-clocks' node not found in device tree\n");
 		goto err;
 	}
 	pp = of_find_property(mods_np, "reset-names", NULL);
@@ -600,7 +600,7 @@ int esc_mods_reset_assert(struct mods_client *client,
 	LOG_ENT();
 	mods_np = find_clocks_node("mods-clocks");
 	if (!mods_np || !of_device_is_available(mods_np)) {
-		cl_error("'mods-clocks' node not found in DTB\n");
+		cl_warn("'mods-clocks' node not found in DTB\n");
 		goto error;
 	}
 
@@ -649,7 +649,7 @@ int esc_mods_clock_reset_assert(struct mods_client *client,
 
 		mods_np = find_clocks_node("mods-clocks");
 		if (!mods_np || !of_device_is_available(mods_np)) {
-			cl_error("'mods-clocks' node not found in DTB\n");
+			cl_warn("'mods-clocks' node not found in DTB\n");
 			goto err;
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
@@ -702,7 +702,7 @@ int esc_mods_clock_reset_deassert(struct mods_client *client,
 
 		mods_np = find_clocks_node("mods-clocks");
 		if (!mods_np || !of_device_is_available(mods_np)) {
-			cl_error("'mods-clocks' node not found in DTB\n");
+			cl_warn("'mods-clocks' node not found in DTB\n");
 			goto err;
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
