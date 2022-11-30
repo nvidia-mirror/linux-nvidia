@@ -1487,7 +1487,7 @@ int nvmap_ioctl_get_fd_from_list(struct file *filp, void __user *arg)
 	struct nvmap_handle *h = NULL;
 	struct handles_range hrange = {0};
 	size_t tot_hs_size = 0;
-	u32 i, count = 0;
+	u32 i, count = 0, flags = 0;
 	size_t bytes;
 	int err = 0;
 	int fd = -1;
@@ -1552,12 +1552,18 @@ int nvmap_ioctl_get_fd_from_list(struct file *filp, void __user *arg)
 		goto free_hs;
 	}
 
-	/* Check all of the handles from system heap */
+	flags = hs[0]->flags;
+	/*
+	 * Check all of the handles from system heap, are RW, not from VA
+	 * and having same cache coherency
+	 */
 	for (i = 0; i < op.num_handles; i++)
-		if (hs[i]->heap_pgalloc)
+		if (hs[i]->heap_pgalloc && !hs[i]->from_va &&
+			!hs[i]->is_ro && hs[i]->flags == flags)
 			count++;
 	if (!count || (op.num_handles && count % op.num_handles)) {
-		pr_err("all or none of the handles should be from heap\n");
+		pr_err("all of the handles should be from system heap, of type RW,"
+			" not from VA and having same cache coherency\n");
 		err = -EINVAL;
 		goto free_hs;
 	}

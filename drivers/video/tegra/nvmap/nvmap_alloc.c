@@ -1176,16 +1176,12 @@ static int nvmap_assign_pages_per_handle(struct nvmap_handle *src_h,
 
 	while (src_h_start < src_h_end) {
 		unsigned long next;
-		struct page *src_page;
 		struct page *dest_page;
 
 		dest_h->pgalloc.pages[*pg_cnt] =
 			src_h->pgalloc.pages[src_h_start >> PAGE_SHIFT];
-		src_page = nvmap_to_page(src_h->pgalloc.pages
-				[src_h_start >> PAGE_SHIFT]);
 		dest_page = nvmap_to_page(dest_h->pgalloc.pages[*pg_cnt]);
 		get_page(dest_page);
-		nvmap_clean_cache_page(src_page);
 
 		next = min(((src_h_start + PAGE_SIZE) & PAGE_MASK),
 				src_h_end);
@@ -1243,11 +1239,11 @@ int nvmap_assign_pages_to_handle(struct nvmap_client *client,
 		start = 0;
 	}
 
+	h->flags = hs[0]->flags;
 	h->heap_type = NVMAP_HEAP_IOVMM;
 	h->heap_pgalloc = true;
 	h->alloc = true;
 	h->is_subhandle = true;
-	atomic_set(&h->pgalloc.ndirty, 0);
 	mb();
 	return err;
 err_h:
