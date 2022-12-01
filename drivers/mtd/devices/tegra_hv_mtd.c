@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -37,6 +37,16 @@
 #include <soc/tegra/fuse.h>
 #endif
 #include <tegra_virt_storage_spec.h>
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+#include <linux/tegra-hsierrrptinj.h>
+#endif
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+#define HSI_QSPI_REPORT_ID(inst)	(0x805B + (inst))
+#define HSI_ERROR_MAGIC			0xDEADDEAD
+
+static uint32_t total_instance_id;
+#endif
 
 struct vmtd_dev {
 	struct vs_config_info config;
@@ -52,6 +62,11 @@ struct vmtd_dev {
 	void *cmd_frame;
 	struct mtd_info mtd;
 	bool is_setup;
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	uint32_t epl_id;
+	uint32_t epl_reporter_id;
+	uint32_t instance_id;
+#endif
 };
 
 #define IVC_RESET_RETRIES 30
@@ -112,9 +127,21 @@ static int vmtd_get_resp(struct vmtd_dev *vmtddev, struct vs_request *vs_req)
 static int vmtd_process_request(struct vmtd_dev *vmtddev,
 	struct vs_request *vs_req)
 {
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	uint32_t num_bytes;
+	loff_t offset;
+#else
 	uint32_t num_bytes = vs_req->mtddev_req.mtd_req.size;
 	loff_t offset = vs_req->mtddev_req.mtd_req.offset;
+#endif
 	int32_t ret = 0;
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	if (vs_req->req_id != HSI_ERROR_MAGIC) {
+		num_bytes = vs_req->mtddev_req.mtd_req.size;
+		offset = vs_req->mtddev_req.mtd_req.offset;
+	}
+#endif
 
 	ret = vmtd_send_cmd(vmtddev, vs_req);
 	if (ret != 0) {
@@ -131,6 +158,18 @@ static int vmtd_process_request(struct vmtd_dev *vmtddev,
 			"fetching response failed!\n");
 		goto fail;
 	}
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	if (vs_req->req_id == HSI_ERROR_MAGIC) {
+		if (vs_req->status != 0) {
+			dev_err(vmtddev->device, "Response status for error injection failed!\n");
+			ret = -EIO;
+			goto fail;
+		} else {
+			return ret;
+		}
+	}
+#endif
 
 	if ((vs_req->status != 0) ||
 		(vs_req->mtddev_resp.mtd_resp.status != 0)) {
@@ -464,11 +503,54 @@ static const struct attribute *vmtd_storage_attrs[] = {
 	NULL
 };
 
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+/* Error report injection test support is included */
+static int vmtd_inject_err_fsi(unsigned int inst_id, struct epl_error_report_frame err_rpt_frame,
+				void *data)
+{
+	struct vmtd_dev *vmtddev = (struct vmtd_dev *)data;
+	struct vs_request *vs_req;
+	int ret = 0;
+
+	/* Sanity check inst_id */
+	if (inst_id != vmtddev->instance_id) {
+		dev_err(vmtddev->device, "Invalid Input -> Instance ID = 0x%04x\n", inst_id);
+		return -EINVAL;
+	}
+
+	/* Sanity check reporter_id */
+	if (err_rpt_frame.reporter_id != vmtddev->epl_reporter_id) {
+		dev_err(vmtddev->device, "Invalid Input -> Reporter ID = 0x%04x\n",
+						err_rpt_frame.reporter_id);
+		return -EINVAL;
+	}
+
+	mutex_lock(&vmtddev->lock);
+
+	vs_req = (struct vs_request *)vmtddev->cmd_frame;
+	vs_req->req_id = HSI_ERROR_MAGIC;
+	vs_req->type = VS_ERR_INJECT;
+	vs_req->error_inject_req.error_id = err_rpt_frame.error_code;
+
+	ret = vmtd_process_request(vmtddev, vs_req);
+	if (ret != 0)
+		dev_err(vmtddev->device,
+			"Error injection failed for mtd device\n");
+
+	mutex_unlock(&vmtddev->lock);
+
+	return ret;
+}
+#endif
+
 static int32_t vmtd_init_device(struct vmtd_dev *vmtddev)
 {
 	struct vs_request *vs_req = (struct vs_request *)vmtddev->cmd_frame;
 	uint32_t i = 0;
 	int32_t ret = 0;
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	int err;
+#endif
 
 	/* This while loop exits as long as the remote endpoint cooperates. */
 	pr_notice("vmtd: send_config wait for ivc channel notified\n");
@@ -521,6 +603,22 @@ static int32_t vmtd_init_device(struct vmtd_dev *vmtddev)
 		dev_warn(vmtddev->device,
 			"Error Setting up sysfs files!\n");
 	}
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	if (vmtddev->config.type == VS_MTD_DEV) {
+		vmtddev->epl_id = IP_QSPI;
+		vmtddev->epl_reporter_id = HSI_QSPI_REPORT_ID(total_instance_id);
+		vmtddev->instance_id = total_instance_id++;
+	}
+
+	if (vmtddev->epl_id == IP_QSPI) {
+		/* Register error reporting callback */
+		err = hsierrrpt_reg_cb(vmtddev->epl_id, vmtddev->instance_id,
+							vmtd_inject_err_fsi, vmtddev);
+		if (err != 0)
+			dev_info(vmtddev->device, "Err inj callback registration failed: %d", err);
+	}
+#endif
 
 	vmtddev->is_setup = true;
 
@@ -641,6 +739,10 @@ static int tegra_virt_mtd_remove(struct platform_device *pdev)
 
 	tegra_hv_ivc_unreserve(vmtddev->ivck);
 	tegra_hv_mempool_unreserve(vmtddev->ivmk);
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	if (vmtddev->epl_id == IP_SDMMC)
+		hsierrrpt_dereg_cb(vmtddev->epl_id, vmtddev->instance_id);
+#endif
 
 	return 0;
 }
