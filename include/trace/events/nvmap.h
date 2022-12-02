@@ -683,12 +683,33 @@ DECLARE_EVENT_CLASS(nvmap_get_list_page,
 	TP_printk("pages left in list=%u", __entry->count)
 );
 
+DECLARE_EVENT_CLASS(nvmap_get_list_page_bp,
+	TP_PROTO(u32 count),
+
+	TP_ARGS(count),
+
+	TP_STRUCT__entry(
+		__field(u32, count)
+	),
+
+	TP_fast_assign(
+		__entry->count = count;
+	),
+
+	TP_printk("pages left in big page list=%u", __entry->count)
+);
+
 DEFINE_EVENT(nvmap_get_list_page, get_zero_list_page,
 	TP_PROTO(u32 count),
 	TP_ARGS(count)
 );
 
 DEFINE_EVENT(nvmap_get_list_page, get_page_list_page,
+	TP_PROTO(u32 count),
+	TP_ARGS(count)
+);
+
+DEFINE_EVENT(nvmap_get_list_page_bp, get_page_list_page_bp,
 	TP_PROTO(u32 count),
 	TP_ARGS(count)
 );
@@ -762,6 +783,26 @@ TRACE_EVENT(nvmap_pp_alloc_lots,
 	TP_printk("requested:%u alloced:%u\n",
 		__entry->requested, __entry->alloced)
 );
+
+TRACE_EVENT(nvmap_pp_alloc_lots_bp,
+	TP_PROTO(u32 alloced, u32 requested),
+
+	TP_ARGS(alloced, requested),
+
+	TP_STRUCT__entry(
+		__field(u32, alloced)
+		__field(u32, requested)
+	),
+
+	TP_fast_assign(
+		__entry->alloced = alloced;
+		__entry->requested = requested;
+	),
+
+	TP_printk("requested:%u alloced:%u\n",
+		__entry->requested, __entry->alloced)
+);
+
 
 TRACE_EVENT(nvmap_pp_fill_zero_lots,
 	TP_PROTO(u32 save_to_zero,

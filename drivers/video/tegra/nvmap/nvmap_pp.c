@@ -102,6 +102,8 @@ static inline struct page *get_page_list_page_bp(struct nvmap_page_pool *pool)
 {
 	struct page *page;
 
+	trace_get_page_list_page_bp(pool->big_page_count);
+
 	if (list_empty(&pool->page_list_bp))
 		return NULL;
 
@@ -359,6 +361,7 @@ int nvmap_page_pool_alloc_lots_bp(struct nvmap_page_pool *pool,
 	}
 
 	rt_mutex_unlock(&pool->lock);
+	trace_nvmap_pp_alloc_lots_bp(ind, nr);
 	return ind;
 }
 
