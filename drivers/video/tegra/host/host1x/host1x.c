@@ -1052,6 +1052,9 @@ static int of_nvhost_parse_platform_data(struct platform_device *dev,
 {
 	struct device_node *np = dev->dev.of_node;
 	struct nvhost_master *host = nvhost_get_host(dev);
+	bool is_gpu_pool_before_generic = false;
+	bool is_gpu_pool_after_generic = false;
+	u32 values[2];
 	u32 value;
 
 	if (!of_property_read_u32(np, "virtual-dev", &value)) {
@@ -1081,12 +1084,40 @@ static int of_nvhost_parse_platform_data(struct platform_device *dev,
 	if (!of_property_read_u32(np, "nvidia,nb-pts", &value))
 		host->info.nb_pts = value;
 
-	if (host->info.nb_pts > host->info.nb_hw_pts) {
+	host->info.gpu_sync_en = false;
+	if (!of_property_read_u32_array(np, "nvidia,gpu-syncpt-pool", values, 2)) {
+		host->info.gpu_pts_base = (int)values[0];
+		host->info.gpu_nb_pts = (int)values[1];
+
+		if (host->info.gpu_nb_pts)
+			host->info.gpu_sync_en = true;
+	} else {
+		host->info.gpu_pts_base = 0U;
+		host->info.gpu_nb_pts = 0U;
+	}
+
+	if ((host->info.nb_pts + host->info.gpu_nb_pts) >
+	     host->info.nb_hw_pts) {
 		nvhost_err(&dev->dev, "invalid nb_pts property");
 		return -EINVAL;
 	}
 
 	host->info.pts_limit = host->info.pts_base + host->info.nb_pts;
+	host->info.gpu_pts_limit = host->info.gpu_pts_base + host->info.gpu_nb_pts;
+
+	/* Check if GPU pool appears before Generic pool without overlap */
+	is_gpu_pool_before_generic = ((host->info.pts_base < host->info.gpu_pts_base) &&
+					(host->info.pts_limit <= host->info.gpu_pts_base));
+	/* Check if GPU pool appears after Generic pool without overlap */
+	is_gpu_pool_after_generic = ((host->info.gpu_pts_base < host->info.pts_base) &&
+					(host->info.gpu_pts_limit <= host->info.pts_base));
+
+	/* Check that generic and GPU syncpoint pools are mutually exclusive */
+	if (host->info.gpu_sync_en &&
+		!(is_gpu_pool_before_generic || is_gpu_pool_after_generic)) {
+		nvhost_err(&dev->dev, "invalid syncpt pools");
+		return -EINVAL;
+	}
 
 	return 0;
 }

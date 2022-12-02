@@ -61,10 +61,13 @@ static const char *max_name = "max";
  */
 void nvhost_syncpt_reset(struct nvhost_syncpt *sp)
 {
-	u32 i;
+	int i;
 
 	for (i = nvhost_syncpt_pts_base(sp);
 			i < nvhost_syncpt_pts_limit(sp); i++)
+		syncpt_op().reset(sp, i);
+	for (i = nvhost_syncpt_gpu_pts_base(sp);
+			i < nvhost_syncpt_gpu_pts_limit(sp); i++)
 		syncpt_op().reset(sp, i);
 	wmb();
 }
@@ -74,10 +77,15 @@ void nvhost_syncpt_reset(struct nvhost_syncpt *sp)
  */
 void nvhost_syncpt_initialize_unused(struct nvhost_syncpt *sp)
 {
-	u32 i;
+	int i;
 
 	for (i = nvhost_syncpt_pts_base(sp);
 			i < nvhost_syncpt_pts_limit(sp); i++) {
+		if (syncpt_op().mark_unused)
+			syncpt_op().mark_unused(sp, i);
+	}
+	for (i = nvhost_syncpt_gpu_pts_base(sp);
+			i < nvhost_syncpt_gpu_pts_limit(sp); i++) {
 		if (syncpt_op().mark_unused)
 			syncpt_op().mark_unused(sp, i);
 	}
@@ -112,6 +120,11 @@ void nvhost_syncpt_save(struct nvhost_syncpt *sp)
 				 i, nvhost_syncpt_get_name(master->dev, i));
 				nvhost_syncpt_debug(sp);
 			}
+	}
+
+	for (i = nvhost_syncpt_gpu_pts_base(sp);
+			i < nvhost_syncpt_gpu_pts_limit(sp); i++) {
+		syncpt_op().update_min(sp, i);
 	}
 }
 
@@ -760,12 +773,20 @@ bool nvhost_is_syncpt_assigned(struct nvhost_syncpt *sp, u32 id)
 /**
  * performs a sequential search and returns first free syncpt id
  */
-static u32 nvhost_find_free_syncpt(struct nvhost_syncpt *sp)
+static u32 nvhost_find_free_syncpt(struct nvhost_syncpt *sp,
+				    bool gpu_managed)
 {
-	u32 i;
+	u32 i, base, limit;
 
-	for (i = NVHOST_FREE_SYNCPT_BASE(sp);
-		i < nvhost_syncpt_pts_limit(sp); ++i)
+	base = NVHOST_FREE_SYNCPT_BASE(nvhost_syncpt_pts_base(sp));
+	limit = nvhost_syncpt_pts_limit(sp);
+
+	if (gpu_managed && nvhost_syncpt_gpu_pts_enabled(sp)) {
+		base = NVHOST_FREE_SYNCPT_BASE(nvhost_syncpt_gpu_pts_base(sp));
+		limit = nvhost_syncpt_gpu_pts_limit(sp);
+	}
+
+	for (i = base; i < limit; ++i)
 		if (!sp->assigned[i])
 			return i;
 
@@ -794,7 +815,7 @@ static int nvhost_reserve_syncpt(struct nvhost_syncpt *sp, u32 id,
 static int nvhost_syncpt_assign_name(struct nvhost_syncpt *sp, u32 id,
 					const char *syncpt_name)
 {
-	if (id < NVHOST_FREE_SYNCPT_BASE(sp) || !sp->assigned[id]) {
+	if (!nvhost_syncpt_is_valid_pt(sp, id) || !sp->assigned[id]) {
 		nvhost_err(&syncpt_to_dev(sp)->dev->dev,
 			   "invalid syncpoint id %u", id);
 		return -EINVAL;
@@ -807,6 +828,7 @@ static int nvhost_syncpt_assign_name(struct nvhost_syncpt *sp, u32 id,
 
 static u32 nvhost_get_syncpt(struct platform_device *pdev,
 			     bool client_managed,
+			     bool gpu_managed,
 			     const char *syncpt_name)
 {
 	u32 id;
@@ -821,7 +843,7 @@ static u32 nvhost_get_syncpt(struct platform_device *pdev,
 
 	/* find a syncpt which is free */
 	do {
-		id = nvhost_find_free_syncpt(sp);
+		id = nvhost_find_free_syncpt(sp, gpu_managed);
 		if (id)
 			break;
 		mutex_unlock(&sp->syncpt_mutex);
@@ -887,7 +909,7 @@ u32 nvhost_get_syncpt_host_managed(struct platform_device *pdev,
 		syncpt_name = kasprintf(GFP_KERNEL, "%s_%d",
 					dev_name(&pdev->dev), param);
 
-	id = nvhost_get_syncpt(pdev, false, syncpt_name);
+	id = nvhost_get_syncpt(pdev, false, false, syncpt_name);
 	if (!id) {
 		nvhost_err(&pdev->dev, "failed to get syncpt");
 		kfree(syncpt_name);
@@ -911,7 +933,7 @@ u32 nvhost_get_syncpt_client_managed(struct platform_device *pdev,
 	else
 		syncpt_name = kasprintf(GFP_KERNEL, "%s", syncpt_name);
 
-	id = nvhost_get_syncpt(pdev, true, syncpt_name);
+	id = nvhost_get_syncpt(pdev, true, false, syncpt_name);
 	if (!id) {
 		nvhost_err(&pdev->dev, "failed to get syncpt");
 		kfree(syncpt_name);
@@ -921,6 +943,30 @@ u32 nvhost_get_syncpt_client_managed(struct platform_device *pdev,
 	return id;
 }
 EXPORT_SYMBOL_GPL(nvhost_get_syncpt_client_managed);
+
+/**
+ * Interface to get a new free syncpt dynamically for gpu operations
+ */
+u32 nvhost_get_syncpt_gpu_managed(struct platform_device *pdev,
+				  const char *syncpt_name)
+{
+	u32 id;
+
+	if (!syncpt_name)
+		syncpt_name = kasprintf(GFP_KERNEL, "client_managed");
+	else
+		syncpt_name = kasprintf(GFP_KERNEL, "%s", syncpt_name);
+
+	id = nvhost_get_syncpt(pdev, true, true, syncpt_name);
+	if (!id) {
+		nvhost_err(&pdev->dev, "failed to get syncpt");
+		kfree(syncpt_name);
+		return 0;
+	}
+
+	return id;
+}
+EXPORT_SYMBOL_GPL(nvhost_get_syncpt_gpu_managed);
 
 /**
  * API to mark in-use syncpt as free
@@ -1296,6 +1342,21 @@ int nvhost_syncpt_pts_base(struct nvhost_syncpt *sp)
 	return syncpt_to_dev(sp)->info.pts_base;
 }
 
+bool nvhost_syncpt_gpu_pts_enabled(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.gpu_sync_en;
+}
+
+int nvhost_syncpt_gpu_pts_limit(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.gpu_pts_limit;
+}
+
+int nvhost_syncpt_gpu_pts_base(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.gpu_pts_base;
+}
+
 int nvhost_syncpt_nb_irqs(struct nvhost_syncpt *sp)
 {
 	return syncpt_to_dev(sp)->info.nb_syncpt_irqs;
@@ -1320,8 +1381,11 @@ bool nvhost_syncpt_is_valid_hw_pt_nospec(struct nvhost_syncpt *sp, u32 *id)
 
 bool nvhost_syncpt_is_valid_pt(struct nvhost_syncpt *sp, u32 id)
 {
-	return (id >= nvhost_syncpt_pts_base(sp) &&
-		id < nvhost_syncpt_pts_limit(sp) && id != NVSYNCPT_INVALID);
+	return (id != NVSYNCPT_INVALID &&
+		((id >= nvhost_syncpt_pts_base(sp) &&
+		  id < nvhost_syncpt_pts_limit(sp)) ||
+		 (id >= nvhost_syncpt_gpu_pts_base(sp) &&
+		  id < nvhost_syncpt_gpu_pts_limit(sp))));
 }
 
 int nvhost_nb_syncpts_store(struct nvhost_syncpt *sp, const char *buf)

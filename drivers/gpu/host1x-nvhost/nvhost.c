@@ -251,6 +251,13 @@ u32 nvhost_get_syncpt_client_managed(struct platform_device *pdev,
 }
 EXPORT_SYMBOL_GPL(nvhost_get_syncpt_client_managed);
 
+u32 nvhost_get_syncpt_gpu_managed(struct platform_device *pdev,
+				     const char *syncpt_name)
+{
+	return nvhost_get_syncpt_client_managed(pdev, syncpt_name);
+}
+EXPORT_SYMBOL_GPL(nvhost_get_syncpt_gpu_managed);
+
 void nvhost_syncpt_put_ref_ext(struct platform_device *pdev, u32 id)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);

@@ -72,6 +72,10 @@ struct host1x_device_info {
 					   in s/w where nb_pts <= nb_hw_pts */
 	int		pts_base;	/* host1x: syncpoint base */
 	int		pts_limit;	/* host1x: syncpoint limit */
+	bool		gpu_sync_en;	/* host1x: GPU syncpt pool status flag */
+	int		gpu_pts_base;	/* host1x: GPU syncpoint pool base */
+	int		gpu_pts_limit;	/* host1x: GPU syncpoint pool limit */
+	int		gpu_nb_pts;	/* host1x: GPU syncpoint pool size */
 	int		nb_syncpt_irqs; /* host1x: number of syncpoint irqs */
 	enum nvhost_syncpt_policy syncpt_policy; /* host1x: syncpoint policy */
 	int		nb_mlocks;	/* host1x: number of mlocks */

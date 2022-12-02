@@ -47,6 +47,21 @@ void nvhost_debug_output(struct output *o, const char* fmt, ...)
 	o->fn(o->ctx, o->buf, len);
 }
 
+static void show_syncpt(struct nvhost_master *m, struct output *o, int i)
+{
+	u32 max = nvhost_syncpt_read_max(&m->syncpt, i);
+	u32 min = nvhost_syncpt_update_min(&m->syncpt, i);
+	int refs = nvhost_syncpt_read_ref(&m->syncpt, i);
+
+	if ((!min && !max) || (refs == 0 && min == max))
+		return;
+	nvhost_debug_output(o,
+			"id %d (%s) min %d max %d refs %d (previous client : %s)\n",
+			i, nvhost_get_chip_ops()->syncpt.name(&m->syncpt, i),
+			min, max, refs,
+			nvhost_syncpt_get_last_client(m->dev, i));
+}
+
 static void show_syncpts(struct nvhost_master *m, struct output *o)
 {
 	int i;
@@ -54,18 +69,11 @@ static void show_syncpts(struct nvhost_master *m, struct output *o)
 	nvhost_debug_output(o, "---- syncpts ----\n");
 	mutex_lock(&m->syncpt.syncpt_mutex);
 	for (i = nvhost_syncpt_pts_base(&m->syncpt);
-			i < nvhost_syncpt_pts_limit(&m->syncpt); i++) {
-		u32 max = nvhost_syncpt_read_max(&m->syncpt, i);
-		u32 min = nvhost_syncpt_update_min(&m->syncpt, i);
-		u32 refs = nvhost_syncpt_read_ref(&m->syncpt, i);
-		if ((!min && !max) || (refs == 0 && min == max))
-			continue;
-		nvhost_debug_output(o,
-				"id %d (%s) min %d max %d refs %d (previous client : %s)\n",
-				i, nvhost_get_chip_ops()->syncpt.name(&m->syncpt, i),
-				min, max, refs,
-				nvhost_syncpt_get_last_client(m->dev, i));
-	}
+			i < nvhost_syncpt_pts_limit(&m->syncpt); i++)
+		show_syncpt(m, o, i);
+	for (i = nvhost_syncpt_gpu_pts_base(&m->syncpt);
+			i < nvhost_syncpt_gpu_pts_limit(&m->syncpt); i++)
+		show_syncpt(m, o, i);
 	mutex_unlock(&m->syncpt.syncpt_mutex);
 
 	nvhost_debug_output(o, "\n");

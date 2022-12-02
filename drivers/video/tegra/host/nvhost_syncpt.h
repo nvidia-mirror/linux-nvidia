@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2022, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,8 +29,7 @@
 #include "nvhost_ktime.h"
 
 /* when searching for free syncpt id, start from this base */
-#define NVHOST_FREE_SYNCPT_BASE(sp)	\
-	(nvhost_syncpt_pts_base(sp) + 1)
+#define NVHOST_FREE_SYNCPT_BASE(sp_base) (sp_base + 1U)
 
 /* timeout to wait for a syncpt to become free */
 #define NVHOST_SYNCPT_FREE_WAIT_TIMEOUT (1 * HZ)
@@ -120,6 +119,9 @@ int nvhost_syncpt_client_managed(struct nvhost_syncpt *sp, u32 id);
 int nvhost_syncpt_nb_hw_pts(struct nvhost_syncpt *sp);
 int nvhost_syncpt_nb_pts(struct nvhost_syncpt *sp);
 int nvhost_syncpt_pts_base(struct nvhost_syncpt *sp);
+bool nvhost_syncpt_gpu_pts_enabled(struct nvhost_syncpt *sp);
+int nvhost_syncpt_gpu_pts_limit(struct nvhost_syncpt *sp);
+int nvhost_syncpt_gpu_pts_base(struct nvhost_syncpt *sp);
 int nvhost_syncpt_nb_irqs(struct nvhost_syncpt *sp);
 bool nvhost_syncpt_is_valid_hw_pt(struct nvhost_syncpt *sp, u32 id);
 bool nvhost_syncpt_is_valid_hw_pt_nospec(struct nvhost_syncpt *sp, u32 *id);
