@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -90,7 +90,6 @@ void print_prot(struct seq_file *file, u32 prot)
 			prot, priv_str, secure_str, data_str);
 }
 
-#ifdef CONFIG_DEBUG_FS
 static int created_root;
 
 static int cbb_err_show(struct seq_file *file, void *data)
@@ -126,9 +125,6 @@ static int tegra_cbb_noc_dbgfs_init(void)
 	return 0;
 }
 
-#else
-static int tegra_cbb_noc_dbgfs_init(void) { return 0; }
-#endif
 
 void tegra_cbb_stallen(void __iomem *addr)
 {
@@ -207,10 +203,12 @@ int tegra_cbberr_register_hook_en(struct platform_device *pdev,
 {
 	int ret = 0;
 
-	ret = tegra_cbb_noc_dbgfs_init();
-	if (ret) {
-		dev_err(&pdev->dev, "failed to create debugfs\n");
-		return ret;
+	if (debugfs_initialized()) {
+		ret = tegra_cbb_noc_dbgfs_init();
+		if (ret) {
+			dev_err(&pdev->dev, "failed to create debugfs\n");
+			return ret;
+		}
 	}
 
 	if (bdata->erd_mask_inband_err) {

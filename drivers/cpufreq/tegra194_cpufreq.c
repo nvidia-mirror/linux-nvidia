@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -271,7 +271,6 @@ static void write_ndiv_request(void *val)
 	}
 }
 
-#ifdef CONFIG_DEBUG_FS
 /* Read freq request in ndiv for a cpu */
 static void read_ndiv_request(void *ret)
 {
@@ -286,7 +285,6 @@ static void read_ndiv_request(void *ret)
 	}
 	*((uint64_t *) ret) = val;
 }
-#endif
 
 /**
  * tegra_update_cpu_speed - update cpu freq
@@ -421,7 +419,6 @@ static void enable_cc3(struct device_node *dn)
 	}
 }
 
-#ifdef CONFIG_DEBUG_FS
 #define RW_MODE			(S_IWUSR | S_IRUGO)
 #define RO_MODE			(S_IRUGO)
 
@@ -715,7 +712,6 @@ static void __exit tegra_cpufreq_debug_exit(void)
 {
 	debugfs_remove_recursive(tegra_cpufreq_debugfs_root);
 }
-#endif
 
 static int tegra194_cpufreq_init(struct cpufreq_policy *policy)
 {
@@ -1152,13 +1148,13 @@ static int __init tegra194_cpufreq_probe(struct platform_device *pdev)
 
 	enable_cc3(dn);
 
-#ifdef CONFIG_DEBUG_FS
-	ret = tegra_cpufreq_debug_init();
-	if (ret) {
-		pr_err("tegra19x-cpufreq: failed to create debugfs nodes\n");
-		goto err_out;
+	if (debugfs_initialized()) {
+		ret = tegra_cpufreq_debug_init();
+		if (ret) {
+			pr_err("tegra19x-cpufreq: failed to create debugfs nodes\n");
+			goto err_out;
+		}
 	}
-#endif
 
 	ret = init_freqtbls(dn);
 	if (ret)
@@ -1202,9 +1198,7 @@ static int __exit tegra194_cpufreq_remove(struct platform_device *pdev)
 	cpufreq_unregister_notifier(&tegra_boundaries_cpufreq_nb,
 					CPUFREQ_POLICY_NOTIFIER);
 
-#ifdef CONFIG_DEBUG_FS
 	tegra_cpufreq_debug_exit();
-#endif
 	cpuhp_remove_state_nocalls(hp_online);
 	cpufreq_unregister_driver(&tegra_cpufreq_driver);
 	free_allocated_res_exit();

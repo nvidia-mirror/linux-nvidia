@@ -406,7 +406,6 @@ static int cdi_tsc_stop_generators(struct tsc_signal_controller *controller)
 	return 0;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static int cdi_tsc_debugfs_init(struct tsc_signal_controller *controller)
 {
 	struct tsc_signal_generator *generator;
@@ -436,7 +435,6 @@ static void cdi_tsc_debugfs_remove(struct tsc_signal_controller *controller)
 	debugfs_remove_recursive(controller->debugfs.d);
 	controller->debugfs.d = NULL;
 }
-#endif
 
 static int cdi_tsc_probe(struct platform_device *pdev)
 {
@@ -470,11 +468,11 @@ static int cdi_tsc_probe(struct platform_device *pdev)
 	if (err != 0)
 		return err;
 
-#ifdef CONFIG_DEBUG_FS
-	err = cdi_tsc_debugfs_init(controller);
-	if (err != 0)
-		return err;
-#endif
+	if (debugfs_initialized()) {
+		err = cdi_tsc_debugfs_init(controller);
+		if (err != 0)
+			return err;
+	}
 
 	return cdi_tsc_start_generators(controller);
 }
@@ -483,9 +481,7 @@ static int cdi_tsc_remove(struct platform_device *pdev)
 {
 	struct tsc_signal_controller *controller = platform_get_drvdata(pdev);
 
-#ifdef CONFIG_DEBUG_FS
 	cdi_tsc_debugfs_remove(controller);
-#endif
 	return cdi_tsc_stop_generators(controller);
 }
 

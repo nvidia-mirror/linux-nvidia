@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -352,7 +352,6 @@ static int bridge_serr_hook(struct pt_regs *regs, int reason,
 	return retval;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static DEFINE_MUTEX(bridge_mca_mutex);
 static struct dentry *bridge_timeout_dir;
 static struct dentry *bridge_timeout_node;
@@ -520,11 +519,6 @@ static int bridge_mca_dbgfs_init(void)
 	}
 	return 0;
 }
-#else
-static int bridge_mca_dbgfs_init(void) { return 0; }
-static int bridge_timeout_dbgfs_init(struct bridge_mca_bank *bank,
-		struct device *dev) { return 0; }
-#endif
 
 #define AXIAPB_TIMEOUT_TIMER	0x2c8
 #define AXI2APB_ERROR_STATUS	0x2ec
@@ -714,10 +708,6 @@ static int tegra18_bridge_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
-	rc = bridge_mca_dbgfs_init();
-	if (rc)
-		return rc;
-
 	bank = devm_kzalloc(&pdev->dev, sizeof(*bank), GFP_KERNEL);
 	bank->bank = res_base->start;
 	bank->vaddr = devm_ioremap_resource(&pdev->dev, res_base);
@@ -732,9 +722,13 @@ static int tegra18_bridge_probe(struct platform_device *pdev)
 	bank->setup_timeout = bdata->setup_timeout;
 	bank->seen_error = 0;
 	bank->timeout = bdata->timeout;
-	rc = bridge_timeout_dbgfs_init(bank, &pdev->dev);
-	if (rc)
-		return rc;
+
+	if (debugfs_initialized()) {
+		rc = bridge_mca_dbgfs_init();
+		rc |= bridge_timeout_dbgfs_init(bank, &pdev->dev);
+		if (rc)
+			return rc;
+	}
 
 	hook = devm_kzalloc(&pdev->dev, sizeof(*hook), GFP_KERNEL);
 	hook->fn = bridge_serr_hook;

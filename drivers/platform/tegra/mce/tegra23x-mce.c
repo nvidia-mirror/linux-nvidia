@@ -303,8 +303,6 @@ static int tegra23x_mce_read_cstate_stats(u32 state, u64 *stats)
 	return 0;
 }
 
-#ifdef CONFIG_DEBUG_FS
-
 static struct dentry *mce_debugfs;
 
 static int tegra23x_mce_versions_get(void *data, u64 *val)
@@ -493,6 +491,9 @@ static __init int tegra23x_mce_init(void)
 	if (tegra_get_chip_id() != TEGRA234)
 		return 0;
 
+	if (!debugfs_initialized())
+		return 0;
+
 	mce_debugfs = debugfs_create_dir("tegra_mce", NULL);
 	if (!mce_debugfs)
 		return -ENOMEM;
@@ -525,7 +526,6 @@ static void __exit tegra23x_mce_exit(void)
 }
 module_init(tegra23x_mce_init);
 module_exit(tegra23x_mce_exit);
-#endif /* CONFIG_DEBUG_FS */
 
 static struct tegra_mce_ops t23x_mce_ops = {
 	.read_versions = tegra23x_mce_read_versions,

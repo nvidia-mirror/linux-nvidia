@@ -383,7 +383,6 @@ init_freq_table(struct platform_device *pdev, struct tegra_bpmp *bpmp,
 	return freq_table;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static struct dentry *tegra_cpufreq_debugfs_root;
 
 static int tegra_cpufreq_debug_init(void)
@@ -406,7 +405,6 @@ static void tegra_cpufreq_debug_exit(void)
 {
 	debugfs_remove_recursive(tegra_cpufreq_debugfs_root);
 }
-#endif
 
 static int tegra234_cpufreq_probe(struct platform_device *pdev)
 {
@@ -503,13 +501,13 @@ static int tegra234_cpufreq_probe(struct platform_device *pdev)
 		}
 	}
 
-#ifdef CONFIG_DEBUG_FS
-	err = tegra_cpufreq_debug_init();
-	if (err) {
-		pr_err("tegra234-cpufreq: failed to create debugfs nodes\n");
-		goto err_free_res;
+	if (debugfs_initialized()) {
+		err = tegra_cpufreq_debug_init();
+		if (err) {
+			pr_err("tegra234-cpufreq: failed to create debugfs nodes\n");
+			goto err_free_res;
+		}
 	}
-#endif
 
 	tegra234_cpufreq_driver.driver_data = data;
 
@@ -529,9 +527,7 @@ put_bpmp:
 
 static int tegra234_cpufreq_remove(struct platform_device *pdev)
 {
-#ifdef CONFIG_DEBUG_FS
 	tegra_cpufreq_debug_exit();
-#endif
 	cpufreq_unregister_driver(&tegra234_cpufreq_driver);
 	tegra234_cpufreq_free_resources();
 

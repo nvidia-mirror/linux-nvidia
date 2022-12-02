@@ -86,7 +86,6 @@ static unsigned long actmon_dev_avg_freq_get(
 	return (u32)val;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static void actmon_dev_disable(struct actmon_dev *dev)
 {
 	u32 val;
@@ -117,7 +116,6 @@ static void actmon_dev_disable(struct actmon_dev *dev)
 	}
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
-#endif
 
 static void actmon_dev_enable(struct actmon_dev *dev)
 {
@@ -210,8 +208,6 @@ static ssize_t avgactv_show(struct kobject *kobj,
 
 	return scnprintf(buf, PAGE_SIZE, "%lu\n", val);
 }
-
-#ifdef CONFIG_DEBUG_FS
 
 #define RW_MODE (S_IWUSR | S_IRUGO)
 #define RO_MODE	S_IRUGO
@@ -527,7 +523,6 @@ err_out:
 	debugfs_remove_recursive(dbgfs_root);
 	return ret;
 }
-#endif
 
 /* Activity monitor sampling operations */
 static irqreturn_t actmon_dev_isr(int irq, void *dev_id)
@@ -1096,9 +1091,9 @@ int tegra_actmon_register(struct actmon_drv_data *actmon_data)
 			dev_err(mon_dev, "Couldn't create avg_actv files\n");
 	}
 
-#ifdef CONFIG_DEBUG_FS
-	ret = actmon_debugfs_init();
-#endif
+	if (debugfs_initialized()) {
+		ret = actmon_debugfs_init();
+	}
 	if (ret == 0)
 		return 0;
 
@@ -1121,9 +1116,7 @@ int tegra_actmon_remove(struct platform_device *pdev)
 {
 	int i;
 
-#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(dbgfs_root);
-#endif
 
 	for (i = 0; i < MAX_DEVICES; i++) {
 		if (actmon->devices[i].dn)

@@ -3,7 +3,7 @@
  *
  * ARAM manager
  *
- * Copyright (C) 2014-2018, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2022, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -48,7 +48,6 @@ unsigned long nvadsp_aram_get_address(void *handle)
 	return mem_get_address(handle);
 }
 
-#ifdef CONFIG_DEBUG_FS
 static struct dentry *aram_dump_debugfs_file;
 
 static int nvadsp_aram_dump(struct seq_file *s, void *data)
@@ -68,7 +67,6 @@ static const struct file_operations aram_dump_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
-#endif
 
 int nvadsp_aram_init(unsigned long addr, unsigned long size)
 {
@@ -78,23 +76,21 @@ int nvadsp_aram_init(unsigned long addr, unsigned long size)
 		return PTR_ERR(aram_handle);
 	}
 
-#ifdef CONFIG_DEBUG_FS
-	aram_dump_debugfs_file = debugfs_create_file("aram_dump",
-		S_IRUSR, NULL, NULL, &aram_dump_fops);
-	if (!aram_dump_debugfs_file) {
-		pr_err("ERROR: failed to create aram_dump debugfs");
-		destroy_mem_manager(aram_handle);
-		return -ENOMEM;
+	if (debugfs_initialized()) {
+		aram_dump_debugfs_file = debugfs_create_file("aram_dump",
+			S_IRUSR, NULL, NULL, &aram_dump_fops);
+		if (!aram_dump_debugfs_file) {
+			pr_err("ERROR: failed to create aram_dump debugfs");
+			destroy_mem_manager(aram_handle);
+			return -ENOMEM;
+		}
 	}
-#endif
 	return 0;
 }
 
 void nvadsp_aram_exit(void)
 {
-#ifdef CONFIG_DEBUG_FS
 	debugfs_remove(aram_dump_debugfs_file);
-#endif
 	destroy_mem_manager(aram_handle);
 }
 

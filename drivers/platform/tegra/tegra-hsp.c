@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -265,8 +265,6 @@ int tegra_hsp_db_del_handler(int master)
 }
 EXPORT_SYMBOL(tegra_hsp_db_del_handler);
 
-#ifdef CONFIG_DEBUG_FS
-
 static int hsp_dbg_enable_master_show(void *data, u64 *val)
 {
 	*val = hsp_readl(db_bases[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE);
@@ -450,6 +448,9 @@ static int debugfs_init(void)
 	if (!hsp_ready())
 		return 0;
 
+	if (!debugfs_initialized())
+		return 0;
+
 	hsp_debugfs_root = debugfs_create_dir("tegra_hsp", NULL);
 	if (IS_ERR_OR_NULL(hsp_debugfs_root))
 		return -EFAULT;
@@ -472,7 +473,6 @@ abort:
 	return -EFAULT;
 }
 late_initcall(debugfs_init);
-#endif
 
 #define NV(prop) "nvidia," prop
 

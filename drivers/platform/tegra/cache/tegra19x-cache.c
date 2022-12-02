@@ -42,9 +42,7 @@
 
 #define PROFILE_DCACHE_FLUSH		0
 
-#ifdef CONFIG_DEBUG_FS
 static struct dentry *t19x_l3cache_root;
-#endif
 
 struct cache_drv_data {
 	struct platform_device *pdev;
@@ -604,7 +602,6 @@ static long t19x_cache_ioctl(struct file *filp, unsigned int cmd,
 	return err;
 }
 
-#ifdef CONFIG_DEBUG_FS
 #define RW_MODE			(S_IWUSR | S_IRUGO)
 #define RO_MODE			(S_IRUGO)
 
@@ -709,7 +706,6 @@ static void t19x_cache_debug_exit(void)
 {
 	debugfs_remove_recursive(t19x_l3cache_root);
 }
-#endif /* End of debug fs */
 
 static const struct file_operations t19x_cache_user_fops = {
 	.owner		= THIS_MODULE,
@@ -788,13 +784,13 @@ static int __init t19x_cache_probe(struct platform_device *pdev)
 		goto err_out;
 	}
 
-#ifdef CONFIG_DEBUG_FS
-	ret = t19x_cache_debug_init();
-	if (ret) {
-		dev_err(dev, "Could not init debugfs\n");
-		goto err_out;
+	if (debugfs_initialized()) {
+		ret = t19x_cache_debug_init();
+		if (ret) {
+			dev_err(dev, "Could not init debugfs\n");
+			goto err_out;
+		}
 	}
-#endif
 
 	dev_notice(dev, "probed\n");
 
@@ -817,9 +813,7 @@ static int __exit t19x_cache_remove(struct platform_device *pdev)
 	misc_deregister(&cache_data->dev_user);
 	devm_kfree(dev, cache_data);
 
-#ifdef CONFIG_DEBUG_FS
 	t19x_cache_debug_exit();
-#endif
 
 	return 0;
 }
