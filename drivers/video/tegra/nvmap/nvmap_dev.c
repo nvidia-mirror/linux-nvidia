@@ -198,17 +198,11 @@ struct nvmap_client *__nvmap_create_client(struct nvmap_device *dev,
 {
 	struct nvmap_client *client;
 	struct task_struct *task;
+	pid_t pid;
+	bool is_existing_client = false;
 
 	if (WARN_ON(!dev))
 		return NULL;
-
-	client = kzalloc(sizeof(*client), GFP_KERNEL);
-	if (!client)
-		return NULL;
-
-	client->name = name;
-	client->kernel_client = true;
-	client->handle_refs = RB_ROOT;
 
 	get_task_struct(current->group_leader);
 	task_lock(current->group_leader);
@@ -221,12 +215,42 @@ struct nvmap_client *__nvmap_create_client(struct nvmap_device *dev,
 		task = current->group_leader;
 	}
 	task_unlock(current->group_leader);
+
+	pid = task ? task->pid : 0;
+
+	mutex_lock(&dev->clients_lock);
+	list_for_each_entry(client, &nvmap_dev->clients, list) {
+		if (nvmap_client_pid(client) == pid) {
+			/* Increment counter to track number of namespaces of a process */
+			atomic_add(1, &client->count);
+			is_existing_client = true;
+			goto unlock;
+		}
+	}
+unlock:
+	if (is_existing_client) {
+		mutex_unlock(&dev->clients_lock);
+		return client;
+	}
+
+	client = kzalloc(sizeof(*client), GFP_KERNEL);
+	if (!client)
+		return NULL;
+	client->name = name;
+	client->handle_refs = RB_ROOT;
 	client->task = task;
 
 	mutex_init(&client->ref_lock);
 	atomic_set(&client->count, 1);
+	client->kernel_client = false;
+	nvmap_id_array_init(&client->id_array);
 
-	mutex_lock(&dev->clients_lock);
+#ifdef NVMAP_CONFIG_HANDLE_AS_ID
+	client->ida = &client->id_array;
+#else
+	client->ida = NULL;
+#endif
+
 	list_add(&client->list, &dev->clients);
 	if (!IS_ERR_OR_NULL(dev->handles_by_pid)) {
 		pid_t pid = nvmap_client_pid(client);
@@ -242,6 +266,11 @@ static void destroy_client(struct nvmap_client *client)
 
 	if (!client)
 		return;
+
+	nvmap_id_array_exit(&client->id_array);
+#ifdef NVMAP_CONFIG_HANDLE_AS_ID
+	client->ida = NULL;
+#endif
 
 	mutex_lock(&nvmap_dev->clients_lock);
 	if (!IS_ERR_OR_NULL(nvmap_dev->handles_by_pid)) {
@@ -298,16 +327,6 @@ static int nvmap_open(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 	trace_nvmap_open(priv, priv->name);
 
-	priv->kernel_client = false;
-
-	nvmap_id_array_init(&priv->id_array);
-
-#ifdef NVMAP_CONFIG_HANDLE_AS_ID
-	priv->ida = &priv->id_array;
-#else
-	priv->ida = NULL;
-#endif
-
 	filp->private_data = priv;
 	return 0;
 }
@@ -319,14 +338,11 @@ static int nvmap_release(struct inode *inode, struct file *filp)
 	if(!priv)
 		return 0;
 
-	nvmap_id_array_exit(&priv->id_array);
-
-#ifdef NVMAP_CONFIG_HANDLE_AS_ID
-	priv->ida = NULL;
-#endif
-
 	trace_nvmap_release(priv, priv->name);
-
+	/*
+	 * count field tracks the number of namespaces within a process.
+	 * Destroy the client only after all namespaces close the /dev/nvmap node.
+	 */
 	if (!atomic_dec_return(&priv->count))
 		destroy_client(priv);
 
