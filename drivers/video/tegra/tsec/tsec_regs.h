@@ -101,6 +101,20 @@ static inline u32 tsec_irqsclr_swgen0_set_f(void)
 	return 0x40;
 }
 
+static inline u32 tsec_irqstat_r(void)
+{
+	/* NV_PSEC_FALCON_IRQSTAT_0 */
+	return 0x1008;
+}
+static inline u32 tsec_irqstat_swgen0(void)
+{
+	return 0x40;
+}
+static inline u32 tsec_irqstat_swgen1(void)
+{
+	return 0x80;
+}
+
 static inline u32 tsec_riscv_irqmset_r(void)
 {
 	/* NV_PSEC_RISCV_IRQMSET_0 */

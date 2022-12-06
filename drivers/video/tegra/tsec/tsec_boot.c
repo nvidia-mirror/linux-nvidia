@@ -576,25 +576,50 @@ static irqreturn_t tsec_irq_top_half(int irq, void *dev_id)
 	unsigned long flags;
 	struct platform_device *pdev = (struct platform_device *)(dev_id);
 	struct tsec_device_data *pdata = platform_get_drvdata(pdev);
+	irqreturn_t irq_ret_val = IRQ_HANDLED;
+	u32 irq_status;
 
 	spin_lock_irqsave(&pdata->mirq_lock, flags);
+
+	/* Read the interrupt status */
+	irq_status = tsec_readl(pdata, tsec_irqstat_r());
 
 	/* Clear the interrupt */
 	tsec_writel(pdata, tsec_thi_int_status_r(),
 			tsec_thi_int_status_clr_f());
-	tsec_writel(pdata, tsec_irqsclr_r(),
-			tsec_irqsclr_swgen0_set_f());
 
-	/* Mask the interrupt.
-	 * Clear RISCV Mask for SWGEN0, so that no more SWGEN0
-	 * interrupts will be routed to CCPLEX, it will be re-enabled
-	 * by the bottom half
+	/* Wakeup threaded handler for SWGEN0 Irq */
+	if (irq_status & tsec_irqstat_swgen0()) {
+		/* Clear SWGEN0 Interrupt */
+		tsec_writel(pdata, tsec_irqsclr_r(),
+			tsec_irqsclr_swgen0_set_f());
+		/* Mask the interrupt.
+		 * Clear RISCV Mask for SWGEN0, so that no more SWGEN0
+		 * interrupts will be routed to CCPLEX, it will be re-enabled
+		 * by the bottom half
+		 */
+		tsec_writel(pdata, tsec_riscv_irqmclr_r(),
+			tsec_riscv_irqmclr_swgen0_set_f());
+		irq_ret_val = IRQ_WAKE_THREAD;
+		irq_status &= ~(tsec_irqstat_swgen0());
+	}
+
+	/* RISCV FW is generating SWGEN1 when it logs something
+	 * in the print buffer at below path
+	 * nvriscv/drivers/src/debug/debug.c:164: irqFireSwGen(SYS_INTR_SWGEN1)
+	 * We dont want to pull out the print buffer from CCPLEX
+	 * hence we just mask out SWGEN1 interrupt here so that it
+	 * is not received any further
 	 */
-	tsec_writel(pdata, tsec_riscv_irqmclr_r(), tsec_riscv_irqmclr_swgen0_set_f());
+	if (irq_status & tsec_irqstat_swgen1()) {
+		tsec_writel(pdata, tsec_riscv_irqmclr_r(),
+			tsec_riscv_irqmclr_swgen1_set_f());
+		irq_status &= ~(tsec_irqstat_swgen1());
+	}
 
 	spin_unlock_irqrestore(&pdata->mirq_lock, flags);
 
-	return IRQ_WAKE_THREAD;
+	return irq_ret_val;
 }
 
 static irqreturn_t tsec_irq_bottom_half(int irq, void *args)
