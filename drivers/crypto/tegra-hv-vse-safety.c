@@ -408,7 +408,7 @@ struct tegra_virtual_se_aes_req_context {
 	/* Operation type */
 	bool encrypt;
 	/* Engine id */
-	u8 engine_id;
+	uint32_t engine_id;
 };
 
 enum se_engine_id {
