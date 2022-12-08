@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -35,36 +35,8 @@
 
 static struct cpumask cpumask;
 
-static void suspend_all_device_irqs(void)
-{
-	struct irq_desc *desc;
-	int irq;
-
-	for_each_irq_desc(irq, desc) {
-		unsigned long flags;
-
-		raw_spin_lock_irqsave(&desc->lock, flags);
-		__disable_irq(desc);
-		raw_spin_unlock_irqrestore(&desc->lock, flags);
-	}
-}
-
-static void resume_all_device_irqs(void)
-{
-	struct irq_desc *desc;
-	int irq;
-
-	for_each_irq_desc(irq, desc) {
-		unsigned long flags;
-
-		raw_spin_lock_irqsave(&desc->lock, flags);
-		__enable_irq(desc);
-		raw_spin_unlock_irqrestore(&desc->lock, flags);
-	}
-}
-
 static int tegra_auto_suspend_notify_callback(struct notifier_block *nb,
-	unsigned long action, void *pcpu)
+					      unsigned long action, void *pcpu)
 {
 	switch (action) {
 	case PM_SUSPEND_PREPARE:
@@ -91,57 +63,48 @@ static struct notifier_block suspend_notifier = {
  * specified target state selected by the governor.
  */
 static int tegra_auto_enter_idle_state(struct cpuidle_device *dev,
-				struct cpuidle_driver *drv, int idx)
+				       struct cpuidle_driver *drv, int idx)
 {
-	if (idle_should_enter_s2idle() == true) {
-		int cpu_id = smp_processor_id();
-		int boot_cpu_id = get_boot_cpu_id();
+	asm volatile("wfi\n");
 
-		if (cpu_id == boot_cpu_id) {
-			int error = 0;
-			int cpu_number = 0;
+	return 0;
+}
 
-			suspend_all_device_irqs();
+static int tegra_auto_enter_s2idle_state(struct cpuidle_device *dev,
+					 struct cpuidle_driver *drv, int idx)
+{
+	int cpu_id = smp_processor_id();
+	int boot_cpu_id = get_boot_cpu_id();
 
-			for_each_online_cpu(cpu_number) {
-				if (cpu_number == boot_cpu_id)
-					continue;
-				while (!cpumask_test_cpu(cpu_number,
-					(const struct cpumask *)&cpumask))
-					udelay(10);
-			}
+	if (cpu_id == boot_cpu_id) {
+		int error = 0;
+		int cpu_number = 0;
 
-			/*
-			 * Causes the linux guest VM to suspend. After SC7
-			 * resume it resumes from this point.
-			 */
-			error = hyp_guest_reset(GUEST_PAUSE_CMD(0), NULL);
-			if (error < 0)
-				pr_err("%s: Failed to trigger suspend, %d\n",
-						__func__, error);
-
-			resume_all_device_irqs();
-
-			pm_system_wakeup();
-
-		} else {
-			preempt_disable();
-			local_irq_disable();
-
-			cpumask_test_and_set_cpu(cpu_id, &cpumask);
-
-			do {
-				asm volatile("wfi\n");
-			} while (idle_should_enter_s2idle() == true);
-
-			local_irq_enable();
-			preempt_enable_no_resched();
+		for_each_online_cpu(cpu_number) {
+			if (cpu_number == boot_cpu_id)
+				continue;
+			while (cpumask_test_cpu(cpu_number, (const struct cpumask *)&cpumask) == 0)
+				udelay(10);
 		}
 
+		/*
+		 * Causes the linux guest VM to suspend.
+		 * After SC7 resume it resumes from this point.
+		 */
+		pr_debug("%s: before HVC: GUEST_PAUSE_CMD, %d\n", __func__, boot_cpu_id);
+		error = hyp_guest_reset(GUEST_PAUSE_CMD(0), NULL);
+		if (error < 0)
+			pr_err("%s: Failed to trigger suspend, %d\n", __func__, error);
+		pr_debug("%s: after HVC: GUEST_PAUSE_CMD, %d\n", __func__, boot_cpu_id);
 	} else {
-		asm volatile("wfi\n");
+		cpumask_test_and_set_cpu(cpu_id, &cpumask);
+
+		do {
+			asm volatile("wfi\n");
+		} while (idle_should_enter_s2idle() == true);
 	}
 
+	pr_debug("%s: exiting s2idle, %d, %d\n", __func__, cpu_id, boot_cpu_id);
 	return 0;
 }
 
@@ -152,7 +115,7 @@ static struct cpuidle_driver tegra_auto_idle_driver __initdata = {
 	 * State at index 0 is standby wfi and considered standard
 	 * on all ARM platforms.
 	 */
-	.state_count = 1,
+	.state_count = 2,
 	.states[0] = {
 		.enter                  = tegra_auto_enter_idle_state,
 		.exit_latency           = 1,
@@ -161,13 +124,21 @@ static struct cpuidle_driver tegra_auto_idle_driver __initdata = {
 		.name                   = "WFI",
 		.desc                   = "ARM WFI",
 	},
+	.states[1] = {
+		.enter                  = tegra_auto_enter_idle_state,
+		.enter_s2idle           = tegra_auto_enter_s2idle_state,
+		.exit_latency           = 1,
+		.target_residency       = 1,
+		.power_usage		= UINT_MAX,
+		.name                   = "TEGRA_S2IDLE",
+		.desc                   = "TEGRA AUTO S2IDLE",
+	},
 };
 
 /*
  * tegra_auto_idle_init_cpu
  *
- * Registers the tegra_auto specific cpuidle driver with the cpuidle
- * framework.
+ * Registers the tegra_auto specific cpuidle driver with the cpuidle framework.
  */
 static int __init tegra_auto_idle_init_cpu(int cpu)
 {
@@ -187,6 +158,7 @@ static int __init tegra_auto_idle_init_cpu(int cpu)
 	}
 
 	return 0;
+
 out_kfree_drv:
 	kfree(drv);
 	return ret;
@@ -213,6 +185,7 @@ static int __init tegra_auto_cpuidle_probe(struct platform_device *pdev)
 	register_pm_notifier(&suspend_notifier);
 
 	return 0;
+
 out_fail:
 	while (--cpu >= 0) {
 		dev = per_cpu(cpuidle_devices, cpu);
@@ -236,6 +209,7 @@ static int tegra_auto_cpuidle_remove(struct platform_device *pdev)
 		cpuidle_unregister(drv);
 		kfree(drv);
 	}
+
 	return 0;
 }
 
