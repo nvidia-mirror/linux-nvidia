@@ -1345,7 +1345,7 @@ int tegra_virt_i2s_get_loopback_enable(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1374,12 +1374,13 @@ int tegra_virt_i2s_set_loopback_enable(
 	msg.params.i2s_info.i2s_id = reg;
 	msg.params.i2s_info.i2s_loopback_enable =
 		ucontrol->value.integer.value[0];
+	msg.ack_required = true;
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 

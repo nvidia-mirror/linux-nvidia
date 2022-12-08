@@ -106,17 +106,18 @@ static int tegra210_admaif_hw_params(struct snd_pcm_substream *substream,
 	memset(&msg, 0, sizeof(struct nvaudio_ivc_msg));
 	msg.params.dmaif_info.id        = dai->id;
 	msg.params.dmaif_info.value     = value;
+	msg.ack_required = true;
 	if (!cif_conf.direction)
 		msg.cmd = NVAUDIO_DMAIF_SET_TXCIF;
 	else
 		msg.cmd = NVAUDIO_DMAIF_SET_RXCIF;
 
-	err = nvaudio_ivc_send(data->hivc_client,
+	err = nvaudio_ivc_send_receive(data->hivc_client,
 				&msg,
 				sizeof(struct nvaudio_ivc_msg));
 
 	if (err < 0)
-		pr_err("%s: error on ivc_send\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 
 	return 0;
 }
