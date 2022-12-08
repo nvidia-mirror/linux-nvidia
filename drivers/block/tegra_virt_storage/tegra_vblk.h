@@ -28,7 +28,7 @@
 #define DRV_NAME "tegra_hv_vblk"
 
 /* Minor number and partition management. */
-#define VBLK_MINORS 16
+#define VBLK_MINORS 32
 
 #define IVC_RESET_RETRIES	30
 
