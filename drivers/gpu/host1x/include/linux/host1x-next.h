@@ -198,6 +198,7 @@ static inline void host1x_bo_munmap(struct host1x_bo *bo, void *addr)
 
 #define HOST1X_SYNCPT_CLIENT_MANAGED	(1 << 0)
 #define HOST1X_SYNCPT_HAS_BASE		(1 << 1)
+#define HOST1X_SYNCPT_GPU		(1 << 2)
 
 struct host1x_syncpt_base;
 struct host1x_syncpt;

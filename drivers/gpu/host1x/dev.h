@@ -118,6 +118,12 @@ struct host1x_info {
 	bool reserve_vblank_syncpts;
 };
 
+struct host1x_syncpt_pool {
+	const char *name;
+	unsigned int base;
+	unsigned int end;
+};
+
 struct host1x {
 	const struct host1x_info *info;
 
@@ -135,6 +141,10 @@ struct host1x {
 	/* Resources accessible by this VM */
 	unsigned int syncpt_base, syncpt_end;
 	unsigned int channel_base, num_channels;
+
+	/* Restricted syncpoint pools */
+	struct host1x_syncpt_pool *pools;
+	unsigned int num_pools;
 
 	struct iommu_group *group;
 	struct iommu_domain *domain;

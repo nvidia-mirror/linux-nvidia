@@ -60,17 +60,34 @@ struct host1x_syncpt *host1x_syncpt_alloc(struct host1x *host,
 					  unsigned long flags,
 					  const char *name)
 {
-	struct host1x_syncpt *sp = host->syncpt;
+	struct host1x_syncpt *sp = host->syncpt + host->syncpt_base;
+	struct host1x_syncpt_pool *pool = NULL;
 	char *full_name;
 	unsigned int i;
 
 	if (!name)
 		return NULL;
 
+	if (flags & HOST1X_SYNCPT_GPU) {
+		for (i = 0; i < host->num_pools; i++) {
+			if (!strcmp(host->pools[i].name, "gpu")) {
+				pool = &host->pools[i];
+				break;
+			}
+		}
+
+		/* If no GPU pool configured, any syncpoint is OK. */
+	}
+
 	mutex_lock(&host->syncpt_mutex);
 
-	for (i = host->syncpt_base; i < host->syncpt_end && kref_read(&sp->ref); i++, sp++)
-		;
+	for (i = host->syncpt_base; i < host->syncpt_end; i++, sp++) {
+		if (sp->pool != pool)
+			continue;
+
+		if (kref_read(&sp->ref) == 0)
+			break;
+	}
 
 	if (i >= host->syncpt_end)
 		goto unlock;
@@ -322,6 +339,14 @@ int host1x_syncpt_init(struct host1x *host)
 	for (i = 0; i < host->info->nb_bases; i++)
 		bases[i].id = i;
 
+	for (i = 0; i < host->num_pools; i++) {
+		struct host1x_syncpt_pool *pool = &host->pools[i];
+		unsigned int j;
+
+		for (j = pool->base; j < pool->end; j++)
+			syncpt[j].pool = pool;
+	}
+
 	mutex_init(&host->syncpt_mutex);
 	host->syncpt = syncpt;
 	host->bases = bases;
@@ -332,9 +357,8 @@ int host1x_syncpt_init(struct host1x *host)
 	 * this for anything.
 	 */
 	if (host->syncpt_base == 0) {
-		host->nop_sp = host1x_syncpt_alloc(host, 0, "reserved-nop");
-		if (!host->nop_sp)
-			return -ENOMEM;
+		kref_init(&syncpt[0].ref);
+		syncpt[0].name = kstrdup("reserved", GFP_KERNEL);
 	}
 
 	if (host->info->reserve_vblank_syncpts) {

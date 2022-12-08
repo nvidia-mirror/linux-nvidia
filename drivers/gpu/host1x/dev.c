@@ -706,6 +706,46 @@ static int host1x_get_assigned_resources(struct host1x *host)
 	return 0;
 }
 
+static int host1x_get_syncpt_pools(struct host1x *host)
+{
+	struct device_node *np = host->dev->of_node;
+	int err, i;
+
+	err = of_property_count_strings(np, "nvidia,syncpoint-pool-names");
+	if (err == -EINVAL)
+		return 0;
+	if (err < 0) {
+		dev_err(host->dev, "invalid nvidia,syncpoint-pool-names property: %d\n", err);
+		return err;
+	}
+
+	host->num_pools = err;
+	host->pools = devm_kcalloc(host->dev, host->num_pools, sizeof(struct host1x_syncpt_pool),
+				   GFP_KERNEL);
+	if (!host->pools)
+		return -ENOMEM;
+
+	for (i = 0; i < host->num_pools; i++) {
+		struct host1x_syncpt_pool *pool = &host->pools[i];
+
+		err = of_property_read_string_index(np, "nvidia,syncpoint-pool-names", i, &pool->name);
+		if (err)
+			return err;
+
+		err = of_property_read_u32_index(np, "nvidia,syncpoint-pools", i*2+0, &pool->base);
+		if (!err)
+			err = of_property_read_u32_index(np, "nvidia,syncpoint-pools", i*2+1, &pool->end);
+		if (err) {
+			dev_err(host->dev, "invalid nvidia,syncpoint-pools property: %d\n", err);
+			return err;
+		}
+
+		pool->end = pool->base + pool->end;
+	}
+
+	return 0;
+}
+
 static int host1x_probe(struct platform_device *pdev)
 {
 	struct host1x *host;
@@ -765,6 +805,10 @@ static int host1x_probe(struct platform_device *pdev)
 	}
 
 	err = host1x_get_assigned_resources(host);
+	if (err)
+		return err;
+
+	err = host1x_get_syncpt_pools(host);
 	if (err)
 		return err;
 

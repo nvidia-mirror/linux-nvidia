@@ -38,6 +38,7 @@ struct host1x_syncpt {
 	bool client_managed;
 	struct host1x *host;
 	struct host1x_syncpt_base *base;
+	struct host1x_syncpt_pool *pool;
 
 	/* interrupt data */
 	struct host1x_fence_list fences;
