@@ -308,7 +308,7 @@ inline u32 ttcan_read_ecr(struct ttcan_controller *ttcan)
 static void tegra_mttcan_config_prod_settings(struct mttcan_priv *priv)
 {
 	struct ttcan_controller *ttcan = priv->ttcan;
-	char *prod_name;
+	const char *prod_name;
 	int ret;
 
 	switch (ttcan->bt_config.data.bitrate) {
