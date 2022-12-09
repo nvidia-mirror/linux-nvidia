@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -114,6 +114,10 @@
 
 #if defined(MODS_HAS_TEGRA) && KERNEL_VERSION(5, 1, 0) <= MODS_KERNEL_VERSION
 #       define MODS_ENABLE_BPMP_MRQ_API 1
+#endif
+
+#if KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
+#       define MODS_HAS_ACPI_MATCH_DATA 1
 #endif
 
 #endif /* _MODS_CONFIG_H_  */

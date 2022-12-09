@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -30,6 +30,7 @@
 
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/acpi.h>
 #include "mods_internal.h"
 
 #define MODS_MAX_SMMU_DEVICES 16
@@ -63,19 +64,31 @@ int get_mods_smmu_device_index(const char *name)
 static int mods_smmu_driver_probe(struct platform_device *pdev)
 {
 	struct device      *dev = &pdev->dev;
-	struct device_node *node = dev->of_node;
-	const char         *dev_name;
-	int                err;
+	const char         *dev_name = NULL;
+	int                err = 0;
 	int                dev_idx;
 
 	LOG_ENT();
 
-	err = of_property_read_string(node, "dev-names", &dev_name);
-	if (err < 0) {
-		mods_error_printk(
-			"smmu probe failed to read dev-names, ret=%d\n", err);
-		LOG_EXT();
-		return err;
+	if (device_property_present(dev, "dev-names")) {
+		err = device_property_read_string(dev, "dev-names", &dev_name);
+		if (err < 0) {
+			mods_error_printk(
+				"smmu probe failed to read dev-names, ret=%d\n", err);
+			LOG_EXT();
+			return err;
+		}
+
+	} else {
+#if MODS_HAS_ACPI_MATCH_DATA
+		dev_name = (const char *)acpi_device_get_match_data(dev);
+#endif
+		if (!dev_name) {
+			mods_error_printk(
+				"smmu probe failed to read dev-names\n");
+			LOG_EXT();
+			return -EINVAL;
+		}
 	}
 	mods_debug_printk(DEBUG_MEM, "smmu probe: dev-names=%s, dev_idx=%d\n",
 			  dev_name,
@@ -112,6 +125,18 @@ static const struct of_device_id of_ids[] = {
 	{ }
 };
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id tegra_mods_acpi_match[] = {
+	{
+		.id = "NVDA1513",
+		.driver_data = (kernel_ulong_t)"mods_qspi1_dma",
+	},
+	{}
+};
+
+MODULE_DEVICE_TABLE(acpi, tegra_mods_acpi_match);
+#endif
+
 static struct platform_driver mods_smmu_driver = {
 	.probe  = mods_smmu_driver_probe,
 	.remove = mods_smmu_driver_remove,
@@ -119,6 +144,7 @@ static struct platform_driver mods_smmu_driver = {
 		.name   = "mods_smmu",
 		.owner  = THIS_MODULE,
 		.of_match_table = of_ids,
+		.acpi_match_table = ACPI_PTR(tegra_mods_acpi_match),
 	},
 };
 
