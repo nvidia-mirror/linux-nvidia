@@ -1580,11 +1580,14 @@ int nvmap_ioctl_get_fd_from_list(struct file *filp, void __user *arg)
 	}
 	/* Create new handle for the size */
 	ref = nvmap_create_handle(client, hrange.sz, false);
-	if (IS_ERR_OR_NULL(ref))
+	if (IS_ERR_OR_NULL(ref)) {
+		err = -EINVAL;
 		goto free_hs;
+	}
 
 	ref->handle->orig_size = hrange.sz;
 	h = ref->handle;
+	mutex_init(&h->pg_ref_h_lock);
 
 	/* Assign pages from the handles to newly created nvmap handle */
 	err =  nvmap_assign_pages_to_handle(client, hs, h, &hrange);

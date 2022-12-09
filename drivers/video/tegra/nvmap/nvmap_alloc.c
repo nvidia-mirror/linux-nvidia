@@ -1037,7 +1037,7 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 		h->pgalloc.pages[i] = nvmap_to_page(h->pgalloc.pages[i]);
 
 #ifdef NVMAP_CONFIG_PAGE_POOLS
-	if (!h->from_va)
+	if (!h->from_va && !h->is_subhandle)
 		page_index = nvmap_page_pool_fill_lots(&nvmap_dev->pool,
 					h->pgalloc.pages, nr_page);
 #endif

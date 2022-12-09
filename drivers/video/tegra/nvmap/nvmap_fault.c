@@ -130,7 +130,7 @@ unlock:
 static void nvmap_vma_close(struct vm_area_struct *vma)
 {
 	struct nvmap_vma_priv *priv = vma->vm_private_data;
-	struct nvmap_vma_list *vma_list;
+	struct nvmap_vma_list *vma_list, *tmp_list;
 	struct nvmap_handle *h;
 	bool vma_found = false;
 	size_t nr_page, i;
@@ -144,7 +144,7 @@ static void nvmap_vma_close(struct vm_area_struct *vma)
 	nr_page = h->size >> PAGE_SHIFT;
 
 	mutex_lock(&h->lock);
-	list_for_each_entry(vma_list, &h->vmas, list) {
+	list_for_each_entry_safe(vma_list, tmp_list, &h->vmas, list) {
 		if (vma_list->vma != vma)
 			continue;
 		if (atomic_dec_return(&vma_list->ref) == 0) {
