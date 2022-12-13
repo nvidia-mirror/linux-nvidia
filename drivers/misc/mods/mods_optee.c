@@ -106,11 +106,13 @@ int esc_mods_invoke_optee_ta(struct mods_client *client,
 	if (params[1].u.value.a > U32_MAX || params[1].u.value.b > U32_MAX) {
 		ret = EOVERFLOW;
 		goto out_shm;
+	} else {
+		p->out_a = (__u32)params[1].u.value.a;
+		p->out_b = (__u32)params[1].u.value.b;
 	}
+
 	memmove(p->buf, temp_buf, p->buf_size);
 	p->tee_ret = invoke_arg.ret;
-	p->out_a = params[1].u.value.a;
-	p->out_b = params[1].u.value.b;
 
 out_shm:
 	tee_shm_free(shm);
