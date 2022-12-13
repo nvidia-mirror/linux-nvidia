@@ -122,17 +122,21 @@ struct nvpps_file_data {
 #define MGBE_STSR_OFFSET		0xd08
 #define MGBE_STNSR_OFFSET		0xd0c
 
-#define TSC_CAPTURE_CONFIGURATION_PTX_0	0xc6a015c
-#define TSC_LOCKING_CONTROL_0	0xc6a01ec
-#define TSC_LOCKING_STATUS_0	0xc6a01f0
-
-#define TSC_MAPPED_RANGE	0x100
-
-/* Below are the tsc control and status register offset from
- * ioremapped virtual base region stored in tsc_reg_map_base.
+/* Below are the tsc register offset from ioremapped
+ * virtual base region stored in tsc_reg_map_base.
  */
-#define TSC_LOCK_CTRL_REG_OFF 0x90
-#define TSC_LOCK_STAT_REG_OFF 0x94
+#define TSC_STSCRSR_OFFSET								0x0
+#define TSC_CAPTURE_CONFIGURATION_PTX_OFFSET			0x58
+#define TSC_CAPTURE_CONTROL_PTX_OFFSET					0x5c
+#define TSC_LOCKING_CONFIGURATION_OFFSET				0xe4
+#define TSC_LOCKING_CONTROL_OFFSET						0xe8
+#define TSC_LOCKING_STATUS_OFFSET						0xec
+#define TSC_LOCKING_REF_FREQUENCY_CONFIGURATION_OFFSET	0xf0
+#define TSC_LOCKING_DIFF_CONFIGURATION_OFFSET			0xf4
+#define TSC_LOCKING_ADJUST_CONFIGURATION_OFFSET			0x108
+#define TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET	0x10c
+#define TSC_LOCKING_ADJUST_NUM_CONTROL_OFFSET			0x110
+#define TSC_LOCKING_ADJUST_DELTA_CONTROL_OFFSET			0x114
 
 #define SRC_SELECT_BIT_OFFSET	8
 #define SRC_SELECT_BITS	0xff
@@ -398,7 +402,7 @@ static void tsc_timer_callback(struct timer_list *t)
 	struct nvpps_device_data *pdev_data = (struct nvpps_device_data *)from_timer(pdev_data, t, tsc_timer);
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0) */
 	uint32_t tsc_lock_status;
-	tsc_lock_status = readl(pdev_data->tsc_reg_map_base + TSC_LOCK_STAT_REG_OFF);
+	tsc_lock_status = readl(pdev_data->tsc_reg_map_base + TSC_LOCKING_STATUS_OFFSET);
 	/* Incase TSC is not locked clear ALIGNED bit(RW1C) so that
 	 * TSC starts to lock to the PTP again based on the PTP
 	 * source selected in TSC registers.
@@ -408,13 +412,13 @@ static void tsc_timer_callback(struct timer_list *t)
 		dev_info(pdev_data->dev, "tsc_lock_stat:%x\n", tsc_lock_status);
 		/* Write 1 to TSC_LOCKING_STATUS_0.ALIGNED to clear it */
 		writel(tsc_lock_status | BIT(TSC_ALIGNED_STATUS_BIT_OFFSET),
-			pdev_data->tsc_reg_map_base + TSC_LOCK_STAT_REG_OFF);
+			pdev_data->tsc_reg_map_base + TSC_LOCKING_STATUS_OFFSET);
 
 		lock_control = readl(pdev_data->tsc_reg_map_base +
-			TSC_LOCK_CTRL_REG_OFF);
+							 TSC_LOCKING_CONTROL_OFFSET);
 		/* Write 1 to TSC_LOCKING_CONTROL_0.ALIGN */
 		writel(lock_control | BIT(TSC_LOCK_CTRL_ALIGN_BIT_OFFSET),
-			pdev_data->tsc_reg_map_base + TSC_LOCK_CTRL_REG_OFF);
+			pdev_data->tsc_reg_map_base + TSC_LOCKING_CONTROL_OFFSET);
 	}
 
 	/* set the next expire time */
@@ -873,6 +877,48 @@ static void nvpps_fill_default_mac_phc_info(struct platform_device *pdev,
 	interface_name = devm_kstrdup(&pdev->dev, pdev_data->iface_nm, GFP_KERNEL);
 }
 
+static void nvpps_ptp_tsc_sync_config(struct platform_device *pdev)
+{
+	uint32_t tsc_config_ptx_0;
+	struct nvpps_device_data *pdev_data = platform_get_drvdata(pdev);
+
+	//onetime config to init PTP TSC Sync logic
+	writel(0x119, pdev_data->tsc_reg_map_base + TSC_LOCKING_CONFIGURATION_OFFSET);
+	writel(0x26c, pdev_data->tsc_reg_map_base + TSC_LOCKING_DIFF_CONFIGURATION_OFFSET);
+	writel(0x1, pdev_data->tsc_reg_map_base + TSC_LOCKING_CONTROL_OFFSET);
+	writel(0x57011, pdev_data->tsc_reg_map_base + TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET);
+	writel(0x67, pdev_data->tsc_reg_map_base + TSC_LOCKING_ADJUST_DELTA_CONTROL_OFFSET);
+	writel(0x313, pdev_data->tsc_reg_map_base + TSC_CAPTURE_CONFIGURATION_PTX_OFFSET);
+	writel(0x1, pdev_data->tsc_reg_map_base + TSC_STSCRSR_OFFSET);
+
+	//Select PTP src for TSC to lock on based on nw interface
+	if (!strncmp(pdev_data->iface_nm, "mgbe0_0", sizeof("mgbe0_0"))) {
+		pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE0 << SRC_SELECT_BIT_OFFSET);
+	} else if (!strncmp(pdev_data->iface_nm, "mgbe1_0", sizeof("mgbe1_0"))) {
+		pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE1 << SRC_SELECT_BIT_OFFSET);
+	} else if (!strncmp(pdev_data->iface_nm, "mgbe2_0", sizeof("mgbe2_0"))) {
+		pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE2 << SRC_SELECT_BIT_OFFSET);
+	} else if (!strncmp(pdev_data->iface_nm, "mgbe3_0", sizeof("mgbe3_0"))) {
+		pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE3 << SRC_SELECT_BIT_OFFSET);
+	} else {
+		pdev_data->tsc_ptp_src = (TSC_PTP_SRC_EQOS << SRC_SELECT_BIT_OFFSET);
+	}
+
+	tsc_config_ptx_0 = readl(pdev_data->tsc_reg_map_base + TSC_CAPTURE_CONFIGURATION_PTX_OFFSET);
+	/* clear and set the ptp src based on ethernet interface passed
+	 * from dt for tsc to lock onto.
+	 */
+	tsc_config_ptx_0 = tsc_config_ptx_0 &
+		~(SRC_SELECT_BITS << SRC_SELECT_BIT_OFFSET);
+	tsc_config_ptx_0 = tsc_config_ptx_0 | pdev_data->tsc_ptp_src;
+	writel(tsc_config_ptx_0, pdev_data->tsc_reg_map_base + TSC_CAPTURE_CONFIGURATION_PTX_OFFSET);
+	tsc_config_ptx_0 = readl(pdev_data->tsc_reg_map_base + TSC_CAPTURE_CONFIGURATION_PTX_OFFSET);
+	dev_info(&pdev->dev, "TSC config ptx 0x%x\n", tsc_config_ptx_0);
+
+	set_mode_tsc(pdev_data);
+
+	return;
+}
 
 static int nvpps_probe(struct platform_device *pdev)
 {
@@ -881,7 +927,6 @@ static int nvpps_probe(struct platform_device *pdev)
 	dev_t				devt;
 	int				err;
 	struct device_node              *np_gte;
-	uint32_t tsc_config_ptx_0;
 
 	dev_info(&pdev->dev, "%s\n", __FUNCTION__);
 
@@ -1051,30 +1096,7 @@ static int nvpps_probe(struct platform_device *pdev)
 		    goto error_ret;
 		}
 
-		if (!strncmp(pdev_data->iface_nm, "mgbe0_0", sizeof("mgbe0_0"))) {
-			pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE0 << SRC_SELECT_BIT_OFFSET);
-		} else if (!strncmp(pdev_data->iface_nm, "mgbe1_0", sizeof("mgbe1_0"))) {
-			pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE1 << SRC_SELECT_BIT_OFFSET);
-		} else if (!strncmp(pdev_data->iface_nm, "mgbe2_0", sizeof("mgbe2_0"))) {
-			pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE2 << SRC_SELECT_BIT_OFFSET);
-		} else if (!strncmp(pdev_data->iface_nm, "mgbe3_0", sizeof("mgbe3_0"))) {
-			pdev_data->tsc_ptp_src = (TSC_PTP_SRC_MGBE3 << SRC_SELECT_BIT_OFFSET);
-		} else {
-			pdev_data->tsc_ptp_src = (TSC_PTP_SRC_EQOS << SRC_SELECT_BIT_OFFSET);
-		}
-
-		tsc_config_ptx_0 = readl(pdev_data->tsc_reg_map_base);
-		/* clear and set the ptp src based on ethernet interface passed
-		 * from dt for tsc to lock onto.
-		 */
-		tsc_config_ptx_0 = tsc_config_ptx_0 &
-			~(SRC_SELECT_BITS << SRC_SELECT_BIT_OFFSET);
-		tsc_config_ptx_0 = tsc_config_ptx_0 | pdev_data->tsc_ptp_src;
-		writel(tsc_config_ptx_0, pdev_data->tsc_reg_map_base);
-		tsc_config_ptx_0 = readl(pdev_data->tsc_reg_map_base);
-		dev_info(&pdev->dev, "TSC config ptx 0x%x\n", tsc_config_ptx_0);
-
-		set_mode_tsc(pdev_data);
+		nvpps_ptp_tsc_sync_config(pdev);
 	}
 
 	return 0;
