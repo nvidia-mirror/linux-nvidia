@@ -22,7 +22,8 @@
 #include <linux/mailbox_client.h>
 
 /* from drivers/mailbox/mailbox.h */
-#include "mailbox.h"
+#define TXDONE_BY_POLL	BIT(1) /* controller can read status of last TX */
+#define TXDONE_BY_ACK	BIT(2) /* S/W ACK received by Client ticks the TX */
 
 #include "tegra23x_psc.h"
 

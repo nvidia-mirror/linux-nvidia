@@ -4,8 +4,11 @@
 
 GCOV_PROFILE := y
 
-ccflags-y += -I$(srctree.nvidia)/drivers/platform/tegra/include \
-	     -I$(srctree)/drivers/mailbox
+ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
+CONFIG_TEGRA_PSC := m
+endif
+
+ccflags-y += -I$(srctree.nvidia)/drivers/platform/tegra/include
 
 ccflags-y += -Werror
 
