@@ -133,7 +133,7 @@ void mc_ecc_config_read(void)
 		mc_cfg.chanpos = 0;
 }
 
-static u32 mc_reverse_masked_bank(u64 linear, int masked_bank, u32 bankpos,
+static u32 mc_reverse_masked_bank(u64 linear, u32 masked_bank, u32 bankpos,
 				u32 bankbits)
 {
 	u32 bank = 0;
