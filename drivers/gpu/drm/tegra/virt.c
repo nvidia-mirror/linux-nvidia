@@ -36,11 +36,14 @@ struct tegra_vhost_cmd_msg {
 
 struct virt_engine {
 	struct device *dev;
-	struct tegra_hv_ivc_cookie *cookie;
 	int connection_id;
 
 	struct tegra_drm_client client;
 };
+
+static DEFINE_MUTEX(ivc_cookie_lock);
+static struct tegra_hv_ivc_cookie *ivc_cookie;
+static struct kref ivc_ref;
 
 static inline struct virt_engine *to_virt_engine(struct tegra_drm_client *client)
 {
@@ -121,6 +124,16 @@ static int virt_engine_setup_ivc(struct virt_engine *virt)
 	u32 ivc_instance;
 	int err;
 
+	mutex_lock(&ivc_cookie_lock);
+
+	if (ivc_cookie) {
+		err = PTR_ERR_OR_ZERO(ivc_cookie);
+		if (!err)
+			kref_get(&ivc_ref);
+		mutex_unlock(&ivc_cookie_lock);
+		return err;
+	}
+
 	hv = of_parse_phandle(host1x_dn, "nvidia,server-ivc", 0);
 	if (!hv) {
 		dev_err(virt->dev, "nvidia,server-ivc not configured\n");
@@ -133,38 +146,62 @@ static int virt_engine_setup_ivc(struct virt_engine *virt)
 		return -EINVAL;
 	}
 
-	virt->cookie = tegra_hv_ivc_reserve(hv, ivc_instance, NULL);
-	if (IS_ERR(virt->cookie)) {
-		dev_err(virt->dev, "IVC channel reservation failed: %ld\n", PTR_ERR(virt->cookie));
-		return PTR_ERR(virt->cookie);
+	ivc_cookie = tegra_hv_ivc_reserve(hv, ivc_instance, NULL);
+	if (IS_ERR(ivc_cookie)) {
+		dev_err(virt->dev, "IVC channel reservation failed: %ld\n", PTR_ERR(ivc_cookie));
+		return PTR_ERR(ivc_cookie);
 	}
 
-	tegra_hv_ivc_channel_reset(virt->cookie);
+	tegra_hv_ivc_channel_reset(ivc_cookie);
 
-	while (tegra_hv_ivc_channel_notified(virt->cookie))
+	while (tegra_hv_ivc_channel_notified(ivc_cookie))
 		;
+
+	kref_init(&ivc_ref);
+
+	mutex_unlock(&ivc_cookie_lock);
 
 	return 0;
 }
 
-static int virt_engine_transfer(struct virt_engine *virt, void *data, u32 size)
+static void release_ivc_cookie(struct kref *ref)
+{
+	(void)ref;
+
+	tegra_hv_ivc_unreserve(ivc_cookie);
+	mutex_unlock(&ivc_cookie_lock);
+}
+
+static void virt_engine_cleanup(void)
+{
+	kref_put_mutex(&ivc_ref, release_ivc_cookie, &ivc_cookie_lock);
+}
+
+static int virt_engine_transfer(void *data, u32 size)
 {
 	int err;
 
-	while (!tegra_hv_ivc_can_write(virt->cookie))
+	mutex_lock(&ivc_cookie_lock);
+
+	while (!tegra_hv_ivc_can_write(ivc_cookie))
 		;
 
-	err = tegra_hv_ivc_write(virt->cookie, data, size);
-	if (err != size)
+	err = tegra_hv_ivc_write(ivc_cookie, data, size);
+	if (err != size) {
+		mutex_unlock(&ivc_cookie_lock);
 		return -ENOMEM;
+	}
 
-	while (!tegra_hv_ivc_can_read(virt->cookie))
+	while (!tegra_hv_ivc_can_read(ivc_cookie))
 		;
 
-	err = tegra_hv_ivc_read(virt->cookie, data, size);
-	if (err != size)
+	err = tegra_hv_ivc_read(ivc_cookie, data, size);
+	if (err != size) {
+		mutex_unlock(&ivc_cookie_lock);
 		return -EIO;
+	}
 
+	mutex_unlock(&ivc_cookie_lock);
 	return 0;
 }
 
@@ -176,7 +213,7 @@ static int virt_engine_connect(struct virt_engine *virt, u32 module_id)
 	msg.cmd = TEGRA_VHOST_CMD_CONNECT;
 	msg.connect.module = module_id;
 
-	err = virt_engine_transfer(virt, &msg, sizeof(msg));
+	err = virt_engine_transfer(&msg, sizeof(msg));
 	if (err < 0)
 		return err;
 
@@ -191,7 +228,7 @@ static int virt_engine_suspend(struct device *dev)
 	msg.cmd = TEGRA_VHOST_CMD_SUSPEND;
 	msg.connection_id = virt->connection_id;
 
-	return virt_engine_transfer(virt, &msg, sizeof(msg));
+	return virt_engine_transfer(&msg, sizeof(msg));
 }
 
 static int virt_engine_resume(struct device *dev)
@@ -202,7 +239,7 @@ static int virt_engine_resume(struct device *dev)
 	msg.cmd = TEGRA_VHOST_CMD_RESUME;
 	msg.connection_id = virt->connection_id;
 
-	return virt_engine_transfer(virt, &msg, sizeof(msg));
+	return virt_engine_transfer(&msg, sizeof(msg));
 }
 
 static const struct of_device_id tegra_virt_engine_of_match[] = {
@@ -278,7 +315,7 @@ static int virt_engine_probe(struct platform_device *pdev)
 	return 0;
 
 cleanup_ivc:
-	tegra_hv_ivc_unreserve(virt->cookie);
+	virt_engine_cleanup();
 unregister_client:
 	host1x_client_unregister(&virt->client.base);
 
@@ -290,7 +327,7 @@ static int virt_engine_remove(struct platform_device *pdev)
 	struct virt_engine *virt_engine = platform_get_drvdata(pdev);
 	int err;
 
-	tegra_hv_ivc_unreserve(virt_engine->cookie);
+	virt_engine_cleanup();
 
 	err = host1x_client_unregister(&virt_engine->client.base);
 	if (err < 0) {
