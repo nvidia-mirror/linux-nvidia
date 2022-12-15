@@ -313,6 +313,9 @@ static void __iomem *tegra_mc_map_regs(struct platform_device *pdev, int device)
 			regs_start = regs;
 	}
 
+	if (start > INT_MAX)
+		return NULL;
+
 	if (of_address_to_resource(pdev->dev.of_node, start, &res))
 		return NULL;
 
