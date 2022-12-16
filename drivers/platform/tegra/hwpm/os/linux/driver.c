@@ -141,6 +141,7 @@ static int tegra_hwpm_probe(struct platform_device *pdev)
 		goto device_create;
 	}
 
+	/* This will limit IOVA buffer mapping to 39 bit addresses */
 	(void) dma_set_mask_and_coherent(hwpm_linux->dev, DMA_BIT_MASK(39));
 
 	ret = tegra_hwpm_get_chip_info(hwpm_linux);

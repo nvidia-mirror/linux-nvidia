@@ -42,9 +42,9 @@ struct tegra_hwpm_mem_mgmt {
 	struct dma_buf_attachment *stream_attach;
 	u64 stream_buf_size;
 	u64 stream_buf_va;
+	u64 mem_bytes_buf_va;
 	struct dma_buf *mem_bytes_dma_buf;
 	struct dma_buf_attachment *mem_bytes_attach;
-	u64 mem_bytes_buf_va;
 	void *mem_bytes_kernel;
 #if defined(CONFIG_TEGRA_HWPM_OOT)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)

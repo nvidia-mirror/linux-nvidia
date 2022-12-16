@@ -19,7 +19,6 @@
 #include <linux/string.h>
 #include <linux/of_address.h>
 #include <linux/dma-buf.h>
-#include <linux/version.h>
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 
 #include <tegra_hwpm_kmem.h>
@@ -59,12 +58,14 @@ static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_err(hwpm, "Unable to get stream dma_buf");
 		return PTR_ERR(hwpm->mem_mgmt->stream_dma_buf);
 	}
+
 	hwpm->mem_mgmt->stream_attach =
 		dma_buf_attach(hwpm->mem_mgmt->stream_dma_buf, hwpm_linux->dev);
 	if (IS_ERR(hwpm->mem_mgmt->stream_attach)) {
 		tegra_hwpm_err(hwpm, "Unable to attach stream dma_buf");
 		return PTR_ERR(hwpm->mem_mgmt->stream_attach);
 	}
+
 	hwpm->mem_mgmt->stream_sgt = dma_buf_map_attachment(
 		hwpm->mem_mgmt->stream_attach, DMA_FROM_DEVICE);
 	if (IS_ERR(hwpm->mem_mgmt->stream_sgt)) {
@@ -79,6 +80,7 @@ static int tegra_hwpm_dma_map_stream_buffer(struct tegra_soc_hwpm *hwpm,
 		tegra_hwpm_err(hwpm, "Invalid stream buffer SMMU IOVA");
 		return -ENXIO;
 	}
+
 	tegra_hwpm_dbg(hwpm, hwpm_dbg_alloc_pma_stream,
 		"stream_buf_pma_va = 0x%llx",
 		alloc_pma_stream->stream_buf_pma_va);
@@ -128,26 +130,31 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 		sg_dma_address(hwpm->mem_mgmt->mem_bytes_sgt->sgl);
 
 #if defined(CONFIG_TEGRA_HWPM_OOT)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-	hwpm->mem_mgmt->mem_bytes_kernel =
-		(struct iosys_map *) &hwpm->mem_mgmt->mem_bytes_map;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0)
+	/*
+	 * Kernel version beyond 5.10 introduces
+	 * dma_buf_map structure (called iosys_map in later versions).
+	 * The kernel Virtual address generated from dma_buf_vmap API
+	 * is stored in mem_bytes_map, which is a dma_buf_map structure
+	 */
 	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
-		(struct iosys_map *)hwpm->mem_mgmt->mem_bytes_kernel);
+		&hwpm->mem_mgmt->mem_bytes_map);
+	if (err != 0) {
+		tegra_hwpm_err(hwpm,
+			"Unable to map mem_bytes buffer into kernel VA space");
+		return -ENOMEM;
+	}
+	hwpm->mem_mgmt->mem_bytes_kernel = hwpm->mem_mgmt->mem_bytes_map.vaddr;
 #else
 	hwpm->mem_mgmt->mem_bytes_kernel =
-		(struct dma_buf_map *) &hwpm->mem_mgmt->mem_bytes_map;
-	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
-		(struct dma_buf_map *)hwpm->mem_mgmt->mem_bytes_kernel);
-#endif
-#else /* !CONFIG_TEGRA_HWPM_OOT */
-	hwpm->mem_mgmt->mem_bytes_kernel =
 		dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf);
-#endif
 	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
 		tegra_hwpm_err(hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
+#endif
+#endif
 
 	memset(hwpm->mem_mgmt->mem_bytes_kernel, 0, 32);
 
@@ -181,8 +188,15 @@ static int tegra_hwpm_reset_stream_buf(struct tegra_soc_hwpm *hwpm)
 	hwpm->mem_mgmt->stream_dma_buf = NULL;
 
 	if (hwpm->mem_mgmt->mem_bytes_kernel) {
+#if defined(CONFIG_TEGRA_HWPM_OOT)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0)
+		dma_buf_vunmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
+			       &hwpm->mem_mgmt->mem_bytes_map);
+#else
 		dma_buf_vunmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
 			       hwpm->mem_mgmt->mem_bytes_kernel);
+#endif
+#endif
 		hwpm->mem_mgmt->mem_bytes_kernel = NULL;
 	}
 
@@ -297,7 +311,11 @@ int tegra_hwpm_clear_mem_pipeline(struct tegra_soc_hwpm *hwpm)
 		u32 sleep_msecs = 100;
 		struct tegra_hwpm_timeout timeout = {0};
 
-		*mem_bytes_kernel_u32 = TEGRA_HWPM_MEM_BYTES_INVALID;
+		ret = tegra_hwpm_timeout_init(hwpm, &timeout, 10U);
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm, "hwpm timeout init failed");
+			return ret;
+		}
 
 		do {
 			ret = hwpm->active_chip->stream_mem_bytes(hwpm);
