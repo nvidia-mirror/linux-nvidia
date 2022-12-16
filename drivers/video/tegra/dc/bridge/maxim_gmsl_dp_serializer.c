@@ -88,8 +88,8 @@
 #define MAX_GMSL_DP_SER_MISC_CONFIG_B1_MASK	(1 << 0)
 #define MAX_GMSL_DP_SER_MISC_CONFIG_B1_VAL	0x1
 
-#define MAX_GMSL_DP_SER_HPD_INTERRUPT_MASK					0x702D
-#define MAX_GMSL_DP_SER_HPD_BRANCH_SINK_COUNT_CHANGE_INTERRUPT_DISABLE_VAL	0x20
+#define MAX_GMSL_DP_SER_HPD_INTERRUPT_MASK		0x702D
+#define MAX_GMSL_DP_SER_HPD_INTERRUPT_VAL		0x7C
 
 #define MAX_GMSL_DP_SER_MAX_LINK_COUNT		0x7070
 #define MAX_GMSL_DP_SER_MAX_LINK_RATE		0x7074
@@ -229,14 +229,11 @@ static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 	};
 
 	/*
-	 * WAR: When ruining a few hundred loops of link training between the
-	 * SOC and the serializer, we are seeing unexpected HPD_IRQ being
-	 * triggered by the MAX96745/96851 serializers due to "Branch sink count
-	 * change" event. Till we figure out why this is happening, disable this
-	 * interrupt source.
+	 * Just enable "Loss of Training" and "Register control" events.
+	 * Mask rest of event which can trigger HPD_IRQ.
 	 */
 	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_HPD_INTERRUPT_MASK,
-			      MAX_GMSL_DP_SER_HPD_BRANCH_SINK_COUNT_CHANGE_INTERRUPT_DISABLE_VAL);
+				MAX_GMSL_DP_SER_HPD_INTERRUPT_VAL);
 
 	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_PHY_EDP_0_CTRL0_B0, 0x0f);
 	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_PHY_EDP_0_CTRL0_B1, 0x0f);
