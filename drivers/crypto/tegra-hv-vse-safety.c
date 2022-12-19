@@ -4,7 +4,7 @@
  *
  * Support for Tegra Virtual Security Engine hardware crypto algorithms.
  *
- * Copyright (c) 2019-2022, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2019-2023, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1659,12 +1659,12 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 	g_crypto_to_ivc_map[aes_ctx->node_id].vse_thread_start = true;
 
 	/*
-	 * If first byte of iv is 1 and the request is for AES CBC/CTR encryption,
+	 * If req->iv[0] is 1 and the request is for AES CBC/CTR encryption,
 	 * it means that generation of random IV is required.
 	 */
 	if (req_ctx->encrypt &&
 			(req_ctx->op_mode == AES_CBC ||
-			req_ctx->op_mode == AES_CTR) &&
+			req_ctx->op_mode == AES_CTR) && (aes_ctx->user_nonce == 0U) &&
 			req->iv[0] == 1) {
 		//Random IV generation is required
 		err = tegra_hv_vse_safety_aes_gen_random_iv(se_dev, req,
@@ -1702,7 +1702,7 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 
 		if (((req_ctx->op_mode == AES_CBC)
 				|| (req_ctx->op_mode == AES_CTR))
-				&& req_ctx->encrypt == true)
+				&& req_ctx->encrypt == true && aes_ctx->user_nonce == 0U)
 			memcpy(req->iv, priv->iv, TEGRA_VIRTUAL_SE_AES_IV_SIZE);
 	} else {
 		dev_err(se_dev->dev,
@@ -3192,10 +3192,11 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 
 	if (encrypt) {
 		/*
-		 * If first byte of iv is 1 and the request is for AES CBC/CTR encryption,
+		 * If req->iv[0] is 1 and the request is for AES CBC/CTR encryption,
 		 * it means that generation of random IV is required.
+		 * IV generation is not required if user nonce is provided.
 		 */
-		if (req->iv[0] == 1) {
+		if (req->iv[0] == 1 && aes_ctx->user_nonce == 0U) {
 			//Random IV generation is required
 			ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_AES_ENCRYPT_INIT;
 			priv->cmd = VIRTUAL_SE_PROCESS;
@@ -3232,6 +3233,9 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 		sg_pcopy_to_buffer(req->src, (u32)sg_nents(req->src),
 			ivc_tx->aes.op_gcm.expected_tag, TEGRA_VIRTUAL_SE_AES_GCM_TAG_SIZE,
 			req->assoclen + cryptlen);
+	} else {
+		if (aes_ctx->user_nonce != 0U)
+			memcpy(ivc_tx->aes.op_gcm.iv, req->iv, crypto_aead_ivsize(tfm));
 	}
 
 	ivc_tx->aes.op_gcm.src_addr_hi = cryptlen;
@@ -3272,9 +3276,10 @@ static int tegra_vse_aes_gcm_enc_dec(struct aead_request *req, bool encrypt)
 	}
 
 	if (encrypt) {
-		/* copy iv to req for encryption*/
-		memcpy(req->iv, priv->iv, crypto_aead_ivsize(tfm));
-
+		if (aes_ctx->user_nonce == 0U) {
+			/* copy iv to req for encryption*/
+			memcpy(req->iv, priv->iv, crypto_aead_ivsize(tfm));
+		}
 		/* copy tag to req for encryption */
 		sg_pcopy_from_buffer(req->dst, sg_nents(req->dst),
 			tag_buf, aes_ctx->authsize,

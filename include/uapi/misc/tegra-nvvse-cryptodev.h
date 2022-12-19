@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION. All Rights Reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -171,6 +171,11 @@ struct  tegra_nvvse_aes_enc_dec_ctl {
 	uint8_t		skip_key;
 	/** [in] Holds an AES Mode */
 	enum		tegra_nvvse_aes_mode aes_mode;
+	/** [in] Holds a Boolean that specifies nonce is passed by user or not.
+	 * value '0' indicates nonce is not passed by user and
+	 * non zero value indicates nonce is passed by user
+	 */
+	uint8_t		user_nonce;
 	/** [inout] Initial Vector (IV) used for AES Encryption and Decryption.
 	  * During Encryption, the nvvse generates IV and populates in oIV in the
 	  * first NvVseAESEncryptDecrypt() call.

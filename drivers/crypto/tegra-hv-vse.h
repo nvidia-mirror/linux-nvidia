@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  */
 
 #ifndef __TEGRA_HV_VSE_H
@@ -75,6 +75,8 @@ struct tegra_virtual_se_aes_context {
 	u32 authsize;
 	/*Crypto dev instance*/
 	uint32_t node_id;
+	/* Flag to indicate user nonce*/
+	uint8_t user_nonce;
 };
 
 /* Security Engine/TSEC AES CMAC context */

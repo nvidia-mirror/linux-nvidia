@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2021-2023, NVIDIA Corporation. All Rights Reserved.
  *
  * Tegra NVVSE crypto device for crypto operation to NVVSE linux library.
  *
@@ -1074,6 +1074,7 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 
 	aes_ctx = crypto_skcipher_ctx(tfm);
 	aes_ctx->node_id = ctx->node_id;
+	aes_ctx->user_nonce = aes_enc_dec_ctl->user_nonce;
 
 	req = skcipher_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1167,10 +1168,10 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 					tnvvse_crypto_complete, &tcrypt_complete);
 		tcrypt_complete.req_err = 0;
 
-		/* Set first byte of IV to 1 for first encryption request and 0 for other
+		/* Set first byte of next_block_iv to 1 for first encryption request and 0 for other
 		 * encryption requests. This is used to invoke generation of random IV.
 		 */
-		if (aes_enc_dec_ctl->is_encryption) {
+		if (aes_enc_dec_ctl->is_encryption && (aes_enc_dec_ctl->user_nonce == 0U)) {
 			if (first_loop && !aes_enc_dec_ctl->is_non_first_call)
 				next_block_iv[0] = 1;
 			else
@@ -1204,7 +1205,8 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 			goto free_xbuf;
 		}
 
-		if (first_loop && aes_enc_dec_ctl->is_encryption) {
+		if ((first_loop && aes_enc_dec_ctl->is_encryption) &&
+			(aes_enc_dec_ctl->user_nonce == 0U)) {
 			if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CBC)
 				memcpy(aes_enc_dec_ctl->initial_vector, req->iv, TEGRA_NVVSE_AES_IV_LEN);
 			else if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR)
@@ -1348,6 +1350,7 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 
 	aes_ctx = crypto_aead_ctx(tfm);
 	aes_ctx->node_id = ctx->node_id;
+	aes_ctx->user_nonce = aes_enc_dec_ctl->user_nonce;
 
 	req = aead_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1414,10 +1417,10 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 	aead_request_set_ad(req, aad_length);
 
 	memset(iv, 0, TEGRA_NVVSE_AES_GCM_IV_LEN);
-	if (!enc)
+	if (!enc || aes_enc_dec_ctl->user_nonce != 0U)
 		memcpy(iv, aes_enc_dec_ctl->initial_vector, TEGRA_NVVSE_AES_GCM_IV_LEN);
 	else if (enc && !aes_enc_dec_ctl->is_non_first_call)
-		/* Set first byte of IV to 1 for first encryption request. This is used to invoke
+		/* Set first byte of iv to 1 for first encryption request. This is used to invoke
 		 * generation of random IV.
 		 */
 		iv[0] = 1;
@@ -1657,8 +1660,9 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 				goto free_buf;
 			}
 		}
-
-		memcpy(aes_enc_dec_ctl->initial_vector, req->iv, TEGRA_NVVSE_AES_GCM_IV_LEN);
+		if (aes_enc_dec_ctl->user_nonce == 0U)
+			memcpy(aes_enc_dec_ctl->initial_vector, req->iv,
+					TEGRA_NVVSE_AES_GCM_IV_LEN);
 	}
 
 free_buf:
