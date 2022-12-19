@@ -320,7 +320,7 @@ static bool tegra_se_ecc_vec_cmp(const u8 *vec1, const u8 *vec2,
 {
 	int i;
 
-	for (i = nbytes - 1; i >= 0; i--) {
+	for (i = (int)nbytes - 1; i >= 0; i--) {
 		if (vec1[i] > vec2[i])
 			return true;
 		else if (vec1[i] < vec2[i])
@@ -477,7 +477,7 @@ static int tegra_se_pka1_init_key_slot(struct tegra_se_elp_dev *se_dev)
 	return 0;
 }
 
-static u32 tegra_se_check_trng_op(struct tegra_se_elp_dev *se_dev)
+static int tegra_se_check_trng_op(struct tegra_se_elp_dev *se_dev)
 {
 	u32 trng_val;
 	u32 val = se_elp_readl(se_dev, PKA1,
@@ -629,13 +629,13 @@ static void tegra_se_pka1_ecc_fill_input(struct tegra_se_pka1_ecc_request *req)
 
 	for (i = 0; i < nwords; i++)
 		se_elp_writel(se_dev, PKA1, *A++, reg_bank_offset(
-			      a_bank, a_id,
+			      a_bank, (u32)a_id,
 			      req->op_mode) + (i * 4));
 
 	if (req->op_mode == SE_ELP_OP_MODE_ECC521) {
 		for (i = nwords; i < nwords_521; i++)
 			se_elp_writel(se_dev, PKA1, 0x0, reg_bank_offset(
-				      a_bank, a_id,
+				      (u32)a_bank, a_id,
 				      req->op_mode) + (i * 4));
 	}
 
@@ -884,8 +884,8 @@ static void tegra_se_set_pka1_op_ready(struct tegra_se_elp_dev *se_dev)
 
 	/* Enable GLBL & RAND_RDY for TRNG */
 	se_elp_writel(se_dev, PKA1,
-		      TEGRA_SE_PKA1_TRNG_IE_RAND_RDY_EN(ELP_ENABLE) |
-		      TEGRA_SE_PKA1_TRNG_IE_GLBL_EN(ELP_ENABLE),
+		      (u32)(TEGRA_SE_PKA1_TRNG_IE_RAND_RDY_EN(ELP_ENABLE) |
+		      TEGRA_SE_PKA1_TRNG_IE_GLBL_EN(ELP_ENABLE)),
 		      TEGRA_SE_PKA1_TRNG_IE_OFFSET);
 
 	/* Enable PKA1 interrupt */
@@ -913,7 +913,7 @@ static void tegra_se_program_pka1_rsa(struct tegra_se_pka1_rsa_context *ctx)
 	    ctx->op_mode == SE_ELP_OP_MODE_RSA3072)
 		partial_radix = pka1_op_size[ctx->op_mode] / 32;
 
-	val = TEGRA_SE_PKA1_CTRL_BASE_RADIX(pka1_ctrl_base(ctx->op_mode)) |
+	val = TEGRA_SE_PKA1_CTRL_BASE_RADIX((u32)pka1_ctrl_base(ctx->op_mode)) |
 		TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX(partial_radix) |
 		TEGRA_SE_PKA1_CTRL_GO(TEGRA_SE_PKA1_CTRL_GO_START);
 
@@ -995,7 +995,7 @@ static void tegra_se_program_pka1_ecc(struct tegra_se_pka1_ecc_request *req)
 	    req->op_mode != SE_ELP_OP_MODE_ECC512)
 		partial_radix = pka1_op_size[req->op_mode] / 32;
 
-	val =  TEGRA_SE_PKA1_CTRL_BASE_RADIX(pka1_ctrl_base(req->op_mode)) |
+	val =  TEGRA_SE_PKA1_CTRL_BASE_RADIX((u32)pka1_ctrl_base(req->op_mode)) |
 			TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX(partial_radix) |
 			TEGRA_SE_PKA1_CTRL_GO(TEGRA_SE_PKA1_CTRL_GO_START);
 
@@ -1011,7 +1011,7 @@ static int tegra_se_check_pka1_op_done(struct tegra_se_elp_dev *se_dev)
 {
 	int ret;
 
-	ret = wait_for_completion_timeout(&se_dev->complete, msecs_to_jiffies(
+	ret = (int)wait_for_completion_timeout(&se_dev->complete, msecs_to_jiffies(
 					  PKA1_TIMEOUT / 1000));
 	if (ret == 0) {
 		dev_err(se_dev->dev, "Interrupt timed out\n");
@@ -1142,7 +1142,7 @@ static void tegra_se_pka1_set_key_param(u32 *param, u32 key_words, u32 slot_num,
 	for (i = key_words; i < len; i++) {
 		se_elp_writel(se_dev, PKA1,
 			      TEGRA_SE_PKA1_KEYSLOT_ADDR_FIELD(op) |
-			      TEGRA_SE_PKA1_KEYSLOT_ADDR_WORD(i),
+			      TEGRA_SE_PKA1_KEYSLOT_ADDR_WORD((u32)i),
 			      TEGRA_SE_PKA1_KEYSLOT_ADDR_OFFSET(slot_num));
 		se_elp_writel(se_dev, PKA1, 0x0,
 			      TEGRA_SE_PKA1_KEYSLOT_DATA_OFFSET(slot_num));
@@ -1637,7 +1637,7 @@ static void tegra_se_program_pka1_mod(struct tegra_se_pka1_mod_request *req)
 		      TEGRA_SE_PKA1_INT_ENABLE_IE_IRQ_EN(ELP_ENABLE),
 		      TEGRA_SE_PKA1_INT_ENABLE_OFFSET);
 
-	val = TEGRA_SE_PKA1_CTRL_BASE_RADIX(pka1_ctrl_base(req->op_mode)) |
+	val = TEGRA_SE_PKA1_CTRL_BASE_RADIX((u32)pka1_ctrl_base(req->op_mode)) |
 		TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX(pka_ctrl_partial_radix(om)) |
 		TEGRA_SE_PKA1_CTRL_GO(TEGRA_SE_PKA1_CTRL_GO_START);
 
@@ -2071,7 +2071,7 @@ int tegra_se_pka1_ecc_op(struct tegra_se_pka1_ecc_request *req)
 		goto ecc_exit;
 	}
 
-	ret = tegra_se_acquire_pka1_mutex(se_dev);
+	ret = (int)tegra_se_acquire_pka1_mutex(se_dev);
 	if (ret) {
 		dev_err(se_dev->dev, "PKA1 Mutex acquire failed\n");
 		goto clk_dis;
@@ -2116,7 +2116,7 @@ static int tegra_se_pka1_mod_op(struct tegra_se_pka1_mod_request *req)
 		goto mod_exit;
 	}
 
-	ret = tegra_se_acquire_pka1_mutex(se_dev);
+	ret = (int)tegra_se_acquire_pka1_mutex(se_dev);
 	if (ret) {
 		dev_err(se_dev->dev, "PKA1 Mutex acquire failed\n");
 		goto clk_dis;
@@ -2350,7 +2350,7 @@ static int tegra_se_eddsa_recover_x(u8 RX0, u32 *RY, u32 *RX,
 				    const struct tegra_se_ecc_curve *curve,
 				    struct tegra_se_eddsa_ctx *ctx)
 {
-	int nwords = ctx->nwords;
+	int nwords = (int)ctx->nwords;
 	u32 u[8] = {0};
 	u32 v[8] = {0};
 	u32 c[8] = {0};
@@ -2492,7 +2492,7 @@ static int tegra_se_ed25519_shamir(struct tegra_se_ecc_point *result,
 }
 
 static int tegra_se_non_mod_mult(u32 *RX, u32 *RY, u32 *x, u32 *y,
-				 int nbytes, int mode)
+				 unsigned int nbytes, unsigned int mode)
 {
 	struct tegra_se_pka1_mod_request req;
 	int ret;
@@ -2582,7 +2582,7 @@ static int tegra_se_c25519_point_mult(struct tegra_se_ecc_point *result,
 				      const struct tegra_se_ecc_point *point,
 				      const u32 *private,
 				      const struct tegra_se_ecc_curve *curve,
-				      int nbytes){
+				      unsigned int nbytes){
 	struct tegra_se_pka1_ecc_request ecc_req;
 	int ret;
 
@@ -2696,7 +2696,7 @@ static bool tegra_se_eddsa_params_is_valid(struct tegra_se_eddsa_params *params)
 	const u32 *private_key = params->key;
 	int private_key_len = params->key_size;
 	const struct tegra_se_ecc_curve *curve;
-	int nbytes;
+	unsigned int nbytes;
 
 	curve = tegra_se_ecc_get_curve(params->curve_id);
 	if (!curve)
@@ -3183,7 +3183,7 @@ static int tegra_se_eddsa_verify(struct akcipher_request *req)
 		goto free_mem;
 	}
 
-	tegra_se_point_decode(ctx->public_key, &PX0, pk->y, nwords);
+	tegra_se_point_decode(ctx->public_key, &PX0, pk->y, (int)nwords);
 
 	ret = tegra_se_eddsa_recover_x(PX0, pk->y, pk->x, curve, ctx);
 	if (ret) {
@@ -3272,7 +3272,11 @@ static int tegra_se_eddsa_max_size(struct crypto_akcipher *tfm)
 #endif
 {
 	struct tegra_se_eddsa_ctx *ctx = akcipher_tfm_ctx(tfm);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+	unsigned int nbytes = ctx->nwords * 4;
+#else
 	int nbytes = ctx->nwords * 4;
+#endif
 
 	/* For r,s */
 	return 2 * nbytes;
@@ -3608,7 +3612,7 @@ static int tegra_se_pka1_rsa_setkey(struct crypto_akcipher *tfm,
 		return ret;
 	}
 
-	ret = tegra_se_acquire_pka1_mutex(se_dev);
+	ret = (int)tegra_se_acquire_pka1_mutex(se_dev);
 	if (ret) {
 		dev_err(se_dev->dev, "PKA1 Mutex acquire failed\n");
 		goto clk_dis;
@@ -3946,7 +3950,7 @@ static int tegra_se_elp_rng_get_random(struct crypto_rng *tfm,
 
 	mutex_lock(&se_dev->hw_lock);
 	clk_prepare_enable(se_dev->c);
-	ret = tegra_se_acquire_rng1_mutex(se_dev);
+	ret = (int)tegra_se_acquire_rng1_mutex(se_dev);
 	if (ret) {
 		dev_err(se_dev->dev, "\n RNG Mutex acquire failed\n");
 		clk_disable_unprepare(se_dev->c);
@@ -4057,7 +4061,7 @@ static int tegra_se_elp_trng_get_random(struct crypto_rng *tfm,
 	mutex_lock(&se_dev->hw_lock);
 	clk_prepare_enable(se_dev->c);
 
-	ret = tegra_se_acquire_pka1_mutex(se_dev);
+	ret = (int)tegra_se_acquire_pka1_mutex(se_dev);
 	if (ret) {
 		dev_err(se_dev->dev, "PKA1 Mutex acquire failed\n");
 		goto clk_dis;
@@ -4141,7 +4145,7 @@ static int tegra_se_ecdsa_sign(struct akcipher_request *req)
 	struct tegra_se_ecdsa_ctx *ctx = tegra_se_ecdsa_get_ctx(tfm);
 	struct tegra_se_ecc_point *x1y1 = NULL;
 	const struct tegra_se_ecc_curve *curve;
-	int nbytes, nwords;
+	unsigned int nbytes, nwords;
 	unsigned int ndigits;
 	u64 z[ECC_MAX_DIGITS], d[ECC_MAX_DIGITS];
 	u64 k[ECC_MAX_DIGITS], k_inv[ECC_MAX_DIGITS];
