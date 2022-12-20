@@ -354,9 +354,19 @@ static int napi_recv(_adapter *padapter, int budget)
 		rx_ok = _FALSE;
 
 #ifdef CONFIG_RTW_GRO
-		if (pregistrypriv->en_gro) {
+		/*
+			cloned SKB use dataref to avoid kernel release it.
+			But dataref changed in napi_gro_receive.
+			So, we should prevent cloned SKB go into napi_gro_receive.
+		*/
+		if (pregistrypriv->en_gro && !skb_cloned(pskb)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+			rtw_napi_gro_receive(&padapter->napi, pskb);
+			rx_ok = _TRUE;
+#else
 			if (rtw_napi_gro_receive(&padapter->napi, pskb) != GRO_DROP)
 				rx_ok = _TRUE;
+#endif
 			goto next;
 		}
 #endif /* CONFIG_RTW_GRO */
@@ -446,7 +456,8 @@ void rtw_os_recv_indicate_pkt(_adapter *padapter, _pkt *pkt, union recv_frame *r
 
 				if (bmcast) {
 					psta = rtw_get_bcmc_stainfo(padapter);
-					pskb2 = rtw_skb_clone(pkt);
+					if (psta)
+						pskb2 = rtw_skb_clone(pkt);
 				} else
 					psta = rtw_get_stainfo(pstapriv, ehdr->h_dest);
 

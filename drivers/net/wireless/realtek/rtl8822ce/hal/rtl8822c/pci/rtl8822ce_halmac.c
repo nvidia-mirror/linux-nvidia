@@ -33,8 +33,8 @@ static u8 pci_write_port_not_xmitframe(void *d,  u32 size, u8 *pBuf,  u8 qsel)
 
 
 	/* map TX DESC buf_addr (including TX DESC + tx data) */
-	mapping = pci_map_single(pdev, pBuf,
-		 size + TX_WIFI_INFO_SIZE, PCI_DMA_TODEVICE);
+	mapping = dma_map_single(&pdev->dev, pBuf,
+				 size + TX_WIFI_INFO_SIZE, DMA_TO_DEVICE);
 
 	/* Calculate page size.
 	 * Total buffer length including TX_WIFI_INFO and PacketLen */
@@ -44,12 +44,12 @@ static u8 pci_write_port_not_xmitframe(void *d,  u32 size, u8 *pBuf,  u8 qsel)
 			tx_page_used++;
 	}
 
-	txbd = pci_alloc_consistent(pdev, sizeof(struct tx_buf_desc), &txbd_dma);
+	txbd = dma_alloc_coherent(&pdev->dev,
+				  sizeof(struct tx_buf_desc), &txbd_dma, GFP_ATOMIC);
 
 	if (!txbd) {
-		pci_unmap_single(pdev, mapping,
-			size + TX_WIFI_INFO_SIZE, PCI_DMA_FROMDEVICE);
-
+		dma_unmap_single(&pdev->dev, mapping,
+				 size + TX_WIFI_INFO_SIZE, DMA_FROM_DEVICE);
 		return _FALSE;
 	}
 	/* BD init */
@@ -111,10 +111,10 @@ static u8 pci_write_port_not_xmitframe(void *d,  u32 size, u8 *pBuf,  u8 qsel)
 
 	udelay(100);
 
-	pci_free_consistent(pdev, sizeof(struct tx_buf_desc), txbd, txbd_dma);
+	dma_free_coherent(&pdev->dev, sizeof(struct tx_buf_desc), txbd, txbd_dma);
 
-	pci_unmap_single(pdev, mapping, size + TX_WIFI_INFO_SIZE,
-		PCI_DMA_FROMDEVICE);
+	dma_unmap_single(&pdev->dev, mapping, size + TX_WIFI_INFO_SIZE,
+			 DMA_FROM_DEVICE);
 
 	return ret;
 }
@@ -239,8 +239,8 @@ static u8 pci_write_data_rsvd_page_xmitframe(void *d, u8 *pBuf, u32 size)
 	} while (!bcn_valid && DLBcnCount <= 100 && !RTW_CANNOT_RUN(padapter));
 
 	txbd = (u8 *)(&ring->buf_desc[0]);
-	pci_unmap_single(pdev, GET_TX_BD_PHYSICAL_ADDR0_LOW(txbd),
-		pxmitbuf->len, PCI_DMA_TODEVICE);
+	dma_unmap_single(&pdev->dev, GET_TX_BD_PHYSICAL_ADDR0_LOW(txbd),
+			 pxmitbuf->len, DMA_TO_DEVICE);
 
 	return _TRUE;
 }

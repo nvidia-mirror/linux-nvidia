@@ -31,7 +31,7 @@
 #define buf_desc_debug(...)  do {} while (0)
 #endif
 
-static void rtl8822ce_xmit_tasklet(void *priv)
+static void rtl8822ce_xmit_tasklet(unsigned long priv)
 {
 	_irqL irqL;
 	_adapter *padapter = (_adapter *)priv;
@@ -51,7 +51,7 @@ s32 rtl8822ce_init_xmit_priv(_adapter *padapter)
 
 #ifdef PLATFORM_LINUX
 	tasklet_init(&pxmitpriv->xmit_tasklet,
-		     (void(*)(unsigned long))rtl8822ce_xmit_tasklet,
+		     rtl8822ce_xmit_tasklet,
 		     (unsigned long)padapter);
 #endif
 	rtl8822c_init_xmit_priv(padapter);
@@ -295,8 +295,8 @@ static void rtl8822ce_update_txbd(struct xmit_frame *pxmitframe,
 	u16 page_size_length = 0;
 
 	/* map TX DESC buf_addr (including TX DESC + tx data) */
-	mapping = pci_map_single(pdvobjpriv->ppcidev, pxmitframe->buf_addr ,
-				 sz + TX_WIFI_INFO_SIZE, PCI_DMA_TODEVICE);
+	mapping = dma_map_single(&pdvobjpriv->ppcidev->dev, pxmitframe->buf_addr,
+				 sz + TX_WIFI_INFO_SIZE, DMA_TO_DEVICE);
 
 	/* Calculate page size.
 	 * Total buffer length including TX_WIFI_INFO and PacketLen */
@@ -1276,7 +1276,8 @@ int rtl8822ce_init_txbd_ring(_adapter *padapter, unsigned int q_idx,
 
 	RTW_INFO("%s entries num:%d\n", __func__, entries);
 
-	txbd = pci_alloc_consistent(pdev, sizeof(*txbd) * entries, &dma);
+	txbd = dma_alloc_coherent(&pdev->dev, sizeof(*txbd) * entries,
+				  &dma, GFP_ATOMIC);
 
 	if (!txbd || (unsigned long)txbd & 0xFF) {
 		RTW_INFO("Cannot allocate TXBD (q_idx = %d)\n", q_idx);
@@ -1317,10 +1318,9 @@ void rtl8822ce_free_txbd_ring(_adapter *padapter, unsigned int prio)
 		pxmitbuf = rtl8822ce_dequeue_xmitbuf(ring);
 
 		if (pxmitbuf) {
-			pci_unmap_single(pdev,
-				GET_TX_BD_PHYSICAL_ADDR0_LOW(txbd),
-				pxmitbuf->len, PCI_DMA_TODEVICE);
-
+			dma_unmap_single(&pdev->dev,
+					 GET_TX_BD_PHYSICAL_ADDR0_LOW(txbd),
+					 pxmitbuf->len, DMA_TO_DEVICE);
 			rtw_free_xmitbuf(t_priv, pxmitbuf);
 
 		} else {
@@ -1330,8 +1330,8 @@ void rtl8822ce_free_txbd_ring(_adapter *padapter, unsigned int prio)
 		}
 	}
 
-	pci_free_consistent(pdev, sizeof(*ring->buf_desc) * ring->entries,
-			    ring->buf_desc, ring->dma);
+	dma_free_coherent(&pdev->dev, sizeof(*ring->buf_desc) * ring->entries,
+			  ring->buf_desc, ring->dma);
 	ring->buf_desc = NULL;
 
 }
@@ -1460,9 +1460,9 @@ void rtl8822ce_tx_isr(PADAPTER Adapter, int prio)
 		pxmitbuf = rtl8822ce_dequeue_xmitbuf(ring);
 
 		if (pxmitbuf) {
-			pci_unmap_single(pdvobjpriv->ppcidev,
-				GET_TX_BD_PHYSICAL_ADDR0_LOW(tx_desc),
-				pxmitbuf->len, PCI_DMA_TODEVICE);
+			dma_unmap_single(&pdvobjpriv->ppcidev->dev,
+					 GET_TX_BD_PHYSICAL_ADDR0_LOW(tx_desc),
+					 pxmitbuf->len, DMA_TO_DEVICE);
 			rtw_sctx_done(&pxmitbuf->sctx);
 			rtw_free_xmitbuf(&(pxmitbuf->padapter->xmitpriv),
 					 pxmitbuf);
@@ -1534,9 +1534,9 @@ void rtl8822ce_tx_isr(PADAPTER Adapter, int prio)
 
 		pxmitbuf = rtl8822ce_dequeue_xmitbuf(ring);
 		if (pxmitbuf) {
-			pci_unmap_single(pdvobjpriv->ppcidev,
-				 GET_TX_BD_PHYSICAL_ADDR0_LOW(tx_desc),
-					 pxmitbuf->len, PCI_DMA_TODEVICE);
+			dma_unmap_single(&pdvobjpriv->ppcidev->dev,
+					 GET_TX_BD_PHYSICAL_ADDR0_LOW(tx_desc),
+					 pxmitbuf->len, DMA_TO_DEVICE);
 			rtw_sctx_done(&pxmitbuf->sctx);
 			rtw_free_xmitbuf(&(pxmitbuf->padapter->xmitpriv),
 					 pxmitbuf);

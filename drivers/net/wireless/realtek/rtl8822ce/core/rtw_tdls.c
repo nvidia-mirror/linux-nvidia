@@ -1831,7 +1831,7 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	_irqL irqL;
 	struct rx_pkt_attrib	*prx_pkt_attrib = &precv_frame->u.hdr.attrib;
-	u8 *prsnie, *ppairwise_cipher;
+	u8 *pftie = NULL, *prsnie, *ppairwise_cipher;
 	u8 i, k;
 	u8 ccmp_included = 0, rsnie_included = 0;
 	u16 j, pairwise_count;
@@ -1946,6 +1946,7 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 			case _VENDOR_SPECIFIC_IE_:
 				break;
 			case _FTIE_:
+				pftie = (u8 *)pIE;
 				if (prx_pkt_attrib->encrypt)
 					_rtw_memcpy(SNonce, (ptr + j + 52), 32);
 				break;
@@ -1999,7 +2000,10 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 
 		ptdls_sta->tdls_sta_state |= TDLS_INITIATOR_STATE;
 		if (prx_pkt_attrib->encrypt) {
-			_rtw_memcpy(ptdls_sta->SNonce, SNonce, 32);
+			if (pftie == NULL)
+				RTW_WARN("%s: SNonce is null\n", __func__);
+			else
+				_rtw_memcpy(ptdls_sta->SNonce, SNonce, 32);
 
 			if (timeout_interval <= 300)
 				ptdls_sta->TDLS_PeerKey_Lifetime = TDLS_TPK_RESEND_COUNT;
@@ -2165,7 +2169,11 @@ int On_TDLS_Setup_Rsp(_adapter *padapter, union recv_frame *precv_frame, struct 
 
 	ptdls_sta->bssratelen = supportRateNum;
 	_rtw_memcpy(ptdls_sta->bssrateset, supportRate, supportRateNum);
-	_rtw_memcpy(ptdls_sta->ANonce, ANonce, 32);
+
+	if (pftie == NULL)
+		RTW_WARN("%s: ANonce is null\n", __func__);
+	else
+		_rtw_memcpy(ptdls_sta->ANonce, ANonce, 32);
 
 #ifdef CONFIG_WFD
 	rtw_tdls_process_wfd_ie(ptdlsinfo, ptr + FIXED_IE, parsing_length);

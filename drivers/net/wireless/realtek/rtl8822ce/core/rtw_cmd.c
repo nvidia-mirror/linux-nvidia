@@ -1434,13 +1434,18 @@ u8 rtw_setstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 key_type, bool
 	else
 		GET_ENCRY_ALGO(psecuritypriv, sta, psetstakey_para->algorithm, _FALSE);
 
-#ifdef CONFIG_TDLS
-	/* TDLS_KEY doesn't support 256-bit key length yet */
-	if (key_type != TDLS_KEY)
-#endif
+	if ((psetstakey_para->algorithm == _GCMP_256_) || (psetstakey_para->algorithm == _CCMP_256_))
 	{
-		if ((psetstakey_para->algorithm == _GCMP_256_) || (psetstakey_para->algorithm == _CCMP_256_))
-			key_len = 32;
+#ifdef CONFIG_TDLS
+		/* TDLS_KEY doesn't support 256-bit key length yet */
+		if (key_type == TDLS_KEY) {
+			RTW_WARN("%s: not support 256-bit key length if TDLS\n", __func__);
+			rtw_mfree((u8 *) psetstakey_para, sizeof(struct set_stakey_parm));
+			res = _FAIL;
+			goto exit;
+		}
+#endif
+		key_len = 32;
 	}
 
 	if (key_type == GROUP_KEY) {

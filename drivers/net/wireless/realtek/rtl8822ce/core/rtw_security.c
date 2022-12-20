@@ -1631,8 +1631,8 @@ u32 rtw_aes_encrypt(_adapter *padapter, u8 *pxmitframe)
 	pframe = ((struct xmit_frame *)pxmitframe)->buf_addr + hw_hdr_offset;
 
 	/* start to encrypt each fragment */
-	if ((pattrib->encrypt == _AES_) ||
-	    (pattrib->encrypt == _CCMP_256_)) {
+	if ((pattrib->encrypt == _CCMP_256_) ||
+	    (pattrib->encrypt == _AES_) ) {
 
 		if (IS_MCAST(pattrib->ra))
 			prwskey = psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey;
@@ -1647,6 +1647,10 @@ u32 rtw_aes_encrypt(_adapter *padapter, u8 *pxmitframe)
 			ptdls_sta = rtw_get_stainfo(&padapter->stapriv, &pattrib->dst[0]);
 			if ((ptdls_sta != NULL) && (ptdls_sta->tdls_sta_state & TDLS_LINKED_STATE)) {
 				RTW_INFO("[%s] for tdls link\n", __FUNCTION__);
+				if (pattrib->encrypt == _CCMP_256_) {
+					RTW_WARN("%s: not support 256-bit key length if TDLS\n", __func__);
+					return _FAIL;
+				}
 				prwskey = &ptdls_sta->tpk.tk[0];
 			}
 		}

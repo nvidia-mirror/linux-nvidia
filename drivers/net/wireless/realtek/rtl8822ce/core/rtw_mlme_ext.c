@@ -266,6 +266,7 @@ void rtw_txpwr_init_regd(struct rf_ctl_t *rfctl)
 		);
 		if (rfctl->regd_name)
 			break;
+		fallthrough;
 	default:
 		rfctl->regd_name = regd_str(TXPWR_LMT_WW);
 		RTW_PRINT("assign %s for default case\n", regd_str(TXPWR_LMT_WW));
@@ -10416,7 +10417,7 @@ static int issue_action_ba(_adapter *padapter, unsigned char *raddr, unsigned ch
 	u16	start_seq;
 	u16	BA_para_set;
 	u16	BA_timeout_value;
-	u16	BA_starting_seqctrl;
+	u16	BA_starting_seqctrl = 0;
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
 	u8					*pframe;
@@ -15716,7 +15717,7 @@ operation_by_state:
 
 #ifdef CONFIG_SCAN_BACKOP
 	case SCAN_BACKING_OP: {
-		u8 back_ch, back_bw, back_ch_offset;
+		u8 back_ch = 0, back_bw = 0, back_ch_offset = 0;
 		u8 need_ch_setting_union = _TRUE;
 
 #ifdef CONFIG_MCC_MODE
@@ -16041,7 +16042,9 @@ u8 setkey_hdl(_adapter *padapter, u8 *pbuf)
 
 	if (amsdu_spp_enable(padapter, pparm->algorithm) == _SUCCESS)
 		ctrl |= BIT(7);
-	write_cam(padapter, cam_id, ctrl, addr, pparm->key);
+
+	write_cam(padapter, cam_id, ctrl, addr, pparm->key,
+		pparm->algorithm & _SEC_TYPE_256_);
 
 	/* if ((cam_id > 3) && (((pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE) || ((pmlmeinfo->state&0x03) == WIFI_FW_ADHOC_STATE)))*/
 #ifndef SEC_DEFAULT_KEY_SEARCH
@@ -16189,7 +16192,10 @@ write_to_cam:
 		}
 		if (amsdu_spp_enable(padapter, pparm->algorithm) == _SUCCESS)
 			ctrl |= BIT(7);
-		write_cam(padapter, cam_id, ctrl, pparm->addr, pparm->key);
+
+		write_cam(padapter, cam_id, ctrl, pparm->addr, pparm->key,
+			pparm->algorithm & _SEC_TYPE_256_);
+
 		if (!(pparm->gk))
 			ATOMIC_INC(&psta->keytrack);	/*CVE-2020-24587*/
 	}

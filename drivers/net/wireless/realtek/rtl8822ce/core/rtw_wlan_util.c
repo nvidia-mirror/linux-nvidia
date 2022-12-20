@@ -788,7 +788,7 @@ void _clear_cam_entry(_adapter *padapter, u8 entry)
 	rtw_sec_write_cam_ent(padapter, entry, 0, null_sta, null_key);
 }
 
-inline void _write_cam(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key)
+static void _write_cam(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key)
 {
 #ifdef CONFIG_WRITE_CACHE_ONLY
 	write_cam_cache(adapter, id , ctrl, mac, key);
@@ -798,9 +798,9 @@ inline void _write_cam(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key)
 #endif
 }
 
-inline void write_cam(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key)
+void write_cam(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key, bool ext)
 {
-	if (ctrl & BIT(9)) {
+	if (ext) {
 		_write_cam(adapter, id, ctrl, mac, key);
 		_write_cam(adapter, (id + 1), ctrl | BIT(5), mac, (key + 16));
 		RTW_INFO_DUMP("key-0: ", key, 16);
@@ -1389,12 +1389,12 @@ inline void rtw_sec_cam_swap(_adapter *adapter, u8 cam_id_a, u8 cam_id_b)
 
 	/*setp-3. set cam_info*/
 	if (cam_a_used) {
-		write_cam(adapter, cam_id_b, cache_a.ctrl, cache_a.mac, cache_a.key);
+		_write_cam(adapter, cam_id_b, cache_a.ctrl, cache_a.mac, cache_a.key);
 		rtw_camid_set(adapter, cam_id_b);
 	}
 
 	if (cam_b_used) {
-		write_cam(adapter, cam_id_a, cache_b.ctrl, cache_b.mac, cache_b.key);
+		_write_cam(adapter, cam_id_a, cache_b.ctrl, cache_b.mac, cache_b.key);
 		rtw_camid_set(adapter, cam_id_a);
 	}
 }

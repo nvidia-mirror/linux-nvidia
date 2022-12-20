@@ -704,8 +704,10 @@ int rtw_mp_txpower(struct net_device *dev,
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
 
+	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
+	input[sizeof(input) - 1] = 0;
 
 	MsetPower = strncmp(input, "off", 3);
 	if (MsetPower == 0) {
@@ -1892,23 +1894,29 @@ int rtw_mp_set_tsside(struct net_device *dev,
 		sprintf(extra, "Set TSSI DE path_A: %d", tsside_a);
 		halrf_tssi_set_de_for_tx_verify(pDM_Odm, tsside_a, RF_PATH_A);
 		mpt_trigger_tssi_tracking(padapter, RF_PATH_A);
-
-	} else if (sscanf(input, "pathb=%d", &tsside_b) == 1) {
+	}
+	else if (sscanf(input, "pathb=%d", &tsside_b) == 1) {
 		sprintf(extra, "Set TSSI DE path_B: %d", tsside_b);
 		halrf_tssi_set_de_for_tx_verify(pDM_Odm, tsside_b, RF_PATH_B);
 		mpt_trigger_tssi_tracking(padapter, RF_PATH_B);
-
-	} else if (sscanf(input, "pathc=%d", &tsside_c) == 1) {
+	}
+#if defined(PHYDM_COMPILE_ABOVE_3SS)
+	else if (sscanf(input, "pathc=%d", &tsside_c) == 1) {
 		sprintf(extra, "Set TSSI DE path_C: %d", tsside_c);
 		halrf_tssi_set_de_for_tx_verify(pDM_Odm, tsside_c, RF_PATH_C);
 		mpt_trigger_tssi_tracking(padapter, RF_PATH_C);
 
-	} else if (sscanf(input, "pathd=%d", &tsside_d) == 1) {
+	}
+#endif
+#if defined(PHYDM_COMPILE_ABOVE_4SS)
+	else if (sscanf(input, "pathd=%d", &tsside_d) == 1) {
 		sprintf(extra, "Set TSSI DE path_D: %d", tsside_d);
 		halrf_tssi_set_de_for_tx_verify(pDM_Odm, tsside_d, RF_PATH_D);
 		mpt_trigger_tssi_tracking(padapter, RF_PATH_D);
 
-	} else
+	}
+#endif
+	else
 		sprintf(extra, "Invalid command format, please input TSSI DE value within patha/b/c/d=xyz");
 
 	wrqu->length = strlen(extra);

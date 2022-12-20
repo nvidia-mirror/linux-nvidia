@@ -284,7 +284,7 @@ u8 WapiWriteOneCamEntry(
 			usConfig |= (0x01 << 5);
 	}
 
-	write_cam(padapter, EntryId, usConfig, pMacAddr, pKey);
+	write_cam(padapter, EntryId, usConfig, pMacAddr, pKey, false);
 
 	WAPI_TRACE(WAPI_API, "===========> %s\n", __FUNCTION__);
 	return 1;

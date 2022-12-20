@@ -683,7 +683,7 @@ void rtw_clean_dk_section(_adapter *adapter);
 void rtw_clean_hw_dk_cam(_adapter *adapter);
 
 /* modify both HW and cache */
-void write_cam(_adapter *padapter, u8 id, u16 ctrl, u8 *mac, u8 *key);
+void write_cam(_adapter *padapter, u8 id, u16 ctrl, u8 *mac, u8 *key, bool ext);
 void clear_cam_entry(_adapter *padapter, u8 id);
 
 /* modify cache only */

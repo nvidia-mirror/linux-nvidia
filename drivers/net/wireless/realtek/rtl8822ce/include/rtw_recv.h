@@ -759,6 +759,7 @@ __inline static u8 *recvframe_pull_tail(union recv_frame *precvframe, sint sz)
 
 }
 
+#if 0
 __inline static union recv_frame *rxmem_to_recvframe(u8 *rxmem)
 {
 	/* due to the design of 2048 bytes alignment of recv_frame, we can reference the union recv_frame */
@@ -798,6 +799,7 @@ __inline static u8 *pkt_to_recvdata(_pkt *pkt)
 	return	precv_frame->u.hdr.rx_data;
 
 }
+#endif
 
 
 __inline static sint get_recvframe_len(union recv_frame *precvframe)

@@ -565,7 +565,7 @@ void rtw_get_adapter_tx_rate_bmp(_adapter *adapter, u16 r_bmp_cck_ofdm[], u32 r_
 			bmp_vht |= tmp_vht;
 		}
 		if (bw == CHANNEL_WIDTH_20)
-			r_bmp_cck_ofdm[bw] = bmp_cck_ofdm;
+			r_bmp_cck_ofdm[0] = bmp_cck_ofdm;
 		if (bw <= CHANNEL_WIDTH_40)
 			r_bmp_ht[bw] = bmp_ht;
 		if (bw <= CHANNEL_WIDTH_160)

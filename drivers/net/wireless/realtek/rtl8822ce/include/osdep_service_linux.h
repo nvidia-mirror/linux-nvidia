@@ -550,5 +550,22 @@ extern struct net_device *rtw_alloc_etherdev(int sizeof_priv);
 
 #define STRUCT_PACKED __attribute__ ((packed))
 
+#ifndef fallthrough
+#if __GNUC__ >= 5 || defined(__clang__)
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+#if __has_attribute(__fallthrough__)
+#define fallthrough __attribute__((__fallthrough__))
+#endif
+#endif
+#ifndef fallthrough
+#define fallthrough do {} while (0) /* fallthrough */
+#endif
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+#define dev_addr_mod(dev, offset, addr, len) _rtw_memcpy(&dev->dev_addr[offset], addr, len)
+#endif
 
 #endif /* __OSDEP_LINUX_SERVICE_H_ */

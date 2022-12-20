@@ -2447,7 +2447,6 @@ static void rtw_btc_action_bt_hid(struct btc_coexist *btc)
 				slot_type = TDMA_4SLOT;
 				table_case = 32;
 				tdma_case = 27;
-				is_toggle_table = TRUE;
 			} else if (coex_sta->bt_ble_hid_exist &&
 				   coex_sta->wl_gl_busy) {
 				table_case = 32;
