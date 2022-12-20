@@ -30,6 +30,7 @@
 #include <linux/workqueue.h>
 #include <linux/of_device.h>
 #include <linux/of.h>
+#include <linux/version.h>
 
 // Target I2C register address
 #define TI_TARGET_ID_0                      0x70
@@ -1020,14 +1021,20 @@ static int ti_fpdlink_dp_ser_probe(struct i2c_client *client)
 	return ret;
 }
 
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+static void ti_fpdlink_dp_ser_remove(struct i2c_client *client)
+#else
 static int ti_fpdlink_dp_ser_remove(struct i2c_client *client)
+#endif
 {
 	struct ti_fpdlink_dp_ser_priv *priv = i2c_get_clientdata(client);
 
 	i2c_unregister_device(client);
 	gpiod_set_value_cansleep(priv->gpiod_pwrdn, 0);
 
+#if KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE
 	return 0;
+#endif
 }
 
 static const struct of_device_id ti_fpdlink_dp_ser_dt_ids[] = {
