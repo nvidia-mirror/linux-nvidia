@@ -2,7 +2,7 @@
 /*
  * MAXIM DP Serializer driver for MAXIM GMSL Serializers
  *
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #include <linux/device.h>
@@ -21,6 +21,12 @@
 #include <linux/of_device.h>
 #include <linux/of.h>
 #include <linux/version.h>
+
+#define MAX_GMSL_DP_SER_REG_4			0x4
+#define MAX_GMSL_DP_SER_REG_4_GMSL_A		(1 << 6)
+#define MAX_GMSL_DP_SER_REG_4_GMSL_A_PAM4_VAL	(1 << 6)
+#define MAX_GMSL_DP_SER_REG_4_GMSL_B		(1 << 7)
+#define MAX_GMSL_DP_SER_REG_4_GMSL_B_PAM4_VAL	(1 << 7)
 
 #define MAX_GMSL_DP_SER_REG_13			0xD
 
@@ -48,6 +54,13 @@
 #define MAX_GMSL_DP_SER_LINK_CTRL_PHY_A		0x29
 #define MAX_GMSL_DP_SER_LINK_CTRL_A_MASK	(1 << 0)
 
+#define MAX_GMSL_DP_SER_LCTRL0_A			0x28
+#define MAX_GMSL_DP_SER_LCTRL0_B			0x32
+#define MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK		(3 << 2)
+#define MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_3GBPS	0x4
+#define MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_6GBPS	0x8
+#define MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS	0xC
+
 #define MAX_GMSL_DP_SER_LCTRL2_A		0x2A
 #define MAX_GMSL_DP_SER_LCTRL2_B		0x34
 #define MAX_GMSL_DP_SER_LCTRL2_LOCK_MASK	(1 << 0)
@@ -55,6 +68,11 @@
 
 #define MAX_GMSL_DP_SER_LINK_CTRL_PHY_B		0x33
 #define MAX_GMSL_DP_SER_LINK_CTRL_B_MASK	(1 << 0)
+
+#define MAX_GMSL_DP_SER_TX0_LINK_A	0x50
+#define MAX_GMSL_DP_SER_TX0_LINK_B	0x60
+#define MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK		(1 << 1)
+#define MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL		0x2
 
 #define MAX_GMSL_DP_SER_VID_TX_X		0x100
 #define MAX_GMSL_DP_SER_VID_TX_Y		0x110
@@ -141,6 +159,8 @@ struct max_gmsl_dp_ser_priv {
 	int ser_errb;
 	unsigned int ser_irq;
 	bool enable_mst;
+	bool enable_gmsl3;
+	bool enable_gmsl_fec;
 	u32 mst_payload_ids[MAX_GMSL_ARRAY_SIZE];
 	u32 gmsl_stream_ids[MAX_GMSL_ARRAY_SIZE];
 	u32 gmsl_link_select[MAX_GMSL_ARRAY_SIZE];
@@ -266,6 +286,41 @@ static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_I2C_SPEED_CAPABILITY,
 			       MAX_GMSL_DP_SER_I2C_SPEED_CAPABILITY_MASK,
 			       MAX_GMSL_DP_SER_I2C_SPEED_CAPABILITY_100KBPS);
+
+	if (priv->enable_gmsl_fec || priv->enable_gmsl3) {
+		if (priv->link_a_is_enabled) {
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_TX0_LINK_A,
+							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK,
+							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL);
+		}
+		if (priv->link_b_is_enabled) {
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_TX0_LINK_B,
+							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK,
+							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL);
+		}
+	}
+
+	if (priv->enable_gmsl3) {
+		if (priv->link_a_is_enabled) {
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LCTRL0_A,
+							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK,
+							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS);
+
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_REG_4,
+							MAX_GMSL_DP_SER_REG_4_GMSL_A,
+							MAX_GMSL_DP_SER_REG_4_GMSL_A_PAM4_VAL);
+		}
+
+		if (priv->link_b_is_enabled) {
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LCTRL0_B,
+							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK,
+							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS);
+
+			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_REG_4,
+							MAX_GMSL_DP_SER_REG_4_GMSL_B,
+							MAX_GMSL_DP_SER_REG_4_GMSL_B_PAM4_VAL);
+		}
+	}
 
 	if (priv->enable_mst)
 		max_gmsl_dp_ser_mst_setup(priv);
@@ -485,9 +540,23 @@ static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
 	priv->enable_mst = of_property_read_bool(ser,
 						 "enable-mst");
 	if (priv->enable_mst)
-		dev_info(dev, "%s: MST mode enabled:\n", __func__);
+		dev_info(dev, "%s: MST mode enabled\n", __func__);
 	else
-		dev_info(dev, "%s: MST mode not enabled:\n", __func__);
+		dev_info(dev, "%s: MST mode not enabled\n", __func__);
+
+	priv->enable_gmsl3 = of_property_read_bool(ser,
+						 "enable-gmsl3");
+	if (priv->enable_gmsl3)
+		dev_info(dev, "%s: GMSL3 mode enabled\n", __func__);
+	else
+		dev_info(dev, "%s: GMSL3 mode not enabled\n", __func__);
+
+	priv->enable_gmsl_fec = of_property_read_bool(ser,
+						 "enable-gmsl-fec");
+	if (priv->enable_gmsl_fec)
+		dev_info(dev, "%s: GMSL FEC enabled\n", __func__);
+	else
+		dev_info(dev, "%s: GMSL FEC not enabled\n", __func__);
 
 	if (priv->enable_mst) {
 		err = of_property_read_variable_u32_array(ser,
