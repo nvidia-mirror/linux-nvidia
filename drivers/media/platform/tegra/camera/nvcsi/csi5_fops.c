@@ -1,7 +1,7 @@
 /*
  * Tegra CSI5 device common APIs
  *
- * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Frank Chen <frankc@nvidia.com>
  *
@@ -217,7 +217,8 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	struct CAPTURE_CONTROL_MSG msg;
 	struct nvcsi_brick_config brick_config;
 	struct nvcsi_cil_config cil_config;
-	bool is_cphy = (csi_lanes == 3);
+	u32 phy_mode = read_phy_mode_from_dt(chan);
+	bool is_cphy = (phy_mode == CSI_PHY_MODE_CPHY);
 	dev_dbg(csi->dev, "%s: stream_id=%u, csi_port=%u\n",
 		__func__, stream_id, csi_port);
 
