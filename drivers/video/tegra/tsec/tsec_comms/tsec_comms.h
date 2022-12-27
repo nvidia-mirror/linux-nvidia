@@ -2,7 +2,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -93,9 +93,31 @@ int tsec_comms_send_cmd(void *cmd, u32 queue_id,
  *
  * params[in]: page_number  page number
  * params[in/out]: gscco_offset filled with offset of the allocated co page
- * params[out]: ccplex va for the co page
+ * params[out]: return value - ccplex va for the co page or NULL if
+ * page_number more than number of available pages
  */
 void *tsec_comms_get_gscco_page(u32 page_number, u32 *gscco_offset);
+
+
+/* @brief: Allocates memory from carveout
+ *
+ * usage: Called to allocate memory from the carveout.
+ *
+ * params[in]: size_in_bytes conveys the required size (must be less
+ * than page size)
+ * params[in/out]: gscco_offset filled with offset of the allocated co memory
+ * params[out]: return value - ccplex va for the co memory or NULL if
+ * allocation failure
+ */
+void *tsec_comms_alloc_mem_from_gscco(u32 size_in_bytes, u32 *gscco_offset);
+
+/* @brief: Free the memory previously allocated using
+ *         tsec_comms_alloc_mem_from_gscco
+ *
+ * params[in]: page_va previously allocated using
+ *             tsec_comms_alloc_mem_from_gscco
+ */
+void tsec_comms_free_gscco_mem(void *page_va);
 
 /* -------- END -------- */
 

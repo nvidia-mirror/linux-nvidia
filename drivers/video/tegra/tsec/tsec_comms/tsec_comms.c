@@ -2,7 +2,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -44,6 +44,7 @@ static u64 s_ipc_gscco_size;
 static u64 s_ipc_gscco_page_base;
 static u64 s_ipc_gscco_page_size;
 static u64 s_ipc_gscco_page_count;
+static u64 s_ipc_gscco_free_page_mask;
 struct TSEC_BOOT_INFO {
 	u32 bootFlag;
 };
@@ -413,6 +414,7 @@ void tsec_comms_initialize(u64 ipc_co_va, u64 ipc_co_va_size)
 	}
 	s_ipc_gscco_page_base = s_ipc_gscco_page_count ?
 		s_ipc_gscco_base + s_ipc_gscco_page_size : 0;
+	s_ipc_gscco_free_page_mask = ~((u64)0);
 #else
 	(void)ipc_co_va;
 	(void)ipc_co_va_size;
@@ -445,6 +447,67 @@ void *tsec_comms_get_gscco_page(u32 page_number, u32 *gscco_offset)
 #endif
 }
 EXPORT_SYMBOL_COMMS(tsec_comms_get_gscco_page);
+
+void *tsec_comms_alloc_mem_from_gscco(u32 size_in_bytes, u32 *gscco_offset)
+{
+#ifdef DO_IPC_OVER_GSC_CO
+	void *page_va;
+	u32 page_number;
+	u64 mask;
+
+	/* memory allocated must fit within 1 page */
+	if (size_in_bytes > s_ipc_gscco_page_size) {
+		plat_print(LVL_ERR,
+			"%s: size %d is larger than page size\n",
+			__func__, size_in_bytes);
+		return NULL;
+	}
+	/* there must be atleast 1 page free */
+	if (s_ipc_gscco_free_page_mask == 0) {
+		plat_print(LVL_ERR,
+			"%s: No free page\n", __func__);
+		return NULL;
+	}
+
+	/* find a free page */
+	page_number = 0;
+	mask = 0x1;
+	while (!(s_ipc_gscco_free_page_mask & mask)) {
+		mask       <<= 1;
+		page_number += 1;
+	}
+
+	/* allocate page */
+	page_va = tsec_comms_get_gscco_page(page_number, gscco_offset);
+	if (page_va)
+		s_ipc_gscco_free_page_mask &= ~(mask);
+
+	return page_va;
+#else
+	plat_print(LVL_ERR, "%s: IPC over GSC-CO not enabled\n", __func__);
+	return NULL;
+#endif
+}
+EXPORT_SYMBOL_COMMS(tsec_comms_alloc_mem_from_gscco);
+
+void tsec_comms_free_gscco_mem(void *page_va)
+{
+#ifdef DO_IPC_OVER_GSC_CO
+	u64 page_addr = (u64)page_va;
+	u64 gscco_page_start = s_ipc_gscco_page_base;
+	u64 gscco_page_end = s_ipc_gscco_page_base +
+		(s_ipc_gscco_page_count * s_ipc_gscco_page_size);
+	u64 page_number = (page_addr - gscco_page_start) /
+		s_ipc_gscco_page_size;
+
+	if ((page_addr >= gscco_page_start) &&
+	    (page_addr < gscco_page_end) &&
+	    (!(page_addr % s_ipc_gscco_page_size)))
+		s_ipc_gscco_free_page_mask |= ((u64)0x1 << page_number);
+#endif
+}
+EXPORT_SYMBOL_COMMS(tsec_comms_free_gscco_mem);
+
 
 int tsec_comms_send_cmd(void *cmd, u32 queue_id,
 	callback_func_t cb_func, void *cb_ctx)
