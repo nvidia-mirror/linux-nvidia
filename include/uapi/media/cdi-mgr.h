@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -34,6 +34,8 @@
 #define CDI_MGR_IOCTL_GET_EXT_PWR_CTRL	    _IOR('o', 12, __u8)
 #define CDI_MGR_IOCTL_ENABLE_ERROR_REPORT	_IO('o', 13)
 #define CDI_MGR_IOCTL_GET_PWR_INFO	    _IOW('o', 14, struct cdi_mgr_pwr_ctrl_info)
+#define CDI_MGR_IOCTL_ENABLE_DES_POWER	_IO('o', 15)
+#define CDI_MGR_IOCTL_DISABLE_DES_POWER	_IO('o', 16)
 
 #define CDI_MGR_POWER_ALL	5
 #define MAX_CDI_NAME_LENGTH	32

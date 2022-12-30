@@ -1,7 +1,7 @@
 /*
  * cdi manager.
  *
- * Copyright (c) 2015-2022, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2015-2023, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -61,6 +61,8 @@
 #define CDI_DEV_MAX	128
 
 #define TIMEOUT_US 2000000 /* 2 seconds */
+
+static struct semaphore tca9539_sem;
 
 /* CDI Dev Debugfs functions
  *
@@ -723,6 +725,48 @@ static int cdi_mgr_wait_err(
 	return err;
 }
 
+static int cdi_mgr_des_power(
+	struct cdi_mgr_priv *cdi_mgr, bool enable)
+{
+	u8 val;
+
+	/* if runtime_pwrctrl_off is not true, power on all here */
+	if (!cdi_mgr->pdata->runtime_pwrctrl_off)
+		cdi_mgr_power_up(cdi_mgr, 0xffffffff);
+
+	cdi_mgr_mcdi_ctrl(cdi_mgr, enable);
+
+	if (cdi_mgr->tca9539.enable) {
+		if (down_timeout(&tca9539_sem,
+			usecs_to_jiffies(TIMEOUT_US)) != 0)
+			dev_err(cdi_mgr->dev,
+				"%s: failed to wait for the semaphore\n",
+				__func__);
+		if (cdi_mgr->cim_ver == 1U) { /* P3714 A01 */
+			if (tca9539_rd(cdi_mgr, 0x02, &val) != 0)
+				return -EFAULT;
+			if (enable)
+				val |= (0x10 << cdi_mgr->tca9539.power_port);
+			else
+				val &= ~(0x10 << cdi_mgr->tca9539.power_port);
+			if (tca9539_wr(cdi_mgr, 0x02, val) != 0)
+				return -EFAULT;
+		} else if (cdi_mgr->cim_ver == 2U) { /* P3714 A02 */
+			if (tca9539_rd(cdi_mgr, 0x03, &val) != 0)
+				return -EFAULT;
+			if (enable)
+				val |= (0x1 << cdi_mgr->tca9539.power_port);
+			else
+				val &= ~(0x1 << cdi_mgr->tca9539.power_port);
+			if (tca9539_wr(cdi_mgr, 0x03, val) != 0)
+				return -EFAULT;
+		}
+		up(&tca9539_sem);
+	}
+
+	return 0;
+}
+
 static long cdi_mgr_ioctl(
 	struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -805,6 +849,12 @@ static long cdi_mgr_ioctl(
 	case CDI_MGR_IOCTL_GET_PWR_INFO:
 		err = cdi_mgr_get_pwr_ctrl_info(cdi_mgr, (void __user *)arg);
 		break;
+	case CDI_MGR_IOCTL_ENABLE_DES_POWER:
+		err = cdi_mgr_des_power(cdi_mgr, true);
+		break;
+	case CDI_MGR_IOCTL_DISABLE_DES_POWER:
+		err = cdi_mgr_des_power(cdi_mgr, false);
+		break;
 	default:
 		dev_err(cdi_mgr->pdev, "%s unsupported ioctl: %x\n",
 			__func__, cmd);
@@ -817,11 +867,8 @@ static long cdi_mgr_ioctl(
 	return err;
 }
 
-static struct semaphore tca9539_sem;
-
 static int cdi_mgr_open(struct inode *inode, struct file *file)
 {
-	u8 val;
 	struct cdi_mgr_priv *cdi_mgr = container_of(inode->i_cdev,
 					struct cdi_mgr_priv, cdev);
 
@@ -833,34 +880,6 @@ static int cdi_mgr_open(struct inode *inode, struct file *file)
 
 	dev_dbg(cdi_mgr->pdev, "%s\n", __func__);
 	file->private_data = cdi_mgr;
-
-	/* if runtime_pwrctrl_off is not true, power on all here */
-	if (!cdi_mgr->pdata->runtime_pwrctrl_off)
-		cdi_mgr_power_up(cdi_mgr, 0xffffffff);
-
-	cdi_mgr_mcdi_ctrl(cdi_mgr, true);
-
-	if (cdi_mgr->tca9539.enable) {
-		if (down_timeout(&tca9539_sem,
-			usecs_to_jiffies(TIMEOUT_US)) != 0)
-			dev_err(cdi_mgr->dev,
-				"%s: failed to wait for the semaphore\n",
-				__func__);
-		if (cdi_mgr->cim_ver == 1U) { /* P3714 A01 */
-			if (tca9539_rd(cdi_mgr, 0x02, &val) != 0)
-				return -EFAULT;
-			val |= (0x10 << cdi_mgr->tca9539.power_port);
-			if (tca9539_wr(cdi_mgr, 0x02, val) != 0)
-				return -EFAULT;
-		} else if (cdi_mgr->cim_ver == 2U) { /* P3714 A02 */
-			if (tca9539_rd(cdi_mgr, 0x03, &val) != 0)
-				return -EFAULT;
-			val |= (0x1 << cdi_mgr->tca9539.power_port);
-			if (tca9539_wr(cdi_mgr, 0x03, val) != 0)
-				return -EFAULT;
-		}
-		up(&tca9539_sem);
-	}
 
 	return 0;
 }
