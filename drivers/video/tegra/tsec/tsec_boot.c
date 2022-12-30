@@ -2,7 +2,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,6 +24,7 @@
 #include "tsec_regs.h"
 #include "tsec_cmds.h"
 #include "tsec_comms/tsec_comms.h"
+#include "tsec_comms/tsec_comms_plat.h"
 
 #define CMD_INTERFACE_TEST 0
 #if CMD_INTERFACE_TEST
@@ -61,7 +62,7 @@ struct carveout_info {
  * Platform specific APIs to be used by platform independent comms library
  */
 
-DEFINE_MUTEX(s_plat_comms_mutex);
+static DEFINE_MUTEX(s_plat_comms_mutex);
 
 void tsec_plat_acquire_comms_mutex(void)
 {
@@ -126,9 +127,9 @@ static int tsec_compute_ucode_offsets(struct platform_device *dev,
 	struct RM_RISCV_UCODE_DESC *ucode_desc;
 
 	ucode_desc = (struct RM_RISCV_UCODE_DESC *)fw_desc->data;
-	rv_data->desc.manifest_offset = le32_to_cpu(ucode_desc->manifestOffset);
-	rv_data->desc.code_offset = le32_to_cpu(ucode_desc->monitorCodeOffset);
-	rv_data->desc.data_offset = le32_to_cpu(ucode_desc->monitorDataOffset);
+	rv_data->desc.manifest_offset = le32_to_cpu((__force __le32)ucode_desc->manifestOffset);
+	rv_data->desc.code_offset = le32_to_cpu((__force __le32)ucode_desc->monitorCodeOffset);
+	rv_data->desc.data_offset = le32_to_cpu((__force __le32)ucode_desc->monitorDataOffset);
 
 	return 0;
 }
@@ -394,7 +395,7 @@ int tsec_finalize_poweron(struct platform_device *dev)
 		goto clean_up;
 	}
 	dev_dbg(&dev->dev, "IPCCO va=0x%llx pa=0x%llx\n",
-		(phys_addr_t)(ipc_co_va), page_to_phys(vmalloc_to_page(ipc_co_va)));
+		(__force phys_addr_t)(ipc_co_va), page_to_phys(vmalloc_to_page(ipc_co_va)));
 #if (KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE)
 	ipc_co_iova = dma_map_page_attrs(&dev->dev, vmalloc_to_page(ipc_co_va),
 		offset_in_page(ipc_co_va), ipc_co_info.size, DMA_BIDIRECTIONAL, 0);
@@ -505,7 +506,7 @@ int tsec_finalize_poweron(struct platform_device *dev)
 	 */
 	tsec_writel(pdata, tsec_riscv_irqmclr_r(), tsec_riscv_irqmclr_swgen1_set_f());
 	/* initialise the comms library before enabling msg interrupt */
-	tsec_comms_initialize((u64)ipc_co_va, ipc_co_info.size);
+	tsec_comms_initialize((__force u64)ipc_co_va, ipc_co_info.size);
 	/* enable message interrupt from tsec to ccplex */
 	enable_irq(pdata->irq);
 

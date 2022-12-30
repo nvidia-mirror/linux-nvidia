@@ -23,13 +23,13 @@
  * TSEC Device Data
  */
 
-struct tsec_device_data t23x_tsec_data = {
+static struct tsec_device_data t23x_tsec_data = {
 	.rate = {192000000, 0, 204000000},
 	.riscv_desc_bin		= "tegra23x/nvhost_tsec_desc.fw",
 	.riscv_image_bin	= "tegra23x/nvhost_tsec_riscv.fw",
 };
 
-struct tsec_device_data t239_tsec_data = {
+static struct tsec_device_data t239_tsec_data = {
 	.rate = {192000000, 0, 204000000},
 	.riscv_desc_bin		= "tegra239/nvhost_tsec_desc.fw",
 	.riscv_image_bin	= "tegra239/nvhost_tsec_riscv.fw",
@@ -259,7 +259,7 @@ static int tsec_module_init(struct platform_device *dev)
 }
 
 
-const struct dev_pm_ops tsec_module_pm_ops = {
+const static struct dev_pm_ops tsec_module_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(tsec_module_suspend, tsec_module_resume)
 };
 
@@ -303,7 +303,7 @@ static int tsec_remove(struct platform_device *dev)
 	return tsec_poweroff(&dev->dev);
 }
 
-struct platform_driver tsec_driver = {
+static struct platform_driver tsec_driver = {
 	.probe = tsec_probe,
 	.remove = tsec_remove,
 	.driver = {
