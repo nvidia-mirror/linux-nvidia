@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -47,6 +47,7 @@
 #endif
 #include "tegra_vblk.h"
 
+#define UFS_IOCTL_MAX_SIZE_SUPPORTED	0x80000
 #if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
 #define HSI_SDMMC4_REPORT_ID		0x805EU
 #define HSI_ERROR_MAGIC			0xDEADDEAD
@@ -901,6 +902,7 @@ static void setup_device(struct vblk_dev *vblkdev)
 	uint32_t max_requests;
 	uint32_t max_ioctl_requests;
 	struct vsc_request *req;
+	struct tegra_hv_ivm_cookie *ivmk;
 #if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
 	int err;
 #endif
@@ -948,15 +950,49 @@ static void setup_device(struct vblk_dev *vblkdev)
 		return;
 	}
 
+	/* reserve mempool for eMMC device and for ufs device
+	 * with pass through support
+	 */
+	if ((vblkdev->config.blk_config.use_vm_address == 1U
+				&& vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F)
+				|| vblkdev->config.blk_config.use_vm_address == 0U) {
+		if (of_property_read_u32_index(vblkdev->device->of_node, "mempool", 0,
+			&(vblkdev->ivm_id))) {
+			dev_err(vblkdev->device, "Failed to read mempool property\n");
+			return;
+		}
+
+		ivmk = tegra_hv_mempool_reserve(vblkdev->ivm_id);
+		if (IS_ERR_OR_NULL(ivmk)) {
+			dev_err(vblkdev->device, "Failed to reserve IVM channel %d\n",
+				vblkdev->ivm_id);
+			ivmk = NULL;
+			return;
+		}
+		vblkdev->ivmk = ivmk;
+
+		vblkdev->shared_buffer = devm_memremap(vblkdev->device,
+				ivmk->ipa, ivmk->size, MEMREMAP_WB);
+		if (IS_ERR_OR_NULL(vblkdev->shared_buffer)) {
+			dev_err(vblkdev->device, "Failed to map mempool area %d\n",
+					vblkdev->ivm_id);
+			tegra_hv_mempool_unreserve(vblkdev->ivmk);
+			return;
+		}
+	}
+
 	/* If IOVA feature is enabled for virt partition, then set max_requests
 	 * to number of IVC frames. Since IOCTL's still use mempool, set
 	 * max_ioctl_requests based on mempool.
 	 */
 	if (vblkdev->config.blk_config.use_vm_address == 1U) {
 		max_requests = vblkdev->ivck->nframes;
-		max_ioctl_requests = ((vblkdev->ivmk->size) / max_io_bytes);
-		if (max_ioctl_requests > MAX_VSC_REQS)
-			max_ioctl_requests = MAX_VSC_REQS;
+		/* set max_ioctl_requests if pass through is supported */
+		if (vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F) {
+			max_ioctl_requests = ((vblkdev->ivmk->size) / UFS_IOCTL_MAX_SIZE_SUPPORTED);
+			if (max_ioctl_requests > MAX_VSC_REQS)
+				max_ioctl_requests = MAX_VSC_REQS;
+		}
 	} else {
 		max_requests = ((vblkdev->ivmk->size) / max_io_bytes);
 		max_ioctl_requests = max_requests;
@@ -1181,7 +1217,6 @@ static int tegra_hv_vblk_probe(struct platform_device *pdev)
 	struct vblk_dev *vblkdev;
 	struct device *dev = &pdev->dev;
 	int ret;
-	struct tegra_hv_ivm_cookie *ivmk;
 
 	if (!is_tegra_hypervisor_mode()) {
 		dev_err(dev, "Hypervisor is not present\n");
@@ -1219,12 +1254,6 @@ static int tegra_hv_vblk_probe(struct platform_device *pdev)
 			ret = -ENODEV;
 			goto fail;
 		}
-		if (of_property_read_u32_index(vblk_node, "mempool", 0,
-			&(vblkdev->ivm_id))) {
-			dev_err(dev, "Failed to read mempool property\n");
-			ret = -ENODEV;
-			goto fail;
-		}
 	}
 
 	vblkdev->ivck = tegra_hv_ivc_reserve(NULL, vblkdev->ivc_id, NULL);
@@ -1236,25 +1265,6 @@ static int tegra_hv_vblk_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	ivmk = tegra_hv_mempool_reserve(vblkdev->ivm_id);
-	if (IS_ERR_OR_NULL(ivmk)) {
-		dev_err(dev, "Failed to reserve IVM channel %d\n",
-			vblkdev->ivm_id);
-		ivmk = NULL;
-		ret = -ENODEV;
-		goto free_ivc;
-	}
-	vblkdev->ivmk = ivmk;
-
-	vblkdev->shared_buffer = devm_memremap(vblkdev->device,
-			ivmk->ipa, ivmk->size, MEMREMAP_WB);
-	if (IS_ERR_OR_NULL(vblkdev->shared_buffer)) {
-		dev_err(dev, "Failed to map mempool area %d\n",
-				vblkdev->ivm_id);
-		ret = -ENOMEM;
-		goto free_mempool;
-	}
-
 	vblkdev->initialized = false;
 
 	vblkdev->wq = alloc_workqueue("vblk_req_wq%d",
@@ -1263,7 +1273,7 @@ static int tegra_hv_vblk_probe(struct platform_device *pdev)
 	if (vblkdev->wq == NULL) {
 		dev_err(dev, "Failed to allocate workqueue\n");
 		ret = -ENOMEM;
-		goto free_mempool;
+		goto free_ivc;
 	}
 
 	init_completion(&vblkdev->req_queue_empty);
@@ -1295,9 +1305,6 @@ static int tegra_hv_vblk_probe(struct platform_device *pdev)
 
 free_wq:
 	destroy_workqueue(vblkdev->wq);
-
-free_mempool:
-	tegra_hv_mempool_unreserve(vblkdev->ivmk);
 
 free_ivc:
 	tegra_hv_ivc_unreserve(vblkdev->ivck);
