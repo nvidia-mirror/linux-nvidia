@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2018-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,8 +21,8 @@
 #include <linux/mmu_notifier.h>
 
 #define	NVIDIA_P2P_UNINITIALIZED 0x0
-#define	NVIDIA_P2P_PINNED 0x1
-#define	NVIDIA_P2P_MAPPED 0x2
+#define	NVIDIA_P2P_PINNED 0x1U
+#define	NVIDIA_P2P_MAPPED 0x2U
 
 #define NVIDIA_P2P_MAJOR_VERSION_MASK   0xffff0000
 #define NVIDIA_P2P_MINOR_VERSION_MASK   0x0000ffff

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2018-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,6 +23,56 @@
 MODULE_DESCRIPTION("Nvidia Tegra P2P Driver");
 MODULE_AUTHOR("Preetham Chandru pchandru@nvidia.com");
 MODULE_LICENSE("GPL");
+
+static inline u64 safe_cast_s32_to_u64(s32 si_a)
+{
+	if (si_a < 0) {
+		WARN_ON(1);
+		return 0UL;
+	} else {
+		return (u64)si_a;
+	}
+}
+
+static inline s32 safe_cast_u64_to_s32(u64 ul_a)
+{
+	if (ul_a > safe_cast_s32_to_u64(INT_MAX)) {
+		WARN_ON(1);
+		return 0;
+	} else {
+		return (s32)ul_a;
+	}
+}
+
+static inline u32 safe_cast_s32_to_u32(s32 si_a)
+{
+	if (si_a < 0) {
+		WARN_ON(1);
+		return 0U;
+	} else {
+		return (u32)si_a;
+	}
+}
+
+static inline s32 safe_cast_u32_to_s32(u32 ui_a)
+{
+	if (ui_a > safe_cast_s32_to_u32(INT_MAX)) {
+		WARN_ON(1);
+		return 0;
+	} else {
+		return (s32)ui_a;
+	}
+}
+
+static inline s32 safe_cast_s64_to_s32(s64 sl_a)
+{
+	if ((sl_a > INT_MAX) || (sl_a < INT_MIN)) {
+		WARN_ON(1);
+		return 0;
+	} else {
+		return (s32)sl_a;
+	}
+}
 
 static void nvidia_p2p_mn_release(struct mmu_notifier *mn,
 	struct mm_struct *mm)
@@ -93,7 +143,7 @@ int nvidia_p2p_get_pages(u64 vaddr, u64 size,
 	int ret = 0;
 	int user_pages = 0;
 	int locked = 0;
-	int nr_pages = size >> PAGE_SHIFT;
+	int nr_pages = safe_cast_u64_to_s32(size >> PAGE_SHIFT);
 	struct page **pages;
 
 	if (nr_pages <= 0) {
@@ -116,9 +166,8 @@ int nvidia_p2p_get_pages(u64 vaddr, u64 size,
 	down_read(&current->mm->mmap_sem);
 #endif
 	locked = 1;
-	user_pages = get_user_pages_locked(vaddr & PAGE_MASK, nr_pages,
-			FOLL_WRITE | FOLL_FORCE,
-			pages, &locked);
+	user_pages = safe_cast_s64_to_s32(get_user_pages_locked(vaddr & PAGE_MASK, nr_pages,
+					FOLL_WRITE | FOLL_FORCE, pages, &locked));
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
 	up_read(&current->mm->mmap_lock);
 #else
@@ -190,14 +239,14 @@ int nvidia_p2p_free_page_table(struct nvidia_p2p_page_table *page_table)
 
 	if (page_table->mapped & NVIDIA_P2P_PINNED) {
 		pages = page_table->pages;
-		user_pages = page_table->entries;
+		user_pages = safe_cast_u32_to_s32(page_table->entries);
 
 		while (--user_pages >= 0) {
 			put_page(pages[user_pages]);
 		}
 
 		kfree(pages);
-		page_table->mapped &= (u32)~NVIDIA_P2P_PINNED;
+		page_table->mapped &= ~NVIDIA_P2P_PINNED;
 	}
 
 	mutex_unlock(&page_table->lock);
@@ -283,7 +332,7 @@ free_hw_address:
 	kfree((*dma_mapping)->hw_address);
 unmap_sg:
 	dma_unmap_sg(dev, sgt->sgl,
-		sgt->nents, direction);
+		safe_cast_u32_to_s32(sgt->nents), direction);
 free_sg_table:
 	sg_free_table(sgt);
 free_sgt:
@@ -317,12 +366,12 @@ int nvidia_p2p_dma_unmap_pages(struct nvidia_p2p_dma_mapping *dma_mapping)
 		if (dma_mapping->entries)
 			dma_unmap_sg(dma_mapping->dev,
 				dma_mapping->sgt->sgl,
-				dma_mapping->sgt->nents,
+				safe_cast_u32_to_s32(dma_mapping->sgt->nents),
 				dma_mapping->direction);
 		sg_free_table(dma_mapping->sgt);
 		kfree(dma_mapping->sgt);
 		kfree(dma_mapping);
-		page_table->mapped &= (u32)~NVIDIA_P2P_MAPPED;
+		page_table->mapped &= ~NVIDIA_P2P_MAPPED;
 	}
 	mutex_unlock(&page_table->lock);
 
