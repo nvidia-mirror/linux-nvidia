@@ -264,8 +264,8 @@ void tsec_comms_drain_msg(bool invoke_cb)
 	struct RM_GSP_INIT_MSG_GSP_INIT *init_msg_body;
 	struct RM_FLCN_QUEUE_HDR *cached_init_msg_hdr;
 	struct RM_GSP_INIT_MSG_GSP_INIT *cached_init_msg_body;
-	callback_func_t cb_func;
-	void *cb_ctx;
+	callback_func_t cb_func = NULL;
+	void *cb_ctx = NULL;
 	u8 tsec_msg[TSEC_MAX_MSG_SIZE];
 
 	msgq_head_reg = tsec_msgq_head_r(TSEC_MSG_QUEUE_PORT);
