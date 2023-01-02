@@ -370,21 +370,30 @@ static bool complete_bio_req(struct vblk_dev *vblkdev)
 	vs_req = &vsc_req->vs_req;
 
 	if ((bio_req != NULL) && (status == 0)) {
-		if (req_op(bio_req) == REQ_OP_DRV_IN) {
+		if ((vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F)
+			&& (req_op(bio_req) == REQ_OP_DRV_IN)) {
 			vblk_complete_ioctl_req(vblkdev, vsc_req,
 					req_resp.blkdev_resp.
 					ioctl_resp.status);
 			vblkdev->inflight_ioctl_reqs--;
 			blk_mq_end_request(bio_req, BLK_STS_OK);
-		}  else {
+		}  else if (req_op(bio_req) != REQ_OP_DRV_IN) {
 			handle_non_ioctl_resp(vblkdev, vsc_req,
 				&(req_resp.blkdev_resp.blk_resp));
+		} else {
+			dev_info(vblkdev->device, "ioctl(pass through) command not supported\n");
 		}
 
 	} else if ((bio_req != NULL) && (status != 0)) {
-		if (req_op(bio_req) == REQ_OP_DRV_IN)
-			vblkdev->inflight_ioctl_reqs--;
-		req_error_handler(vblkdev, bio_req);
+		if (!(vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F)
+			&& req_op(bio_req) == REQ_OP_DRV_IN) {
+			dev_info(vblkdev->device, "ioctl(pass through) command not supported\n");
+		} else {
+			if ((vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F)
+				&& (req_op(bio_req) == REQ_OP_DRV_IN))
+				vblkdev->inflight_ioctl_reqs--;
+			req_error_handler(vblkdev, bio_req);
+		}
 	} else {
 		dev_err(vblkdev->device,
 			"VSC request %d has null bio request!\n",
@@ -479,7 +488,8 @@ static bool submit_bio_req(struct vblk_dev *vblkdev)
 	if(!list_empty(&vblkdev->req_list)) {
 		entry = list_first_entry(&vblkdev->req_list, struct req_entry,
 						list_entry);
-		if ((req_op(entry->req) == REQ_OP_DRV_IN) &&
+		if ((vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F) &&
+				(req_op(entry->req) == REQ_OP_DRV_IN) &&
 				(vblkdev->config.blk_config.use_vm_address) &&
 				(vblkdev->inflight_ioctl_reqs >= vblkdev->max_ioctl_requests)) {
 			spin_unlock(&vblkdev->queue_lock);
@@ -600,14 +610,19 @@ static bool submit_bio_req(struct vblk_dev *vblkdev)
 			}
 		}
 	} else {
-		if (vblk_prep_ioctl_req(vblkdev,
+		if (vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F
+			&& !vblk_prep_ioctl_req(vblkdev,
 			(struct vblk_ioctl_req *)bio_req->completion_data,
 			vsc_req)) {
+			vblkdev->inflight_ioctl_reqs++;
+		} else if (!(vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F)) {
+			dev_info(vblkdev->device, "ioctl(pass through) command not supported\n");
+			goto bio_exit;
+		} else {
 			dev_err(vblkdev->device,
 				"Failed to prepare ioctl request!\n");
 			goto bio_exit;
 		}
-		vblkdev->inflight_ioctl_reqs++;
 	}
 
 	if (!tegra_hv_ivc_write(vblkdev->ivck, vs_req,
@@ -1063,9 +1078,11 @@ static void setup_device(struct vblk_dev *vblkdev)
 					(uintptr_t)(req_id * max_io_bytes));
 			req->mempool_offset = (req_id * max_io_bytes);
 		} else {
-			req->mempool_virt = (void *)((uintptr_t)vblkdev->shared_buffer +
+			if (vblkdev->config.blk_config.req_ops_supported & VS_BLK_IOCTL_OP_F) {
+				req->mempool_virt = (void *)((uintptr_t)vblkdev->shared_buffer +
 					(uintptr_t)((req_id % max_ioctl_requests) * max_io_bytes));
-			req->mempool_offset = ((req_id % max_ioctl_requests) * max_io_bytes);
+				req->mempool_offset = (req_id % max_ioctl_requests) * max_io_bytes;
+			}
 		}
 		req->mempool_len = max_io_bytes;
 		req->id = req_id;
