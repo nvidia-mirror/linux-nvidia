@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -58,6 +58,7 @@ enum tegra_hwpm_ip_enum {
 	TEGRA_HWPM_IP_MSS_ISO_NISO_HUBS,
 	TEGRA_HWPM_IP_MSS_MCF,
 	TEGRA_HWPM_IP_APE,
+	TEGRA_HWPM_IP_C2C,
 	TERGA_HWPM_NUM_IPS
 };
 
@@ -86,6 +87,7 @@ enum tegra_hwpm_resource_enum {
 	TEGRA_HWPM_RESOURCE_PMA,
 	TEGRA_HWPM_RESOURCE_CMD_SLICE_RTR,
 	TEGRA_HWPM_RESOURCE_APE,
+	TEGRA_HWPM_RESOURCE_C2C,
 	TERGA_HWPM_NUM_RESOURCES
 };
 

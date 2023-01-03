@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -83,6 +83,9 @@ static u32 tegra_hwpm_translate_soc_hwpm_ip(struct tegra_soc_hwpm *hwpm,
 		break;
 	case TEGRA_SOC_HWPM_IP_APE:
 		ip_enum_idx = TEGRA_HWPM_IP_APE;
+		break;
+	case TEGRA_SOC_HWPM_IP_C2C:
+		ip_enum_idx = TEGRA_HWPM_IP_C2C;
 		break;
 	default:
 		tegra_hwpm_err(hwpm,
@@ -185,6 +188,9 @@ u32 tegra_hwpm_translate_soc_hwpm_resource(struct tegra_soc_hwpm *hwpm,
 		break;
 	case TEGRA_SOC_HWPM_RESOURCE_APE:
 		res_enum_idx = TEGRA_HWPM_RESOURCE_APE;
+		break;
+	case TEGRA_SOC_HWPM_RESOURCE_C2C:
+		res_enum_idx = TEGRA_HWPM_RESOURCE_C2C;
 		break;
 	default:
 		tegra_hwpm_err(hwpm,
