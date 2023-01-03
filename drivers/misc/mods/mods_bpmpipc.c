@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -106,7 +106,7 @@ static int bpmp_ipc_recv(struct mods_client *client,
 	const void *frame;
 	ktime_t end;
 
-	end = ktime_add_us(ktime_get(), timeout_ms * 1000);
+	end = ktime_add_ms(ktime_get(), timeout_ms);
 	do {
 		frame = tegra_ivc_read_get_next_frame(ivc);
 		if (!IS_ERR(frame))
