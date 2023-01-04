@@ -3,7 +3,7 @@
  *
  * User-space interface to nvmap
  *
- * Copyright (c) 2011-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -223,6 +223,7 @@ struct nvmap_client *__nvmap_create_client(struct nvmap_device *dev,
 		if (nvmap_client_pid(client) == pid) {
 			/* Increment counter to track number of namespaces of a process */
 			atomic_add(1, &client->count);
+			put_task_struct(current->group_leader);
 			is_existing_client = true;
 			goto unlock;
 		}
@@ -234,8 +235,10 @@ unlock:
 	}
 
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
-	if (!client)
+	if (!client) {
+		mutex_unlock(&dev->clients_lock);
 		return NULL;
+	}
 	client->name = name;
 	client->handle_refs = RB_ROOT;
 	client->task = task;
