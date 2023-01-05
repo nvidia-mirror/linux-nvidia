@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -122,6 +122,9 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 					  (unsigned long long)data.data0,
 					  (unsigned long long)data.data1);
 		break;
+	case MODS_FFA_CMD_HSS_TEST:
+		cl_debug(DEBUG_TEGRADMA, "sending cmd MODS_FFA_CMD_HSS_TEST to SP\n");
+		break;
 	default:
 		cl_error("Unexpected command from SP 0x%llx\n", (unsigned long long)p->cmd);
 		return err;
@@ -146,21 +149,21 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 					  (unsigned long long)data.data1);
 		p->outdata[0] = data.data1;
 		break;
-	case MODS_FFA_CMD_SE_TESTS:
-		cl_debug(DEBUG_TEGRADMA, "sending SE_TESTS data to SP :read cmd 0x%llx, alg|engineId:0x%llx\n",
-					  (unsigned long long)data.data0,
-					  (unsigned long long)data.data1);
-		p->outdata[0] = data.data1;
-		break;
-	case MODS_FFA_CMD_SE_KEY_MOVER:
-		cl_debug(DEBUG_TEGRADMA, "sending SE_KEY_MOVER data to SP :read cmd 0x%llx, data:0x%llx\n",
-					  (unsigned long long)data.data0,
+	case MODS_FFA_CMD_HSS_TEST:
+		cl_debug(DEBUG_TEGRADMA, "received response from SP for CMD_HSS_TEST: 0x%llx\n",
 					  (unsigned long long)data.data1);
 		p->outdata[0] = data.data1;
 		break;
 	}
 
-	if (err)
+	if (err) {
 		cl_error("unexpected error from SP: %d\n", err);
-	return err;
+		return err;
+	}
+	// data.data0 always holds the error code of the ffa cmd
+	if (data.data0) {
+		cl_error("error response from SP: %ld\n", (long)data.data0);
+		return -EFAULT;
+	}
+	return OK;
 }
