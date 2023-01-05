@@ -1167,9 +1167,12 @@ static int tegra_camrtc_resume(struct device *dev)
 
 	tegra_camrtc_pm_start(dev, "resume");
 
-	err = tegra_camrtc_poweron(dev, true);
+	pm_runtime_mark_last_busy(dev);
 
-	if (err == 0)
+	/* Call tegra_cam_rtcpu_runtime_resume() - unless PM thinks dev is ACTIVE */
+	err = pm_runtime_resume(dev);
+	if (err == 1)
+		/* Already marked ACTIVE, boot explicitly */
 		err = tegra_camrtc_boot(dev);
 
 	tegra_camrtc_pm_done(dev, "resume", err);
