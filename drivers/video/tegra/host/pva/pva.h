@@ -3,7 +3,7 @@
  *
  * Tegra PVA header
  *
- * Copyright (c) 2016-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -391,6 +391,7 @@ struct pva {
 	int irq[MAX_PVA_IRQS];
 	s32 sids[16];
 	u32 sid_count;
+	u32 ec_state[8];
 
 	wait_queue_head_t cmd_waitqueue[MAX_PVA_INTERFACE];
 	struct pva_cmd_status_regs cmd_status_regs[MAX_PVA_INTERFACE];

@@ -51,7 +51,8 @@ nvhost-pva-objs  = \
 		pva_mailbox_t23x.o \
 		pva_interface_regs_t23x.o \
 		pva_version_config_t23x.o \
-		pva_ccq_t23x.o
+		pva_ccq_t23x.o \
+		pva_sec_ec.o
 
 obj-$(NVPVA_OBJ) += nvhost-pva.o
 

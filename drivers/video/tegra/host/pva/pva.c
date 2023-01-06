@@ -59,7 +59,7 @@
 #include "pva_iommu_context_dev.h"
 #include "nvpva_syncpt.h"
 #include "pva-fw-address-map.h"
-
+#include "pva_sec_ec.h"
 /*
  * NO IOMMU set 0x60000000 as start address.
  * With IOMMU set 0x80000000(>2GB) as startaddress
@@ -780,7 +780,6 @@ static int nvpva_write_hwid(struct platform_device *pdev)
 	return 0;
 }
 
-
 int pva_finalize_poweron(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
@@ -871,6 +870,9 @@ int pva_prepare_poweroff(struct platform_device *pdev)
 	 */
 	for (i = 0; i < pva->version_config->irq_count; i++)
 		disable_irq(pva->irq[i]);
+
+	/* disable error reporting to HSM*/
+	pva_disable_ec_err_reporting(pva);
 
 	/* Put PVA to reset to ensure that the firmware doesn't get accessed */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)

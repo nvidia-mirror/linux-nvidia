@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,6 +18,7 @@
 #include <linux/wait.h>
 
 #include "pva.h"
+#include "pva_sec_ec.h"
 
 static void pva_abort_handler(struct work_struct *work)
 {
@@ -61,8 +62,14 @@ static void pva_abort_handler(struct work_struct *work)
 		goto skip_recovery;
 	}
 
+	/* disable error reporting to hsm*/
+	pva_disable_ec_err_reporting(pva);
+
 	/* Reset the PVA and reload firmware */
 	nvhost_module_reset(pdev, true);
+
+	/* enable error reporting to hsm*/
+	pva_enable_ec_err_reporting(pva);
 
 	/* Remove pending tasks from the queue */
 	nvpva_queue_abort_all(pva->pool);

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2016-2022 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023 NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -43,7 +43,9 @@
 /* Watchdog support */
 #define SEC_LIC_INTR_WDT	0x1
 
-/* unfied register interface for both v1 and v2 */
+#define SEC_BASE_COMMON		0x20000U
+
+/* unified register interface for both v1 and v2 */
 static inline u32 sec_lic_intr_status_r(int version)
 {
 	if (version == 1)
@@ -159,5 +161,45 @@ static inline u32 sec_lic_intr_enable_r(int version)
 static inline u32 hwpm_get_offset(void)
 {
 	return 0x200000;
+}
+
+static inline u32 sec_ec_errslice0_missionerr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0x30U);
+}
+
+static inline u32 sec_ec_errslice1_missionerr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0x60U);
+}
+
+static inline u32 sec_ec_errslice2_missionerr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0x90U);
+}
+
+static inline u32 sec_ec_errslice3_missionerr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0xC0U);
+}
+
+static inline u32 sec_ec_errslice0_latenterr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0x40U);
+}
+
+static inline u32 sec_ec_errslice1_latenterr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0x70U);
+}
+
+static inline u32 sec_ec_errslice2_latenterr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0xA0U);
+}
+
+static inline u32 sec_ec_errslice3_latenterr_enable_r(void)
+{
+	return (SEC_BASE_COMMON + 0xD0U);
 }
 #endif
