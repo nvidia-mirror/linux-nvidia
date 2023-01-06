@@ -2,7 +2,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -12,9 +12,6 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "tsec_linux.h"
@@ -158,12 +155,11 @@ int tsec_poweroff(struct device *dev)
 
 	pdata = dev_get_drvdata(dev);
 
-	if (pdata->power_on)
+	if (pdata->power_on) {
 		tsec_prepare_poweroff(to_platform_device(dev));
-
-	tsec_disable_clk(pdata);
-
-	pdata->power_on = false;
+		tsec_disable_clk(pdata);
+		pdata->power_on = false;
+	}
 
 	return 0;
 }
