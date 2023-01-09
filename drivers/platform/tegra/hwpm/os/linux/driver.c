@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/dma-buf.h>
 #include <linux/debugfs.h>
+#include <linux/version.h>
 
 #include <tegra_hwpm.h>
 #include <tegra_hwpm_ip.h>
@@ -46,7 +47,11 @@ static const struct of_device_id tegra_soc_hwpm_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_soc_hwpm_of_match);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 static char *tegra_hwpm_get_devnode(struct device *dev, umode_t *mode)
+#else
+static char *tegra_hwpm_get_devnode(const struct device *dev, umode_t *mode)
+#endif
 {
 	if (!mode) {
 		return NULL;
