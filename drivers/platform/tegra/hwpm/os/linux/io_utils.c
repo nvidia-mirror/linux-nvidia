@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -97,7 +97,7 @@ static int ip_readl(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 			/* Fall back to un-registered IP method */
 			void __iomem *ptr = NULL;
 			u64 reg_addr = tegra_hwpm_safe_add_u64(
-				aperture->start_abs_pa, offset);
+				aperture->start_pa, offset);
 
 			ptr = ioremap(reg_addr, 0x4);
 			if (!ptr) {
@@ -145,7 +145,7 @@ static int ip_writel(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 			/* Fall back to un-registered IP method */
 			void __iomem *ptr = NULL;
 			u64 reg_addr = tegra_hwpm_safe_add_u64(
-				aperture->start_abs_pa, offset);
+				aperture->start_pa, offset);
 
 			ptr = ioremap(reg_addr, 0x4);
 			if (!ptr) {
@@ -172,14 +172,15 @@ static int hwpm_readl(struct tegra_soc_hwpm *hwpm,
 		"Aperture (0x%llx-0x%llx) offset(0x%llx)",
 		aperture->start_abs_pa, aperture->end_abs_pa, offset);
 
-	if (aperture->dt_mmio == NULL) {
-		tegra_hwpm_err(hwpm, "aperture is not iomapped as expected");
-		return -ENODEV;
-	}
-
 	if (hwpm->fake_registers_enabled) {
 		return fake_readl(hwpm, aperture, offset, val);
 	} else {
+		if (aperture->dt_mmio == NULL) {
+			tegra_hwpm_err(hwpm,
+				"aperture is not iomapped as expected");
+			return -ENODEV;
+		}
+
 		*val = readl(aperture->dt_mmio + offset);
 	}
 
@@ -199,14 +200,15 @@ static int hwpm_writel(struct tegra_soc_hwpm *hwpm,
 		"Aperture (0x%llx-0x%llx) offset(0x%llx) val(0x%x)",
 		aperture->start_abs_pa, aperture->end_abs_pa, offset, val);
 
-	if (aperture->dt_mmio == NULL) {
-		tegra_hwpm_err(hwpm, "aperture is not iomapped as expected");
-		return -ENODEV;
-	}
-
 	if (hwpm->fake_registers_enabled) {
 		err = fake_writel(hwpm, aperture, offset, val);
 	} else {
+		if (aperture->dt_mmio == NULL) {
+			tegra_hwpm_err(hwpm,
+				"aperture is not iomapped as expected");
+			return -ENODEV;
+		}
+
 		writel(val, aperture->dt_mmio + offset);
 	}
 
@@ -229,6 +231,11 @@ int tegra_hwpm_readl_impl(struct tegra_soc_hwpm *hwpm,
 
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||
 		(aperture->element_type == HWPM_ELEMENT_PERFMUX)) {
+		/*
+		 * Register address passed for perfmon access is with
+		 * respect to first perfmon block.
+		 * Hence, subtract base_addr from given addr for offset.
+		 */
 		u64 reg_offset = tegra_hwpm_safe_sub_u64(
 					addr, aperture->base_pa);
 		/* HWPM domain registers */
@@ -256,6 +263,11 @@ int tegra_hwpm_writel_impl(struct tegra_soc_hwpm *hwpm,
 
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||
 		(aperture->element_type == HWPM_ELEMENT_PERFMUX)) {
+		/*
+		 * Register address passed for perfmon access is with
+		 * respect to first perfmon block.
+		 * Hence, subtract base_addr from given addr for offset.
+		 */
 		u64 reg_offset = tegra_hwpm_safe_sub_u64(
 					addr, aperture->base_pa);
 		/* HWPM domain internal registers */
@@ -285,6 +297,11 @@ int tegra_hwpm_regops_readl_impl(struct tegra_soc_hwpm *hwpm,
 		return -ENODEV;
 	}
 
+	/*
+	 * Register address passed to this function always belong to
+	 * virtual address range of the aperture.
+	 * Hence, subtract start_abs_pa from given addr for offset.
+	 */
 	reg_offset = tegra_hwpm_safe_sub_u64(addr, aperture->start_abs_pa);
 
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||
@@ -314,6 +331,11 @@ int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 		return -ENODEV;
 	}
 
+	/*
+	 * Register address passed to this function always belong to
+	 * virtual address range of the aperture.
+	 * Hence, subtract start_abs_pa from given addr for offset.
+	 */
 	reg_offset = tegra_hwpm_safe_sub_u64(addr, aperture->start_abs_pa);
 
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||

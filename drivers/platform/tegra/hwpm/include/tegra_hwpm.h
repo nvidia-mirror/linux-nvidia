@@ -206,12 +206,6 @@ struct hwpm_ip_aperture {
 	 */
 	u32 element_index;
 
-	/* MMIO device tree aperture - only populated for perfmon */
-	void __iomem *dt_mmio;
-
-	/* DT tree name */
-	char name[64];
-
 	/*
 	 * Device index corresponding to device node aperture address index
 	 * in Device tree or ACPI table.
@@ -219,22 +213,44 @@ struct hwpm_ip_aperture {
 	 */
 	u32 device_index;
 
-	/* Allowlist */
-	struct allowlist *alist;
-	u64 alist_size;
+	/* MMIO device tree aperture - only populated for perfmon */
+	void __iomem *dt_mmio;
 
-	/* Physical aperture */
-	u64 start_abs_pa;
-	u64 end_abs_pa;
+	/* DT tree name */
+	char name[64];
 
-	/* MMIO aperture */
+	/*
+	 * MMIO address for the aperture. This address range is present
+	 * in the device node.
+	 * MMIO addresses can be same as virtual aperture addresses.
+	 */
 	u64 start_pa;
 	u64 end_pa;
 
-	/* Base address: used to calculate register offset */
+	/*
+	 * Virtual aperture address
+	 * Regops addresses should be in this range.
+	 */
+	u64 start_abs_pa;
+	u64 end_abs_pa;
+
+	/*
+	 * Base address of Perfmon Block
+	 * All perfmon apertures have identical placement of registers
+	 * HWPM read/write logic for perfmons refers to registers in the first
+	 * perfmon block. Use this base address value to compute register
+	 * offset in HWPM read/write functions.
+	 */
 	u64 base_pa;
 
-	/* Fake registers for VDK which doesn't have a SOC HWPM fmodel */
+	/* Allowlist */
+	u64 alist_size;
+	struct allowlist *alist;
+
+	/*
+	 * Fake registers for simulation where SOC HWPM is not implemented
+	 * Use virtual aperture address values for allocation.
+	 */
 	u32 *fake_registers;
 };
 

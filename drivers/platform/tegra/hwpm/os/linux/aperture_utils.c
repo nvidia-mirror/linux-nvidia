@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,6 +37,7 @@ int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 	}
 
 	/* Reserve */
+	/* Make sure that resource exists in device node */
 	res = platform_get_resource(hwpm_linux->pdev,
 		IORESOURCE_MEM, perfmon->device_index);
 	if ((!res) || (res->start == 0) || (res->end == 0)) {
@@ -44,26 +45,17 @@ int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 		return -ENOMEM;
 	}
 
-	if (res->start != perfmon->start_abs_pa) {
+	/* Confirm that correct resource is retrived */
+	if (res->start != perfmon->start_pa) {
 		tegra_hwpm_err(hwpm, "Failed to get correct"
 			"perfmon address for %s,"
 			"Expected - 0x%llx, Returned - 0x%llx",
-			perfmon->name, perfmon->start_abs_pa,
-			res->start);
+			perfmon->name, perfmon->start_pa, res->start);
 		return -ENOMEM;
 	}
 
-	perfmon->dt_mmio = devm_ioremap(
-		hwpm_linux->dev, res->start, resource_size(res));
-	if (IS_ERR(perfmon->dt_mmio)) {
-		tegra_hwpm_err(hwpm, "Couldn't map perfmon %s", perfmon->name);
-		return PTR_ERR(perfmon->dt_mmio);
-	}
-
-	perfmon->start_pa = res->start;
-	perfmon->end_pa = res->end;
-
 	if (hwpm->fake_registers_enabled) {
+		/* Allocate resource memory as MMIO */
 		u64 address_range = tegra_hwpm_safe_add_u64(
 			tegra_hwpm_safe_sub_u64(res->end, res->start), 1ULL);
 		u64 num_regs = address_range / sizeof(u32);
@@ -76,7 +68,17 @@ int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 				perfmon->start_abs_pa, perfmon->end_abs_pa);
 			return -ENOMEM;
 		}
+	} else {
+		/* Map resource memory in kernel space */
+		perfmon->dt_mmio = devm_ioremap(
+			hwpm_linux->dev, res->start, resource_size(res));
+		if (IS_ERR(perfmon->dt_mmio)) {
+			tegra_hwpm_err(hwpm,
+				"Couldn't map perfmon %s", perfmon->name);
+			return PTR_ERR(perfmon->dt_mmio);
+		}
 	}
+
 	return 0;
 }
 
@@ -88,14 +90,11 @@ int tegra_hwpm_perfmux_reserve_impl(struct tegra_soc_hwpm *hwpm,
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	perfmux->start_pa = perfmux->start_abs_pa;
-	perfmux->end_pa = perfmux->end_abs_pa;
-
 	/* Allocate fake registers */
 	if (hwpm->fake_registers_enabled) {
 		u64 address_range = tegra_hwpm_safe_add_u64(
-			tegra_hwpm_safe_sub_u64(
-				perfmux->end_pa, perfmux->start_pa), 1ULL);
+			tegra_hwpm_safe_sub_u64(perfmux->end_abs_pa,
+				perfmux->start_abs_pa), 1ULL);
 		u64 num_regs = address_range / sizeof(u32);
 
 		perfmux->fake_registers =
@@ -103,7 +102,7 @@ int tegra_hwpm_perfmux_reserve_impl(struct tegra_soc_hwpm *hwpm,
 		if (perfmux->fake_registers == NULL) {
 			tegra_hwpm_err(hwpm, "Aperture(0x%llx - 0x%llx):"
 				" Couldn't allocate memory for fake registers",
-				perfmux->start_pa, perfmux->end_pa);
+				perfmux->start_abs_pa, perfmux->end_abs_pa);
 			return -ENOMEM;
 		}
 	}
@@ -149,8 +148,6 @@ int tegra_hwpm_perfmon_release_impl(struct tegra_soc_hwpm *hwpm,
 	}
 	devm_iounmap(hwpm_linux->dev, perfmon->dt_mmio);
 	perfmon->dt_mmio = NULL;
-	perfmon->start_pa = 0ULL;
-	perfmon->end_pa = 0ULL;
 
 	if (perfmon->fake_registers) {
 		tegra_hwpm_kfree(hwpm, perfmon->fake_registers);

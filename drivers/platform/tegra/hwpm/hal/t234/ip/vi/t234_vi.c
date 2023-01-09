@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,8 +29,8 @@ static struct hwpm_ip_aperture t234_vi_inst0_perfmon_element_static_array[
 		.device_index = T234_VI0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_vi0_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_vi0_limit_r(),
-		.start_pa = 0ULL,
-		.end_pa = 0ULL,
+		.start_pa = addr_map_rpg_pm_vi0_base_r(),
+		.end_pa = addr_map_rpg_pm_vi0_limit_r(),
 		.base_pa = addr_map_rpg_pm_base_r(),
 		.alist = t234_perfmon_alist,
 		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
@@ -49,8 +49,8 @@ static struct hwpm_ip_aperture t234_vi_inst1_perfmon_element_static_array[
 		.device_index = T234_VI1_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_vi1_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_vi1_limit_r(),
-		.start_pa = 0ULL,
-		.end_pa = 0ULL,
+		.start_pa = addr_map_rpg_pm_vi1_base_r(),
+		.end_pa = addr_map_rpg_pm_vi1_limit_r(),
 		.base_pa = addr_map_rpg_pm_base_r(),
 		.alist = t234_perfmon_alist,
 		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
@@ -68,8 +68,8 @@ static struct hwpm_ip_aperture t234_vi_inst0_perfmux_element_static_array[
 		.name = {'\0'},
 		.start_abs_pa = addr_map_vi_thi_base_r(),
 		.end_abs_pa = addr_map_vi_thi_limit_r(),
-		.start_pa = 0ULL,
-		.end_pa = 0ULL,
+		.start_pa = addr_map_vi_thi_base_r(),
+		.end_pa = addr_map_vi_thi_limit_r(),
 		.base_pa = 0ULL,
 		.alist = t234_vi_thi_alist,
 		.alist_size = ARRAY_SIZE(t234_vi_thi_alist),
@@ -87,8 +87,8 @@ static struct hwpm_ip_aperture t234_vi_inst1_perfmux_element_static_array[
 		.name = {'\0'},
 		.start_abs_pa = addr_map_vi2_thi_base_r(),
 		.end_abs_pa = addr_map_vi2_thi_limit_r(),
-		.start_pa = 0ULL,
-		.end_pa = 0ULL,
+		.start_pa = addr_map_vi2_thi_base_r(),
+		.end_pa = addr_map_vi2_thi_limit_r(),
 		.base_pa = 0ULL,
 		.alist = t234_vi_thi_alist,
 		.alist_size = ARRAY_SIZE(t234_vi_thi_alist),

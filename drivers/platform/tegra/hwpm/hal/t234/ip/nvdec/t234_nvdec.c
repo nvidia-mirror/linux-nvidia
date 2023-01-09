@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,8 +29,8 @@ static struct hwpm_ip_aperture t234_nvdec_inst0_perfmon_element_static_array[
 		.device_index = T234_NVDECA0_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_nvdec0_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_nvdec0_limit_r(),
-		.start_pa = 0,
-		.end_pa = 0,
+		.start_pa = addr_map_rpg_pm_nvdec0_base_r(),
+		.end_pa = addr_map_rpg_pm_nvdec0_limit_r(),
 		.base_pa = addr_map_rpg_pm_base_r(),
 		.alist = t234_perfmon_alist,
 		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
@@ -48,8 +48,8 @@ static struct hwpm_ip_aperture t234_nvdec_inst0_perfmux_element_static_array[
 		.name = {'\0'},
 		.start_abs_pa = addr_map_nvdec_base_r(),
 		.end_abs_pa = addr_map_nvdec_limit_r(),
-		.start_pa = 0,
-		.end_pa = 0,
+		.start_pa = addr_map_nvdec_base_r(),
+		.end_pa = addr_map_nvdec_limit_r(),
 		.base_pa = 0ULL,
 		.alist = t234_nvdec_alist,
 		.alist_size = ARRAY_SIZE(t234_nvdec_alist),

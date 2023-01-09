@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,8 +29,8 @@ static struct hwpm_ip_aperture t234_scf_inst0_perfmon_element_static_array[
 		.device_index = T234_SCF_PERFMON_DEVICE_NODE_INDEX,
 		.start_abs_pa = addr_map_rpg_pm_scf_base_r(),
 		.end_abs_pa = addr_map_rpg_pm_scf_limit_r(),
-		.start_pa = 0ULL,
-		.end_pa = 0ULL,
+		.start_pa = addr_map_rpg_pm_scf_base_r(),
+		.end_pa = addr_map_rpg_pm_scf_limit_r(),
 		.base_pa = addr_map_rpg_pm_base_r(),
 		.alist = t234_perfmon_alist,
 		.alist_size = ARRAY_SIZE(t234_perfmon_alist),
