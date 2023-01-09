@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -528,8 +528,9 @@ void *nvmap_dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size)
 {
 	struct dma_coherent_mem_replica *mem;
-	unsigned long flags;
-	int pos, err;
+	unsigned long flags, pageno;
+	unsigned int alloc_size;
+	int pos;
 
 	if (!dev || !dev->dma_mem)
 		return ERR_PTR(-EINVAL);
@@ -537,15 +538,20 @@ void *nvmap_dma_mark_declared_memory_occupied(struct device *dev,
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 
 	size += device_addr & ~PAGE_MASK;
+	alloc_size = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 	pos = PFN_DOWN(device_addr - mem->device_base);
-	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+	pageno = bitmap_find_next_zero_area(mem->bitmap, mem->size, pos, alloc_size, 0);
+	if (pageno >= mem->size)
+		goto error;
+	bitmap_set(mem->bitmap, pageno, alloc_size);
 	spin_unlock_irqrestore(&mem->spinlock, flags);
-
-	if (err != 0)
-		return ERR_PTR(err);
 	return mem->virt_base + (pos << PAGE_SHIFT);
+
+error:
+	spin_unlock_irqrestore(&mem->spinlock, flags);
+	return ERR_PTR(-ENOMEM);
 }
 
 void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
@@ -553,6 +559,7 @@ void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
 {
 	struct dma_coherent_mem_replica *mem;
 	unsigned long flags;
+	unsigned int alloc_size;
 	int pos;
 
 	if (!dev || !dev->dma_mem)
@@ -561,10 +568,11 @@ void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 
 	size += device_addr & ~PAGE_MASK;
+	alloc_size = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 	pos = PFN_DOWN(device_addr - mem->device_base);
-	bitmap_release_region(mem->bitmap, pos, get_order(size));
+	bitmap_clear(mem->bitmap, pos, alloc_size);
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 }
 
