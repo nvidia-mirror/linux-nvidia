@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,7 +20,7 @@
 #include <tegra_hwpm_io.h>
 #include <tegra_hwpm.h>
 
-int tegra_hwpm_element_reserve(struct tegra_soc_hwpm *hwpm,
+static int tegra_hwpm_element_reserve(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *element)
 {
 	int err = 0;
@@ -57,7 +57,7 @@ fail:
 	return err;
 }
 
-int tegra_hwpm_element_disable(struct tegra_soc_hwpm *hwpm,
+static int tegra_hwpm_element_disable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *element)
 {
 	int err = 0;
@@ -94,7 +94,7 @@ fail:
 	return err;
 }
 
-int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
+static int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *element)
 {
 	int err = 0;

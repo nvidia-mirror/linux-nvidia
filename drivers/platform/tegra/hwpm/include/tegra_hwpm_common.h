@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -48,11 +48,6 @@ int tegra_hwpm_release_rtr(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_reserve_resource(struct tegra_soc_hwpm *hwpm, u32 resource);
 int tegra_hwpm_release_resources(struct tegra_soc_hwpm *hwpm);
 int tegra_hwpm_bind_resources(struct tegra_soc_hwpm *hwpm);
-
-int tegra_hwpm_element_reserve(struct tegra_soc_hwpm *hwpm,
-	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *perfmon);
-int tegra_hwpm_element_release(struct tegra_soc_hwpm *hwpm,
-	struct hwpm_ip_aperture *perfmon);
 
 int tegra_hwpm_set_fs_info_ip_ops(struct tegra_soc_hwpm *hwpm,
 	struct tegra_hwpm_ip_ops *ip_ops,
