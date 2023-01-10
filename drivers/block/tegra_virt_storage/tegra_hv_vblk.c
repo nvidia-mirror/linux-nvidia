@@ -915,7 +915,7 @@ static void setup_device(struct vblk_dev *vblkdev)
 	uint32_t max_io_bytes;
 	uint32_t req_id;
 	uint32_t max_requests;
-	uint32_t max_ioctl_requests;
+	uint32_t max_ioctl_requests = 0U;
 	struct vsc_request *req;
 	struct tegra_hv_ivm_cookie *ivmk;
 #if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
