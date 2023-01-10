@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -430,7 +430,7 @@ static int setup_cache_attr(struct mods_client   *client,
 		for (offs = 0; offs < sg->length; offs += PAGE_SIZE) {
 			void *ptr;
 
-			ptr = kmap(sg_page(sg) + (offs >> PAGE_SHIFT));
+			ptr = MODS_KMAP(sg_page(sg) + (offs >> PAGE_SHIFT));
 			if (unlikely(!ptr)) {
 				cl_error("kmap failed\n");
 				return -ENOMEM;
@@ -556,7 +556,7 @@ static int restore_cache_one_chunk(struct page *p_page, u8 order)
 	u32 i;
 
 	for (i = 0; i < num_pages; i++) {
-		void *ptr = kmap(p_page + i);
+		void *ptr = MODS_KMAP(p_page + i);
 		int   err = -ENOMEM;
 
 		if (likely(ptr))
@@ -2556,7 +2556,7 @@ static void clear_entry_cache_mappings(struct mods_client    *client,
 			u32 i_page     = chunk_offs >> PAGE_SHIFT;
 			u32 page_offs  = chunk_offs - (i_page << PAGE_SHIFT);
 			u64 page_va    =
-			    (u64)(size_t)kmap(sg_page(sg) + i_page);
+			    (u64)(size_t)MODS_KMAP(sg_page(sg) + i_page);
 			u64 clear_va   = page_va + page_offs;
 			u64 clear_pa   = sg_phys(sg) + chunk_offs;
 			u32 clear_size = PAGE_SIZE - page_offs;

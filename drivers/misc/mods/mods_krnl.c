@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -485,7 +485,6 @@ static int __init mods_init_module(void)
 	if (rc < 0)
 		return rc;
 #endif
-
 #endif
 
 #if defined(CONFIG_ARM_FFA_TRANSPORT)
@@ -920,7 +919,7 @@ static int mods_krnl_vma_access(struct vm_area_struct *vma,
 			if (map_offs + len > PAGE_SIZE)
 				len = (int)(PAGE_SIZE - map_offs);
 
-			ptr = kmap(p_page);
+			ptr = MODS_KMAP(p_page);
 			if (ptr) {
 				char *bptr = (char *)ptr + map_offs;
 
@@ -1336,7 +1335,7 @@ static int esc_mods_get_screen_info(struct mods_client      *client,
 static int esc_mods_get_screen_info_2(struct mods_client        *client,
 				      struct MODS_SCREEN_INFO_2 *p)
 {
-#if defined(CONFIG_FB)
+#if defined(CONFIG_FB) && defined(MODS_HAS_FB_SET_SUSPEND)
 	unsigned int i;
 	bool         found = false;
 #endif
@@ -1349,7 +1348,7 @@ static int esc_mods_get_screen_info_2(struct mods_client        *client,
 	p->ext_lfb_base = 0;
 #endif
 
-#if defined(CONFIG_FB)
+#if defined(CONFIG_FB) && defined(MODS_HAS_FB_SET_SUSPEND)
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
 		return OK;
 
@@ -1361,7 +1360,8 @@ static int esc_mods_get_screen_info_2(struct mods_client        *client,
 	 * in use by the console and potentially using it themselves.
 
 	 * For an EFI console, pull the FB base address from the FB
-	 * driver registered_fb data instead of screen_info
+	 * driver registered_fb data instead of screen_info.
+	 * Note: on kernel 6.1 and up registered_fb is not available.
 	 */
 	for (i = 0; i < ARRAY_SIZE(registered_fb); i++) {
 		bool skipped = true;
@@ -1390,6 +1390,68 @@ static int esc_mods_get_screen_info_2(struct mods_client        *client,
 #endif
 
 #if defined(MODS_HAS_CONSOLE_LOCK)
+
+#if defined(CONFIG_FB) && defined(MODS_HAS_FB_SET_SUSPEND)
+static int suspend_fb(struct mods_client *client)
+{
+	unsigned int i;
+	int          err = -EINVAL;
+
+	/* tell the os to block fb accesses */
+	for (i = 0; i < ARRAY_SIZE(registered_fb); i++) {
+		bool suspended = false;
+
+		if (!registered_fb[i])
+			continue;
+
+		console_lock();
+		if (registered_fb[i]->state != FBINFO_STATE_SUSPENDED) {
+			fb_set_suspend(registered_fb[i], 1);
+			client->mods_fb_suspended[i] = 1;
+			suspended = true;
+		}
+		console_unlock();
+		err = OK;
+
+		if (suspended)
+			cl_info("suspended fb%u '%s'\n", i,
+				registered_fb[i]->fix.id);
+	}
+
+	return err;
+}
+
+static int resume_fb(struct mods_client *client)
+{
+	unsigned int i;
+	int          err = -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(registered_fb); i++) {
+		bool resumed = false;
+
+		if (!registered_fb[i])
+			continue;
+
+		console_lock();
+		if (client->mods_fb_suspended[i]) {
+			fb_set_suspend(registered_fb[i], 0);
+			client->mods_fb_suspended[i] = 0;
+			resumed = true;
+		}
+		console_unlock();
+		err = OK;
+
+		if (resumed)
+			cl_info("resumed fb%u\n", i);
+	}
+
+	return err;
+}
+#else
+#define suspend_fb(client) (-EINVAL)
+#define resume_fb(client) (-EINVAL)
+#endif
+
 static atomic_t console_is_locked;
 
 static int esc_mods_lock_console(struct mods_client *client)
@@ -1419,9 +1481,6 @@ static int esc_mods_unlock_console(struct mods_client *client)
 static int esc_mods_suspend_console(struct mods_client *client)
 {
 	int err = -EINVAL;
-#if defined(CONFIG_FB)
-	unsigned int i;
-#endif
 
 	LOG_ENT();
 
@@ -1431,28 +1490,7 @@ static int esc_mods_suspend_console(struct mods_client *client)
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_FB)
-	/* tell the os to block fb accesses */
-	for (i = 0; i < ARRAY_SIZE(registered_fb); i++) {
-		bool suspended = false;
-
-		if (!registered_fb[i])
-			continue;
-
-		console_lock();
-		if (registered_fb[i]->state != FBINFO_STATE_SUSPENDED) {
-			fb_set_suspend(registered_fb[i], 1);
-			client->mods_fb_suspended[i] = 1;
-			suspended = true;
-		}
-		console_unlock();
-		err = OK;
-
-		if (suspended)
-			cl_info("suspended fb%u '%s'\n", i,
-				registered_fb[i]->fix.id);
-	}
-#endif
+	err = suspend_fb(client);
 
 #if defined(MODS_HAS_CONSOLE_BINDING)
 	if (&vga_con == vc_cons[fg_console].d->vc_sw) {
@@ -1486,9 +1524,6 @@ static int esc_mods_resume_console(struct mods_client *client)
 static int mods_resume_console(struct mods_client *client)
 {
 	int err = -EINVAL;
-#if defined(CONFIG_FB)
-	unsigned int i;
-#endif
 
 	LOG_ENT();
 
@@ -1501,26 +1536,7 @@ static int mods_resume_console(struct mods_client *client)
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_FB)
-	for (i = 0; i < ARRAY_SIZE(registered_fb); i++) {
-		bool resumed = false;
-
-		if (!registered_fb[i])
-			continue;
-
-		console_lock();
-		if (client->mods_fb_suspended[i]) {
-			fb_set_suspend(registered_fb[i], 0);
-			client->mods_fb_suspended[i] = 0;
-			resumed = true;
-		}
-		console_unlock();
-		err = OK;
-
-		if (resumed)
-			cl_info("resumed fb%u\n", i);
-	}
-#endif
+	err = resume_fb(client);
 
 #if defined(MODS_HAS_CONSOLE_BINDING)
 	if (&dummy_con == vc_cons[fg_console].d->vc_sw) {

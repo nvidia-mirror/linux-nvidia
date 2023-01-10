@@ -88,7 +88,6 @@
 #endif
 
 #if KERNEL_VERSION(4, 13, 0) <= MODS_KERNEL_VERSION
-#       define MODS_HAS_FLR_SUPPORT
 #       define MODS_HAS_SET_MEMORY_HEADER 1
 #endif
 
@@ -98,10 +97,6 @@
 
 #if KERNEL_VERSION(4, 16, 0) <= MODS_KERNEL_VERSION
 #       define MODS_HAS_POLL_T 1
-#endif
-
-#if KERNEL_VERSION(4, 17, 0) <= MODS_KERNEL_VERSION
-#       define MODS_PCIE_FLR_HAS_ERR
 #endif
 
 #if defined(CONFIG_ACPI_NUMA) && KERNEL_VERSION(5, 1, 0) <= MODS_KERNEL_VERSION
@@ -116,8 +111,8 @@
 #       define MODS_ENABLE_BPMP_MRQ_API 1
 #endif
 
-#if KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
-#       define MODS_HAS_ACPI_MATCH_DATA 1
+#if KERNEL_VERSION(6, 1, 0) > MODS_KERNEL_VERSION
+#       define MODS_HAS_FB_SET_SUSPEND 1
 #endif
 
 #endif /* _MODS_CONFIG_H_  */

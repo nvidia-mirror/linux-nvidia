@@ -80,7 +80,7 @@ static int mods_smmu_driver_probe(struct platform_device *pdev)
 		}
 
 	} else {
-#if MODS_HAS_ACPI_MATCH_DATA
+#if KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
 		dev_name = (const char *)acpi_device_get_match_data(dev);
 #endif
 		if (!dev_name) {

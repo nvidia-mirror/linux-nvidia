@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -261,7 +261,7 @@ struct NVL_TRAINED {
 #define DEBUG_TEGRADMA		0x400
 #define DEBUG_ISR_DETAILED	(DEBUG_ISR | DEBUG_DETAILED)
 #define DEBUG_MEM_DETAILED	(DEBUG_MEM | DEBUG_DETAILED)
-#define DEBUG_ALL		(DEBUG_IOCTL | DEBUG_PCI | DEBUG_ACPI | \
+#define DEBUG_ALL	        (DEBUG_IOCTL | DEBUG_PCI | DEBUG_ACPI | \
 	DEBUG_ISR | DEBUG_MEM | DEBUG_FUNC | DEBUG_CLOCK | DEBUG_DETAILED | \
 	DEBUG_TEGRADC | DEBUG_TEGRADMA)
 
@@ -370,6 +370,12 @@ struct mods_priv {
 #	define MODS_SG_UNMARK_END(sg) sg_unmark_end(sg)
 #else
 #	define MODS_SG_UNMARK_END(sg) ({(sg)->page_link &= ~2; })
+#endif
+
+#if KERNEL_VERSION(5, 11, 0) <= MODS_KERNEL_VERSION
+#	define MODS_KMAP kmap_local_page
+#else
+#	define MODS_KMAP kmap
 #endif
 
 /* ************************************************************************* */
@@ -711,7 +717,6 @@ int esc_mods_send_trustzone_msg(struct mods_client         *client,
 int esc_mods_invoke_optee_ta(struct mods_client *client,
 	struct MODS_OPTEE_PARAMS *p);
 #endif
-
 #endif
 
 /* MODS SP call */
@@ -750,11 +755,6 @@ void smmu_driver_exit(void);
 int esc_mods_send_ipi(struct mods_client *client, struct MODS_SEND_IPI *p);
 #endif
 
-#if defined(CONFIG_ARM_FFA_TRANSPORT)
-int mods_ffa_abi_register(void);
-void mods_ffa_abi_unregister(void);
-#endif
-
 #if defined(CONFIG_TEGRA_IVC)
 int esc_mods_bpmp_uphy_lane_eom_scan(struct mods_client *client,
 				     struct MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS *p);
@@ -763,6 +763,11 @@ int mods_bpmpipc_init(struct mods_client *client,
 		      u64 req_phys_addr,
 		      u64 resp_phys_addr);
 void mods_bpmpipc_cleanup(void);
+#endif
+
+#if defined(CONFIG_ARM_FFA_TRANSPORT)
+int mods_ffa_abi_register(void);
+void mods_ffa_abi_unregister(void);
 #endif
 
 #endif	/* _MODS_INTERNAL_H_  */

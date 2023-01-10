@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -27,6 +27,9 @@
 #include <linux/io.h>
 #include <linux/fs.h>
 #include <linux/pci.h>
+#if KERNEL_VERSION(2, 32, 0) <= MODS_KERNEL_VERSION
+#include <linux/pm_runtime.h>
+#endif
 #if KERNEL_VERSION(3, 19, 0) <= MODS_KERNEL_VERSION
 #include <linux/property.h>
 #endif
@@ -1009,14 +1012,32 @@ int esc_mods_pci_set_dma_mask(struct mods_client       *client,
 	return err;
 }
 
+static int check_flr(struct pci_dev *dev)
+{
+	int cap_pos;
+	u32 cap;
+
+#if KERNEL_VERSION(4, 12, 0) <= MODS_KERNEL_VERSION
+	if (dev->dev_flags & PCI_DEV_FLAGS_NO_FLR_RESET)
+		return -ENOTTY;
+#endif
+
+	cap_pos = pci_find_capability(dev, PCI_CAP_ID_EXP);
+	if (!cap_pos)
+		return -ENOTTY;
+
+	pci_read_config_dword(dev, cap_pos + PCI_EXP_DEVCAP, &cap);
+	if (!(cap & PCI_EXP_DEVCAP_FLR))
+		return -ENOTTY;
+
+	return 0;
+}
+
 int esc_mods_pci_reset_function(struct mods_client    *client,
 				struct mods_pci_dev_2 *pcidev)
 {
-#if defined(MODS_HAS_FLR_SUPPORT)
-	int             err;
 	struct pci_dev *dev;
-	u32             cap;
-	const struct pci_error_handlers *err_handler;
+	int             err;
 
 	LOG_ENT();
 
@@ -1032,32 +1053,26 @@ int esc_mods_pci_reset_function(struct mods_client    *client,
 		return err;
 	}
 
-	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
-	if ((dev->dev_flags & PCI_DEV_FLAGS_NO_FLR_RESET) ||
-	    !(cap & PCI_EXP_DEVCAP_FLR)) {
+	err = check_flr(dev);
+	if (unlikely(err)) {
 		cl_error(
 			 "function level reset not supported on dev %04x:%02x:%02x.%x\n",
 			 pcidev->domain,
 			 pcidev->bus,
 			 pcidev->device,
 			 pcidev->function);
-		err = -ENOTTY;
 		goto error;
 	}
 
-	pci_cfg_access_lock(dev);
-	device_lock(&dev->dev);
+#if KERNEL_VERSION(2, 32, 0) <= MODS_KERNEL_VERSION
+	pm_runtime_get_sync(&dev->dev);
+#endif
 
-	err_handler = dev->driver ? dev->driver->err_handler : NULL;
-	if (err_handler && err_handler->reset_prepare)
-		err_handler->reset_prepare(dev);
+	err = pci_reset_function(dev);
 
-	pci_set_power_state(dev, PCI_D0);
-	pci_save_state(dev);
-	pci_write_config_word(dev, PCI_COMMAND, PCI_COMMAND_INTX_DISABLE);
-
-#if defined(MODS_PCIE_FLR_HAS_ERR)
-	err = pcie_flr(dev);
+#if KERNEL_VERSION(2, 32, 0) <= MODS_KERNEL_VERSION
+	pm_runtime_put(&dev->dev);
+#endif
 
 	if (unlikely(err))
 		cl_error("pcie_flr failed on dev %04x:%02x:%02x.%x\n",
@@ -1065,31 +1080,17 @@ int esc_mods_pci_reset_function(struct mods_client    *client,
 			 pcidev->bus,
 			 pcidev->device,
 			 pcidev->function);
-#else
-	pcie_flr(dev);
-#endif
-
-	if (!err)
+	else
 		cl_info("pcie_flr succeeded on dev %04x:%02x:%02x.%x\n",
 			pcidev->domain,
 			pcidev->bus,
 			pcidev->device,
 			pcidev->function);
 
-	pci_restore_state(dev);
-
-	if (err_handler && err_handler->reset_done)
-		err_handler->reset_done(dev);
-
-	device_unlock(&dev->dev);
-	pci_cfg_access_unlock(dev);
 error:
 	pci_dev_put(dev);
 	LOG_EXT();
 	return err;
-#else
-	return -EINVAL;
-#endif
 }
 
 #ifdef MODS_HAS_DEV_PROPS
