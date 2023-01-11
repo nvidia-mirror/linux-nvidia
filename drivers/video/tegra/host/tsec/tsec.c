@@ -1,7 +1,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2012-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -345,7 +345,7 @@ static void tsec_execute_method(dma_addr_t dma_handle,
 
 	nvhost_syncpt_wait_timeout_ext(tsec, job->sp->id,
 			job->sp->fence,
-			(u32)MAX_SCHEDULE_TIMEOUT,
+			(unsigned long)MAX_SCHEDULE_TIMEOUT,
 			NULL, NULL);
 
 exit:

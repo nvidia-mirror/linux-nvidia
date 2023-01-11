@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -992,7 +992,7 @@ static void nvhost_free_syncpt(struct nvhost_syncpt *sp, u32 id)
 			id, nvhost_syncpt_get_name(host->dev, id));
 		nvhost_syncpt_wait_timeout(sp, id,
 					   nvhost_syncpt_read_max(sp, id),
-					   (u32)MAX_SCHEDULE_TIMEOUT,
+					   MAX_SCHEDULE_TIMEOUT,
 					   NULL, NULL, false);
 	}
 
@@ -1461,7 +1461,7 @@ int nvhost_syncpt_is_expired_ext(struct platform_device *dev,
 EXPORT_SYMBOL(nvhost_syncpt_is_expired_ext);
 
 int nvhost_syncpt_wait_timeout_ext(struct platform_device *dev, u32 id,
-	u32 thresh, u32 timeout, u32 *value, struct timespec64 *ts)
+	u32 thresh, unsigned long timeout, u32 *value, struct timespec64 *ts)
 {
 	struct nvhost_master *master = nvhost_get_host(dev);
 	struct nvhost_syncpt *sp =
