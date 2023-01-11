@@ -233,41 +233,41 @@ static int tegra_hv_vcpu_yield_remove(struct platform_device *pdev)
 	if (vcpu_yield_pdev) {
 		vcpu_yield_dev_list = vcpu_yield_pdev->vcpu_yield_dev_list;
 		vcpu_yield_class = vcpu_yield_pdev->vcpu_yield_class;
-	}
 
-	if (vcpu_yield_dev_list) {
-		for (i = 0; i < vcpu_yield_pdev->vmid_count; i++) {
-			vcpu_yield = &vcpu_yield_dev_list[i];
+		if (vcpu_yield_dev_list) {
+			for (i = 0; i < vcpu_yield_pdev->vmid_count; i++) {
+				vcpu_yield = &vcpu_yield_dev_list[i];
 
-			if (vcpu_yield->device) {
-				cdev_del(&vcpu_yield->cdev);
-				device_del(vcpu_yield->device);
+				if (vcpu_yield->device) {
+					cdev_del(&vcpu_yield->cdev);
+					device_del(vcpu_yield->device);
+				}
+
+				if (vcpu_yield->ivck) {
+					devm_free_irq(vcpu_yield->device,
+						vcpu_yield->ivck->irq, vcpu_yield);
+					tegra_hv_ivc_unreserve(vcpu_yield->ivck);
+					vcpu_yield->ivck = NULL;
+				}
+
+				device_destroy(vcpu_yield_class, vcpu_yield->dev);
+
 			}
-
-			if (vcpu_yield->ivck) {
-				devm_free_irq(vcpu_yield->device, vcpu_yield->ivck->irq,
-					vcpu_yield);
-				tegra_hv_ivc_unreserve(vcpu_yield->ivck);
-				vcpu_yield->ivck = NULL;
-			}
-
-			device_destroy(vcpu_yield_class, vcpu_yield->dev);
-
+			kfree(vcpu_yield_dev_list);
 		}
-		kfree(vcpu_yield_dev_list);
+
+		if (!IS_ERR_OR_NULL(vcpu_yield_class))
+			class_destroy(vcpu_yield_class);
+
+		if (vcpu_yield_pdev->vcpu_yield_dev) {
+			unregister_chrdev_region(vcpu_yield_pdev->vcpu_yield_dev,
+				vcpu_yield_pdev->vmid_count);
+			vcpu_yield_pdev->vcpu_yield_dev = 0;
+		}
+
+		kfree(vcpu_yield_pdev);
+		dev_set_drvdata(&pdev->dev, NULL);
 	}
-
-	if (!IS_ERR_OR_NULL(vcpu_yield_class))
-		class_destroy(vcpu_yield_class);
-
-	if (vcpu_yield_pdev->vcpu_yield_dev) {
-		unregister_chrdev_region(vcpu_yield_pdev->vcpu_yield_dev,
-			vcpu_yield_pdev->vmid_count);
-		vcpu_yield_pdev->vcpu_yield_dev = 0;
-	}
-
-	kfree(vcpu_yield_pdev);
-	dev_set_drvdata(&pdev->dev, NULL);
 
 	return 0;
 }
