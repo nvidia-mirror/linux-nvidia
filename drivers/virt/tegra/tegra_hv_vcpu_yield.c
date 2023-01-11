@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 #define pr_fmt(fmt) "%s:%s(): " fmt, KBUILD_MODNAME, __func__
 
@@ -215,7 +215,7 @@ out:
 	return ret;
 }
 
-const struct file_operations fops = {
+static const struct file_operations fops = {
 	.owner = THIS_MODULE,
 	.open = tegra_hv_vcpu_yield_open,
 	.release = tegra_hv_vcpu_yield_release,
