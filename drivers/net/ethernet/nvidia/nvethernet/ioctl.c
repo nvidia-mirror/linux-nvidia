@@ -17,94 +17,6 @@
 #include "ether_linux.h"
 
 /**
- * @brief Function to check valid ip4 address
- *
- * Algorithm:
- * 1) Check if IP4 address provided is valid.
- *
- * @param[in] ip_addr: Pointer to ip4 addr buffer.
- *
- * @retval true If valid ip4 address
- * @retval false Otherwise
- */
-static bool ether_is_ip4_addr(unsigned char *ip_addr)
-{
-	unsigned char addr;
-	bool is_ip4_addr = false;
-
-	if (ip_addr == NULL) {
-		return is_ip4_addr;
-	}
-	addr = (ip_addr[0] & MAX_IP_ADDR_BYTE);
-	/* class E ip address reserved for future use
-	 */
-	if (addr >= CLASS_E_IP4_ADDR_RANGE_START) {
-		is_ip4_addr = false;
-	} else {
-		is_ip4_addr = true;
-	}
-	return is_ip4_addr;
-}
-
-/**
- * @brief Function to check valid multicast address
- *
- * Algorithm:
- * 1) Check if multicast address provided is valid.
- *
- * @param[in] ip_addr: Pointer to multicast addr buffer.
- *
- * @retval true If valid multicast address
- * @retval false Otherwise
- */
-static bool ether_is_mc_addr(unsigned char *mc_addr)
-{
-	unsigned char addr;
-	bool is_mc_addr = false;
-
-	if (mc_addr == NULL) {
-		return is_mc_addr;
-	}
-	addr = (mc_addr[0] & MAX_IP_ADDR_BYTE);
-	/* class D ip address reserved for multicast address
-	 */
-	if (addr >= MIN_MC_ADDR_RANGE &&  addr <= MAX_MC_ADDR_RANGE) {
-		is_mc_addr = true;
-	} else {
-		is_mc_addr = false;
-	}
-	return is_mc_addr;
-}
-
-/**
- * @brief Function to check valid broadcast address
- *
- * Algorithm:
- * 1) Check if broadcast address provided is valid.
- *
- * @param[in] bc_addr: Pointer to broadcast addr buffer.
- *
- * @retval true If valid broadcast address
- * @retval false Otherwise
- */
-static bool ether_is_bc_addr(unsigned char *bc_addr)
-{
-	bool is_bc_addr = true;
-	int i;
-
-	if (bc_addr == NULL) {
-		return false;
-	}
-	for (i = 0; i < NUM_BYTES_IN_IPADDR; i++) {
-		if (bc_addr[i] != MAX_IP_ADDR_BYTE) {
-			is_bc_addr = false;
-			break;
-		}
-	}
-	return is_bc_addr;
-}
-
-/**
  * @brief Function to handle private ioctl - EQOS_AVB_ALGORITHM
  *
  * Algorithm: Call osi_set_avb with user passed data
@@ -122,8 +34,10 @@ static int ether_set_avb_algo(struct net_device *ndev,
 {
 	struct ether_priv_data *pdata = netdev_priv(ndev);
 	struct osi_core_priv_data *osi_core = pdata->osi_core;
+#ifndef OSI_STRIPPED_LIB
 	struct osi_dma_priv_data *osi_dma = pdata->osi_dma;
 	struct osi_tx_ring *tx_ring = NULL;
+#endif /* !OSI_STRIPPED_LIB */
 	struct osi_ioctl ioctl_data = {};
 	int ret = -1;
 
@@ -146,6 +60,7 @@ static int ether_set_avb_algo(struct net_device *ndev,
 		return -EINVAL;
 	}
 
+#ifndef OSI_STRIPPED_LIB
 	/* Check AVB mode disable on slot function enable */
 	tx_ring = osi_dma->tx_ring[ioctl_data.avb.qindex];
 	if (tx_ring && tx_ring->slot_check == OSI_ENABLE &&
@@ -155,6 +70,7 @@ static int ether_set_avb_algo(struct net_device *ndev,
 			ioctl_data.avb.qindex);
 		return -EINVAL;
 	}
+#endif /* !OSI_STRIPPED_LIB */
 
 	ioctl_data.cmd = OSI_CMD_SET_AVB;
 	return osi_handle_ioctl(osi_core, &ioctl_data);
@@ -303,6 +219,7 @@ static int ether_get_avb_algo(struct net_device *ndev,
 	return ret;
 }
 
+#ifndef OSI_STRIPPED_LIB
 /**
  * @brief Handle ioctl to enable/disable PTP offload
  *
@@ -398,6 +315,94 @@ static int ether_config_ptp_offload(struct ether_priv_data *pdata,
 }
 
 /**
+ * @brief Function to check valid ip4 address
+ *
+ * Algorithm:
+ * 1) Check if IP4 address provided is valid.
+ *
+ * @param[in] ip_addr: Pointer to ip4 addr buffer.
+ *
+ * @retval true If valid ip4 address
+ * @retval false Otherwise
+ */
+static bool ether_is_ip4_addr(unsigned char *ip_addr)
+{
+	unsigned char addr;
+	bool is_ip4_addr = false;
+
+	if (ip_addr == NULL) {
+		return is_ip4_addr;
+	}
+	addr = (ip_addr[0] & MAX_IP_ADDR_BYTE);
+	/* class E ip address reserved for future use
+	 */
+	if (addr >= CLASS_E_IP4_ADDR_RANGE_START) {
+		is_ip4_addr = false;
+	} else {
+		is_ip4_addr = true;
+	}
+	return is_ip4_addr;
+}
+
+/**
+ * @brief Function to check valid multicast address
+ *
+ * Algorithm:
+ * 1) Check if multicast address provided is valid.
+ *
+ * @param[in] ip_addr: Pointer to multicast addr buffer.
+ *
+ * @retval true If valid multicast address
+ * @retval false Otherwise
+ */
+static bool ether_is_mc_addr(unsigned char *mc_addr)
+{
+	unsigned char addr;
+	bool is_mc_addr = false;
+
+	if (mc_addr == NULL) {
+		return is_mc_addr;
+	}
+	addr = (mc_addr[0] & MAX_IP_ADDR_BYTE);
+	/* class D ip address reserved for multicast address
+	 */
+	if (addr >= MIN_MC_ADDR_RANGE &&  addr <= MAX_MC_ADDR_RANGE) {
+		is_mc_addr = true;
+	} else {
+		is_mc_addr = false;
+	}
+	return is_mc_addr;
+}
+
+/**
+ * @brief Function to check valid broadcast address
+ *
+ * Algorithm:
+ * 1) Check if broadcast address provided is valid.
+ *
+ * @param[in] bc_addr: Pointer to broadcast addr buffer.
+ *
+ * @retval true If valid broadcast address
+ * @retval false Otherwise
+ */
+static bool ether_is_bc_addr(unsigned char *bc_addr)
+{
+	bool is_bc_addr = true;
+	int i;
+
+	if (bc_addr == NULL) {
+		return false;
+	}
+	for (i = 0; i < NUM_BYTES_IN_IPADDR; i++) {
+		if (bc_addr[i] != MAX_IP_ADDR_BYTE) {
+			is_bc_addr = false;
+			break;
+		}
+	}
+	return is_bc_addr;
+}
+
+/**
  * @brief Handle ioctl to enable/disable ARP offload
  *
  * Algorithm:
@@ -450,6 +455,7 @@ static int ether_config_arp_offload(struct ether_priv_data *pdata,
 		ret ? "Failed" : "Success");
 	return ret;
 }
+#endif /* !OSI_STRIPPED_LIB */
 
 /**
  * @brief This function is invoked by ioctl function when user issues an ioctl
@@ -610,6 +616,7 @@ static int ether_config_l2_filters(struct net_device *dev,
 	return osi_handle_ioctl(osi_core, &ioctl_data);
 }
 
+#ifndef OSI_STRIPPED_LIB
 /**
  * @brief This function is invoked by ioctl functio when user issues an ioctl
  * command to configure VALN filtering.
@@ -917,6 +924,7 @@ static int ether_config_ptp_rxq(struct net_device *ndev,
 	ioctl_data.cmd = OSI_CMD_PTP_RXQ_ROUTE;
 	return osi_handle_ioctl(osi_core, &ioctl_data);
 }
+#endif /* !OSI_STRIPPED_LIB */
 
 /**
  * @brief This function is invoked by ioctl function when user issues an ioctl
@@ -1071,14 +1079,16 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 			    struct ifreq *ifr)
 {
 	struct ether_priv_data *pdata = netdev_priv(ndev);
+#ifndef OSI_STRIPPED_LIB
 	struct phy_device *phydev = ndev->phydev;
-	struct ether_exported_ifr_data ifdata;
+	struct osi_ioctl ioctl_data = {};
 	struct osi_core_priv_data *osi_core = pdata->osi_core;
+#endif /* !OSI_STRIPPED_LIB */
+	struct ether_exported_ifr_data ifdata;
 #ifdef OSI_DEBUG
 	struct osi_dma_priv_data *osi_dma = pdata->osi_dma;
 #endif
 	int ret = -EOPNOTSUPP;
-	struct osi_ioctl ioctl_data = {};
 
 	if (copy_from_user(&ifdata, (void __user *)ifr->ifr_data,
 			   sizeof(ifdata)) != 0U) {
@@ -1109,6 +1119,7 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 	}
 
 	switch (ifdata.ifcmd) {
+#ifndef OSI_STRIPPED_LIB
 	case EQOS_GET_TX_QCNT:
 		ifdata.qinx = osi_core->num_mtl_queues;
 		ret = 0;
@@ -1127,12 +1138,14 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 		}
 		ret = 0;
 		break;
+#endif /* !OSI_STRIPPED_LIB */
 	case ETHER_AVB_ALGORITHM:
 		ret = ether_set_avb_algo(ndev, &ifdata);
 		break;
 	case ETHER_GET_AVB_ALGORITHM:
 		ret = ether_get_avb_algo(ndev, &ifdata);
 		break;
+#ifndef OSI_STRIPPED_LIB
 	case ETHER_CONFIG_ARP_OFFLOAD:
 		ret = ether_config_arp_offload(pdata, &ifdata);
 		break;
@@ -1147,6 +1160,35 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 			ret = -EOPNOTSUPP;
 		}
 		break;
+	case ETHER_CONFIG_LOOPBACK_MODE:
+		ret = ether_config_loopback_mode(ndev, ifdata.if_flags);
+		break;
+	case EQOS_VLAN_FILTERING_CMD:
+		ret = ether_config_vlan_filter(ndev, &ifdata);
+		break;
+	case ETHER_PAD_CALIBRATION:
+		ret = ether_pad_calibration(ndev, ifdata.if_flags);
+		break;
+	case EQOS_L2_DA_FILTERING_CMD:
+		ret = ether_config_l2_da_filter(ndev, &ifdata);
+		break;
+	case ETHER_MC_DMA_ROUTE:
+		ret = ether_config_mc_dmasel(ndev, ifdata.if_flags);
+		break;
+	case ETHER_READ_REG:
+		ioctl_data.cmd = OSI_CMD_READ_REG;
+		ioctl_data.arg1_u32 = ifdata.if_flags;
+		ret = osi_handle_ioctl(osi_core, &ioctl_data);
+		ifdata.qinx = ret;
+		break;
+	case ETHER_WRITE_REG:
+		ioctl_data.cmd = OSI_CMD_WRITE_REG;
+		ioctl_data.arg1_u32 = ifdata.qinx;
+		ioctl_data.arg2_u32 = ifdata.if_flags;
+		ret = osi_handle_ioctl(osi_core, &ioctl_data);
+		ifdata.qinx = ret;
+		break;
+#endif /* !OSI_STRIPPED_LIB */
 	case EQOS_L3L4_FILTER_CMD:
 		/* flags should be 0x0 or 0x1, discard any other */
 		if (pdata->hw_feat.l3l4_filter_num > 0U) {
@@ -1164,39 +1206,11 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 	case ETHER_CONFIG_FRP_CMD:
 		ret = ether_config_frp_cmd(ndev, &ifdata);
 		break;
-	case EQOS_VLAN_FILTERING_CMD:
-		ret = ether_config_vlan_filter(ndev, &ifdata);
-		break;
-	case EQOS_L2_DA_FILTERING_CMD:
-		ret = ether_config_l2_da_filter(ndev, &ifdata);
-		break;
-	case ETHER_MC_DMA_ROUTE:
-		ret = ether_config_mc_dmasel(ndev, ifdata.if_flags);
-		break;
-	case ETHER_CONFIG_LOOPBACK_MODE:
-		ret = ether_config_loopback_mode(ndev, ifdata.if_flags);
-		break;
 	case ETHER_CONFIG_EST:
 		ret = ether_config_est(ndev, &ifdata);
 		break;
 	case ETHER_CONFIG_FPE:
 		ret = ether_config_fpe(ndev, &ifdata);
-		break;
-	case ETHER_READ_REG:
-		ioctl_data.cmd = OSI_CMD_READ_REG;
-		ioctl_data.arg1_u32 = ifdata.if_flags;
-		ret = osi_handle_ioctl(pdata->osi_core, &ioctl_data);
-		ifdata.qinx = ret;
-		break;
-	case ETHER_WRITE_REG:
-		ioctl_data.cmd = OSI_CMD_WRITE_REG;
-		ioctl_data.arg1_u32 = ifdata.qinx;
-		ioctl_data.arg2_u32 = ifdata.if_flags;
-		ret = osi_handle_ioctl(pdata->osi_core, &ioctl_data);
-		ifdata.qinx = ret;
-		break;
-	case ETHER_PAD_CALIBRATION:
-		ret = ether_pad_calibration(ndev, ifdata.if_flags);
 		break;
 #ifdef OSI_DEBUG
 	case ETHER_REGISTER_DUMP:
@@ -1206,7 +1220,7 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 			goto err;
 
 		ioctl_data.cmd = OSI_CMD_REG_DUMP;
-		ret = osi_handle_ioctl(pdata->osi_core, &ioctl_data);
+		ret = osi_handle_ioctl(osi_core, &ioctl_data);
 		break;
 	case ETHER_STRUCTURE_DUMP:
 		osi_dma->ioctl_data.cmd = OSI_DMA_IOCTL_CMD_STRUCTS_DUMP;
@@ -1215,7 +1229,7 @@ int ether_handle_priv_ioctl(struct net_device *ndev,
 			goto err;
 
 		ioctl_data.cmd = OSI_CMD_STRUCTS_DUMP;
-		ret = osi_handle_ioctl(pdata->osi_core, &ioctl_data);
+		ret = osi_handle_ioctl(osi_core, &ioctl_data);
 		break;
 	case ETHER_DEBUG_INTR_CONFIG:
 		ret = ether_debug_intr_config(ndev, &ifdata);

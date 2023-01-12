@@ -12,8 +12,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ifneq ($(CONFIG_TEGRA_LINUX_SAFETY),y)
-
 OSI_COMMON := nvethernetrm/osi/common
 OSI_CORE := nvethernetrm/osi/core
 OSI_DMA := nvethernetrm/osi/dma
@@ -59,6 +57,6 @@ nvethernet-objs:= ether_linux.o \
 
 include $(srctree.nvidia)/drivers/net/ethernet/nvidia/nvethernet/nvethernetrm/include/config.tmk
 
+ifneq ($(CONFIG_TEGRA_LINUX_SAFETY),y)
 nvethernet-$(CONFIG_NVETHERNET_SELFTESTS) += selftests.o
-
 endif
