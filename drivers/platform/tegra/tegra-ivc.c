@@ -1,7 +1,7 @@
 /*
  * Inter-VM Communication
  *
- * Copyright (C) 2014-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -210,7 +210,7 @@ static inline int ivc_channel_empty(struct ivc *ivc,
 	 * a potentially malicious peer, so returning empty is safer, because it
 	 * gives the impression that the channel has gone silent.
 	 */
-	if (safe_subtract_u32(w_count, r_count) > ivc->nframes)
+	if (w_count - r_count > ivc->nframes)
 		return 1;
 
 	return w_count == r_count;
@@ -223,7 +223,7 @@ static inline int ivc_channel_full(struct ivc *ivc,
 	 * Invalid cases where the counters indicate that the queue is over
 	 * capacity also appear full.
 	 */
-	return safe_subtract_u32(READ_ONCE(ch->w_count), READ_ONCE(ch->r_count))
+	return READ_ONCE(ch->w_count) - READ_ONCE(ch->r_count)
 		>= ivc->nframes;
 }
 
@@ -236,7 +236,7 @@ static inline uint32_t ivc_channel_avail_count(struct ivc *ivc,
 	 * comment in ivc_channel_empty() for an explanation about special
 	 * over-full considerations.
 	 */
-	return safe_subtract_u32(READ_ONCE(ch->w_count), READ_ONCE(ch->r_count));
+	return READ_ONCE(ch->w_count) - READ_ONCE(ch->r_count);
 }
 
 static inline void ivc_advance_tx(struct ivc *ivc)
