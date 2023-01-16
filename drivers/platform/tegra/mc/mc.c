@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/mc.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2011-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2011-2023, NVIDIA Corporation.  All rights reserved.
  *
  * Author:
  *	Erik Gilling <konkers@google.com>
@@ -450,16 +450,6 @@ static int tegra_mc_probe(struct platform_device *pdev)
 	}
 
 	enable_mssnvlinks(pdev);
-
-#if defined(CONFIG_TEGRA_MC_EARLY_ACK)
-	reg = mc_readl(MC_EMEM_ARB_OVERRIDE);
-	reg |= 3;
-#if defined(CONFIG_TEGRA_ERRATA_1157520)
-	if (tegra_revision == TEGRA_REVISION_A01)
-		reg &= ~2;
-#endif
-	mc_writel(reg, MC_EMEM_ARB_OVERRIDE);
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 	mc_debugfs_dir = debugfs_create_dir("mc", NULL);
