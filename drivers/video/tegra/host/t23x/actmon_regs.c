@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,8 +61,39 @@ static struct nvhost_actmon_register __attribute__((__unused__))
 
 static struct nvhost_actmon_register __attribute__((__unused__))
 	t23x_nvenc_actmon_registers[] = {
-	/* NV_PNVENC_TFBIF_ACTMON_ACTIVE_WEIGHT */
-	{ .addr = 0x00001854, .val = 0x000000d8 },
+	/*
+	 * NV_PNVENC_TFBIF_ACTMON_ACTIVE_MASK
+	 * - Mask out signals with associated bit field value equals to 1
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 0111
+	 * - STARVED signal is not used in nvenc
+	 */
+	{
+		.addr = 0x0000184c,
+		.val = 0x00000007
+	},
+	/*
+	 * NV_PNVENC_TFBIF_ACTMON_ACTIVE_BORPS
+	 * - 2 bits are used to describe the usage of each signal
+	 * - bit #0 => POLARITY, 1=NEGATIVE, 0=POSITIVE
+	 * - bit #1 => OPERATION, 1=AND, 0=OR
+	 * - bit fields = active,delayed,stalled,starved
+	 * - bit representation = 10000000
+	 */
+	{
+		.addr = 0x00001850,
+		.val = 0x00000080
+	},
+	/*
+	 * NV_PNVENC_TFBIF_ACTMON_ACTIVE_WEIGHT
+	 * - 32 bits are used to specify the count weight
+	 * - NVENC will toggle active signal every `count_weight` cycle time
+	 * - count_weight formula = nvenc_fmax / actmon_clk * 4
+	 */
+	{
+		.addr = 0x00001854,
+		.val = 0x000000d0
+	},
 	{}
 };
 
