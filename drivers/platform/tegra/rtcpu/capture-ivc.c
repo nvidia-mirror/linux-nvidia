@@ -41,9 +41,6 @@ static int tegra_capture_ivc_tx_(struct tegra_capture_ivc *civc,
 	struct tegra_ivc_channel *chan;
 	int ret;
 
-	if (civc == NULL)
-		return -ENODEV;
-
 	chan = civc->chan;
 	if (chan == NULL || WARN_ON(!chan->is_ready))
 		return -EIO;
@@ -75,7 +72,7 @@ static int tegra_capture_ivc_tx(struct tegra_capture_ivc *civc,
 	size_t hdrlen = sizeof(hdr);
 	char const *ch_name = "NULL";
 
-	if (civc && civc->chan)
+	if (civc->chan)
 		ch_name = dev_name(&civc->chan->dev);
 
 	if (len < hdrlen) {
@@ -97,14 +94,18 @@ static int tegra_capture_ivc_tx(struct tegra_capture_ivc *civc,
 
 int tegra_capture_ivc_control_submit(const void *control_desc, size_t len)
 {
-	WARN_ON(__scivc_control == NULL);
+	if (WARN_ON(__scivc_control == NULL))
+		return -ENODEV;
+
 	return tegra_capture_ivc_tx(__scivc_control, control_desc, len);
 }
 EXPORT_SYMBOL(tegra_capture_ivc_control_submit);
 
 int tegra_capture_ivc_capture_submit(const void *capture_desc, size_t len)
 {
-	WARN_ON(__scivc_capture == NULL);
+	if (WARN_ON(__scivc_capture == NULL))
+		return -ENODEV;
+
 	return tegra_capture_ivc_tx(__scivc_capture, capture_desc, len);
 }
 EXPORT_SYMBOL(tegra_capture_ivc_capture_submit);
