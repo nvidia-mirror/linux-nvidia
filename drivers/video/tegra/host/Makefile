@@ -11,6 +11,11 @@ ifeq ($(CONFIG_TEGRA_T239_GRHOST),y)
 	ccflags-y += -I$(srctree.nvidia-t239)/drivers/video/tegra/host
 endif
 
+ifeq ($(CONFIG_TEGRA_T264_GRHOST),y)
+	ccflags-y += -I$(srctree.nvidia-t264)/include
+	ccflags-y += -I$(srctree.nvidia-t264)/drivers/video/tegra/host
+endif
+
 ccflags-y += -Werror -Wno-vla
 
 nvhost-y += \
@@ -39,6 +44,9 @@ nvhost-y += \
 
 nvhost-$(CONFIG_TEGRA_T239_GRHOST) += \
 	t239/t239.o
+
+nvhost-$(CONFIG_TEGRA_T264_GRHOST) += \
+	t264/t264.o
 
 nvhost-$(CONFIG_TEGRA_GRHOST_OFA) += ofa/ofa.o
 nvhost-$(CONFIG_TEGRA_GRHOST_NVDEC) += nvdec/nvdec.o nvdec/nvdec_t23x.o

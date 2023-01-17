@@ -14,6 +14,13 @@ config TEGRA_T239_GRHOST
 	help
 	  Driver for the Tegra graphics host hardware.
 
+config TEGRA_T264_GRHOST
+	bool "Tegra 264 graphics host driver"
+	depends on TEGRA_GRHOST && ARCH_TEGRA_264_SOC
+	default y
+	help
+	  Driver for the Tegra graphics host hardware.
+
 config TEGRA_T23X_GRHOST_PVA
         bool "Tegra 23x PVA support"
         depends on TEGRA_GRHOST && ARCH_TEGRA_23x_SOC

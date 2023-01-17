@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Driver Entrypoint
  *
- * Copyright (c) 2010-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -68,6 +68,9 @@
 #include "t23x/t23x.h"
 #ifdef CONFIG_TEGRA_T239_GRHOST
 #include "t239/t239.h"
+#endif
+#ifdef CONFIG_TEGRA_T264_GRHOST
+#include "t264/t264.h"
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
@@ -1019,6 +1022,11 @@ static struct of_device_id tegra_host1x_of_match[] = {
 	{ .name = "host1x",
 		.compatible = "nvidia,tegra239-host1x",
 		.data = (struct nvhost_device_data *)&t239_host1x_info },
+#endif
+#ifdef CONFIG_TEGRA_T264_GRHOST
+	{ .name = "host1x",
+		.compatible = "nvidia,tegra264-host1x",
+		.data = (struct nvhost_device_data *)&t264_host1x_info },
 #endif
 	{ },
 };
