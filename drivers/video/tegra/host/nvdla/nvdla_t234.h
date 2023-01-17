@@ -13,7 +13,7 @@
 #include "nvdla_cg_regs.h"
 #include "dla_t23x_fw_version.h"
 
-struct nvhost_device_data t23x_nvdla0_info = {
+static struct nvhost_device_data t23x_nvdla0_info = {
 	.devfs_name_family	= "nvdla",
 	.class			= NV_DLA0_CLASS_ID,
 	.clocks			= {
@@ -44,7 +44,7 @@ struct nvhost_device_data t23x_nvdla0_info = {
 	.firmware_not_in_subdir = true,
 };
 
-struct nvhost_device_data t23x_nvdla1_info = {
+static struct nvhost_device_data t23x_nvdla1_info = {
 	.devfs_name_family	= "nvdla",
 	.class			= NV_DLA1_CLASS_ID,
 	.clocks			= {

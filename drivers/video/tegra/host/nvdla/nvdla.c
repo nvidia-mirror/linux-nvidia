@@ -593,7 +593,7 @@ out:
 }
 
 /* Free utilization rate memory */
-void nvdla_free_utilization_rate_memory(struct platform_device *pdev)
+static void nvdla_free_utilization_rate_memory(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
@@ -609,7 +609,7 @@ void nvdla_free_utilization_rate_memory(struct platform_device *pdev)
 }
 
 /* Allocate memory to store the resource utilization rate */
-int nvdla_alloc_utilization_rate_memory(struct platform_device *pdev)
+static int nvdla_alloc_utilization_rate_memory(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
@@ -629,7 +629,7 @@ int nvdla_alloc_utilization_rate_memory(struct platform_device *pdev)
 }
 
 /* Free window size memory */
-void nvdla_free_window_size_memory(struct platform_device *pdev)
+static void nvdla_free_window_size_memory(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
@@ -645,7 +645,7 @@ void nvdla_free_window_size_memory(struct platform_device *pdev)
 }
 
 /* Allocate memory to store the window size for which the utilization rate is computed */
-int nvdla_alloc_window_size_memory(struct platform_device *pdev)
+static int nvdla_alloc_window_size_memory(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
