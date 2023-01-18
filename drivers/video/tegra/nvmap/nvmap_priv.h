@@ -3,7 +3,7 @@
  *
  * GPU memory management driver for Tegra
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -926,4 +926,8 @@ extern void __dma_map_area(const void *cpu_va, size_t size, int dir);
 int nvmap_assign_pages_to_handle(struct nvmap_client *client,
 		struct nvmap_handle **hs, struct nvmap_handle *h,
 		struct handles_range *rng);
+
+#ifdef NVMAP_LOADABLE_MODULE
+void nvmap_dma_release_coherent_memory(struct dma_coherent_mem_replica *mem);
+#endif /* NVMAP_LOADABLE_MODULE */
 #endif /* __VIDEO_TEGRA_NVMAP_NVMAP_H */

@@ -576,7 +576,7 @@ void nvmap_dma_mark_declared_memory_unoccupied(struct device *dev,
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 }
 
-static void nvmap_dma_release_coherent_memory(struct dma_coherent_mem_replica *mem)
+void nvmap_dma_release_coherent_memory(struct dma_coherent_mem_replica *mem)
 {
 	if (!mem)
 		return;
@@ -727,15 +727,9 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 	return err;
 }
 
-static void nvmap_co_device_release(struct reserved_mem *rmem,struct device *dev)
+static void nvmap_co_device_release(struct reserved_mem *rmem, struct device *dev)
 {
-	struct nvmap_platform_carveout *co = rmem->priv;
-
-	if (!co)
-		return;
-
-	if (co->usage_mask == NVMAP_HEAP_CARVEOUT_IVM)
-		kfree(co->name);
+	return;
 }
 
 static const struct reserved_mem_ops nvmap_co_ops = {

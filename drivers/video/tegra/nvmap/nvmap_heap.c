@@ -3,7 +3,7 @@
  *
  * GPU heap allocator.
  *
- * Copyright (c) 2011-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -535,6 +535,8 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 		co->name, (void *)(uintptr_t)base, len/1024);
 	return h;
 fail:
+	if (h->dma_dev->kobj.name)
+		kfree_const(h->dma_dev->kobj.name);
 	kfree(h);
 	return NULL;
 }
@@ -543,6 +545,17 @@ fail:
 void nvmap_heap_destroy(struct nvmap_heap *heap)
 {
 	WARN_ON(!list_empty(&heap->all_list));
+	if (heap->dma_dev->kobj.name)
+		kfree_const(heap->dma_dev->kobj.name);
+
+	if (heap->is_ivm)
+		kfree(heap->name);
+
+#ifdef NVMAP_LOADABLE_MODULE
+	nvmap_dma_release_coherent_memory((struct dma_coherent_mem_replica *)
+					  heap->dma_dev->dma_mem);
+#endif /* NVMAP_LOADABLE_MODULE */
+
 	while (!list_empty(&heap->all_list)) {
 		struct list_block *l;
 		l = list_first_entry(&heap->all_list, struct list_block,
