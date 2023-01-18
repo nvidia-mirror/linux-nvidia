@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  */
 
 /**
@@ -29,7 +29,7 @@
 
 #define CAMRTC_TAG_IVC_SETUP	CAMRTC_TAG64('I', 'V', 'C', '-', 'S', 'E', 'T', 'U')
 #define CAMRTC_TAG_NV_TRACE	CAMRTC_TAG64('N', 'V', ' ', 'T', 'R', 'A', 'C', 'E')
-#define CAMRTC_TAG_NV_CAM_TRACE	CAMRTC_TAG64('N', 'V', ' ', 'C', 'A', 'M', 'T', 'R')
+#define CAMRTC_TAG_NV_TRCON	CAMRTC_TAG64('N', 'V', ' ', 'T', 'R', 'C', 'O', 'N')
 #define CAMRTC_TAG_NV_COVERAGE	CAMRTC_TAG64('N', 'V', ' ', 'C', 'O', 'V', 'E', 'R')
 /** }@ */
 
