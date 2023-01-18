@@ -290,7 +290,7 @@ enum {
 int tegra_mc_flush(int id);
 int tegra_mc_flush_done(u32 id);
 
-void tegra_mc_utils_init(void);
+void tegra_mc_utils_init(const struct device_node *np);
 
 /*
  * Necessary bit fields for various MC registers. Add to these as

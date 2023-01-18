@@ -290,36 +290,54 @@ static void tegra_mc_utils_debugfs_init(void)
 }
 #endif
 
-void tegra_mc_utils_init(void)
+static u32 get_dram_dt_prop(const struct device_node *np, const char *prop)
+{
+	u32 val;
+	int ret;
+
+	ret = of_property_read_u32(np, prop, &val);
+	if (ret) {
+		pr_err("failed to read %s\n", prop);
+		return ~0U;
+	}
+
+	return val;
+}
+
+void tegra_mc_utils_init(const struct device_node *np)
 {
 	u32 dram, ch, ecc, rank;
 	void __iomem *emc_base;
 
-	emc_base = ioremap(EMC_BASE, 0x00010000);
-	if (is_tegra_safety_build())
-		dram = 0x1;
-	else
+	if (!is_tegra_hypervisor_mode()) {
+		emc_base = ioremap(EMC_BASE, 0x00010000);
 		dram = readl(emc_base + EMC_FBIO_CFG5_0) & DRAM_MASK;
 
-	ch = mc_readl(MC_EMEM_ADR_CFG_CHANNEL_ENABLE_0) & CH_MASK;
-	/*
-	 * TODO: For non orin chips MC_ECC_CONTROL_0 is not present, hence set
-	 * ecc to 0 and cleanup this once we have chip specific mc_utils driver.
-	 */
-	if (tegra_get_chip_id() == TEGRA234 &&
-		((tegra_read_chipid() >> 4) & 0xf) == 4)
-		ecc = mc_readl(MC_ECC_CONTROL_0) & ECC_MASK;
-	else
-		ecc = 0;
+		ch = mc_readl(MC_EMEM_ADR_CFG_CHANNEL_ENABLE_0) & CH_MASK;
+		/*
+		 * TODO: For non orin chips MC_ECC_CONTROL_0 is not present, hence set
+		 * ecc to 0 and cleanup this once we have chip specific mc_utils driver.
+		 */
+		if (tegra_get_chip_id() == TEGRA234 &&
+			((tegra_read_chipid() >> 4) & 0xf) == 4)
+			ecc = mc_readl(MC_ECC_CONTROL_0) & ECC_MASK;
+		else
+			ecc = 0;
 
-	rank = mc_readl(MC_EMEM_ADR_CFG_0) & RANK_MASK;
+		rank = mc_readl(MC_EMEM_ADR_CFG_0) & RANK_MASK;
 
-	iounmap(emc_base);
+		iounmap(emc_base);
 
-	while (ch) {
-		if (ch & 1)
-			ch_num++;
-		ch >>= 1;
+		while (ch) {
+			if (ch & 1)
+				ch_num++;
+			ch >>= 1;
+		}
+	} else {
+		ecc = get_dram_dt_prop(np, "dram_ecc");
+		rank = get_dram_dt_prop(np, "dram_rank");
+		dram = get_dram_dt_prop(np, "dram_lpddr");
+		ch_num = get_dram_dt_prop(np, "dram_channels");
 	}
 
 	/* pre silicon use LPDDR4 16ch (for orin, 8 for t239) no ecc 1-rank config*/

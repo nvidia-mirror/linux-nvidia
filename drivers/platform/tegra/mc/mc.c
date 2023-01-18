@@ -458,10 +458,11 @@ static int tegra_mc_probe(struct platform_device *pdev)
 		       PTR_ERR(mc_debugfs_dir));
 #endif
 
-	tegra_mcerr_init(mc_debugfs_dir, pdev);
+	if (!is_tegra_hypervisor_mode())
+		tegra_mcerr_init(mc_debugfs_dir, pdev);
 
 	if (tegra_get_chip_id() == TEGRA234)
-		tegra_mc_utils_init();
+		tegra_mc_utils_init(pdev->dev.of_node);
 
 	return 0;
 }
@@ -479,7 +480,7 @@ static int tegra_mc_resume_early(struct device *dev)
 	return 0;
 }
 
-void __weak tegra_mc_utils_init(void)
+void __weak tegra_mc_utils_init(const struct device_node *np)
 {
 	return;
 }

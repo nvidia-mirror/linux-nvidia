@@ -43,8 +43,6 @@ enum dram_types {
 	DRAM_TYPE_LPDDR4_4CH_2RANK,
 };
 
-void tegra_mc_utils_init(void);
-
 /*
  * Utility API to convert the given frequency to Bandwidth.
  *
