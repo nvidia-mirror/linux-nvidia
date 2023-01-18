@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -172,8 +172,8 @@ static void rtcpu_trace_init_memory(struct tegra_rtcpu_trace *tracer)
 
 	{
 		struct camrtc_trace_memory_header header = {
-			.signature[0] = CAMRTC_TRACE_SIGNATURE_1,
-			.signature[1] = CAMRTC_TRACE_SIGNATURE_2,
+			.tlv.tag = CAMRTC_TAG_NV_TRCON,
+			.tlv.len = tracer->trace_memory_size,
 			.revision = 1,
 			.exception_offset = CAMRTC_TRACE_EXCEPTION_OFFSET,
 			.exception_size = CAMRTC_TRACE_EXCEPTION_SIZE,
