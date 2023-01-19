@@ -342,8 +342,8 @@ int dce_ipc_channel_init(struct tegra_dce *d, u32 ch_type)
 	dev = dev_from_dce(d);
 
 #if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
-	iosys_map_set_vaddr_iomem(&rx, r->base + r->s_offset);
-	iosys_map_set_vaddr_iomem(&tx, r->base + r->s_offset + q_sz);
+	iosys_map_set_vaddr(&rx, r->base + r->s_offset);
+	iosys_map_set_vaddr(&tx, r->base + r->s_offset + q_sz);
 
 	ret = tegra_ivc_init(&ch->d_ivc, NULL, &rx, r->iova + r->s_offset, &tx,
 			r->iova + r->s_offset + q_sz, q_info->nframes, msg_sz,

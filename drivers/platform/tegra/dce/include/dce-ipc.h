@@ -106,7 +106,7 @@ struct dce_ipc_region {
 	u32 s_offset;
 	dma_addr_t iova;
 	unsigned long size;
-	void __iomem *base;
+	void *base;
 };
 
 struct dce_ipc_queue_info {
