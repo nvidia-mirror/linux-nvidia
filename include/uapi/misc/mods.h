@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -25,7 +25,7 @@
 
 /* Driver version */
 #define MODS_DRIVER_VERSION_MAJOR 4
-#define MODS_DRIVER_VERSION_MINOR 12
+#define MODS_DRIVER_VERSION_MINOR 13
 #define MODS_DRIVER_VERSION ((MODS_DRIVER_VERSION_MAJOR << 8) | \
 			     ((MODS_DRIVER_VERSION_MINOR / 10) << 4) | \
 			     (MODS_DRIVER_VERSION_MINOR % 10))
@@ -1889,6 +1889,8 @@ enum MODS_SP_FFA_CMD_TYPE {
 	MODS_FFA_CMD_READ_REG,
 	MODS_FFA_CMD_WRITE_REG,
 	MODS_FFA_CMD_READ_VER,
+	MODS_FFA_CMD_SE_TESTS,
+	MODS_FFA_CMD_SE_KEY_MOVER,
 	MODS_FFA_CMD_TYPE_END
 };
 
@@ -2155,6 +2157,5 @@ struct MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS {
 #define MODS_ESC_FFA_CMD MODSIO(WR, 145, MODS_FFA_PARAMS)
 #define MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN MODSIO(WR, 146, \
 						MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS)
-
 
 #endif /* _UAPI_MODS_H_  */

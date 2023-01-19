@@ -112,6 +112,16 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 	case MODS_FFA_CMD_READ_VER:
 		cl_debug(DEBUG_TEGRADMA, "sending cmd MODS_FFA_CMD_READ_VER to SP\n");
 		break;
+	case MODS_FFA_CMD_SE_TESTS:
+		cl_debug(DEBUG_TEGRADMA, "sending SE_TESTS data to SP :read cmd 0x%llx, alg|engineId:0x%llx\n",
+					  (unsigned long long)data.data0,
+					  (unsigned long long)data.data1);
+		break;
+	case MODS_FFA_CMD_SE_KEY_MOVER:
+		cl_debug(DEBUG_TEGRADMA, "sending SE_KEY_MOVER data to SP :read cmd 0x%llx, data:0x%llx\n",
+					  (unsigned long long)data.data0,
+					  (unsigned long long)data.data1);
+		break;
 	default:
 		cl_error("Unexpected command from SP 0x%llx\n", (unsigned long long)p->cmd);
 		return err;
@@ -133,6 +143,18 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 		break;
 	case MODS_FFA_CMD_READ_VER:
 		cl_debug(DEBUG_TEGRADMA, "received version from SP : 0x%llx\n",
+					  (unsigned long long)data.data1);
+		p->outdata[0] = data.data1;
+		break;
+	case MODS_FFA_CMD_SE_TESTS:
+		cl_debug(DEBUG_TEGRADMA, "sending SE_TESTS data to SP :read cmd 0x%llx, alg|engineId:0x%llx\n",
+					  (unsigned long long)data.data0,
+					  (unsigned long long)data.data1);
+		p->outdata[0] = data.data1;
+		break;
+	case MODS_FFA_CMD_SE_KEY_MOVER:
+		cl_debug(DEBUG_TEGRADMA, "sending SE_KEY_MOVER data to SP :read cmd 0x%llx, data:0x%llx\n",
+					  (unsigned long long)data.data0,
 					  (unsigned long long)data.data1);
 		p->outdata[0] = data.data1;
 		break;
