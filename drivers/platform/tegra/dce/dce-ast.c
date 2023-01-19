@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -386,7 +386,7 @@ static void (*const ast_master_addr_fn[MAX_NO_ASTS][MAX_AST_REGIONS])
  *
  * Ruturns 64 bit mask.
  */
-u64 dce_get_fw_ast_reg_mask(struct tegra_dce *d)
+static u64 dce_get_fw_ast_reg_mask(struct tegra_dce *d)
 {
 	struct dce_firmware *fw = d->fw_data;
 

@@ -22,7 +22,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/dce_events.h>
 
-struct dce_ipc_channel ivc_channels[DCE_IPC_CH_KMD_TYPE_MAX] = {
+static struct dce_ipc_channel ivc_channels[DCE_IPC_CH_KMD_TYPE_MAX] = {
 	[DCE_IPC_CH_KMD_TYPE_ADMIN] = {
 		.flags = DCE_IPC_CHANNEL_VALID
 			 | DCE_IPC_CHANNEL_MSG_HEADER,

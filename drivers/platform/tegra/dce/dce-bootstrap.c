@@ -223,7 +223,7 @@ void dce_bootstrap_work_fn(struct tegra_dce *d)
  *
  * Return : Void
  */
-void dce_handle_irq_status(struct tegra_dce *d, u32 status)
+static void dce_handle_irq_status(struct tegra_dce *d, u32 status)
 {
 
 	if (status & DCE_IRQ_LOG_OVERFLOW)
@@ -274,7 +274,7 @@ void dce_handle_irq_status(struct tegra_dce *d, u32 status)
  *
  * Return : Void
  */
-void dce_bootstrap_handle_boot_status(struct tegra_dce *d, u32 status)
+static void dce_bootstrap_handle_boot_status(struct tegra_dce *d, u32 status)
 {
 	int ret = 0;
 	dce_mailbox_store_interface_status(d, status,

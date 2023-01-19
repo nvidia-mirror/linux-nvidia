@@ -117,7 +117,7 @@ bool dce_io_valid_reg(struct tegra_dce *d, u32 r)
 void *dce_kzalloc(struct tegra_dce *d, size_t size, bool dma_flag)
 {
 	void *alloc;
-	u32 flags = GFP_KERNEL;
+	gfp_t flags = GFP_KERNEL;
 
 	if (dma_flag)
 		flags |= __GFP_DMA;
@@ -628,7 +628,7 @@ void dce_schedule_work(struct dce_work_struct *work)
  *
  * Return : void
  */
-void dce_work_handle_fn(struct work_struct *work)
+static void dce_work_handle_fn(struct work_struct *work)
 {
 	struct dce_work_struct *dce_work = container_of(work,
 							struct dce_work_struct,

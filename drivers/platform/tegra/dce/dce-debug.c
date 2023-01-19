@@ -621,7 +621,7 @@ void dce_remove_debug(struct tegra_dce *d)
 	d_dev->debugfs = NULL;
 }
 
-int dump_hsp_regs_show(struct seq_file *s, void *unused)
+static int dump_hsp_regs_show(struct seq_file *s, void *unused)
 {
 	u8 i = 0;
 	struct tegra_dce *d = s->private;

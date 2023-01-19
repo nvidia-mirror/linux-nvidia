@@ -20,7 +20,7 @@
 #define DCE_CLIENT_IPC_HANDLE_INVALID 0U
 #define DCE_CLIENT_IPC_HANDLE_VALID ((u32)BIT(31))
 
-struct tegra_dce_client_ipc client_handles[DCE_CLIENT_IPC_TYPE_MAX];
+static struct tegra_dce_client_ipc client_handles[DCE_CLIENT_IPC_TYPE_MAX];
 
 static uint32_t dce_interface_type_map[DCE_CLIENT_IPC_TYPE_MAX] = {
 	[DCE_CLIENT_IPC_TYPE_CPU_RM] = DCE_IPC_TYPE_DISPRM,
@@ -63,7 +63,7 @@ out:
 	return valid;
 }
 
-struct tegra_dce_client_ipc *dce_client_ipc_lookup_handle(u32 handle)
+static struct tegra_dce_client_ipc *dce_client_ipc_lookup_handle(u32 handle)
 {
 	struct tegra_dce_client_ipc *cl = NULL;
 

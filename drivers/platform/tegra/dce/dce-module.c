@@ -301,7 +301,7 @@ static int dce_pm_resume(struct device *dev)
 	return dce_pm_exit_sc7(d);
 }
 
-const struct dev_pm_ops dce_pm_ops = {
+static const struct dev_pm_ops dce_pm_ops = {
 	.suspend = dce_pm_suspend,
 	.resume  = dce_pm_resume,
 };
