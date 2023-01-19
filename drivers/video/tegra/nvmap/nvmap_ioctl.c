@@ -3,7 +3,7 @@
  *
  * User-space interface to nvmap
  *
- * Copyright (c) 2011-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -764,7 +764,7 @@ int nvmap_ioctl_create_from_ivc(struct file *filp, void __user *arg)
 		return -ENODEV;
 
 	ref = nvmap_try_duplicate_by_ivmid(client, op.ivm_id, &block);
-	if (!ref) {
+	if (IS_ERR_OR_NULL(ref)) {
 		/*
 		 * See nvmap_heap_alloc() for encoding details.
 		 */

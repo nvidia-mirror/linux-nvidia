@@ -3,7 +3,7 @@
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -339,6 +339,10 @@ found:
 
 	/* h->dmabuf can't be NULL anymore. Duplicate the handle. */
 	ref = nvmap_duplicate_handle(client, h, true, false);
+	if (IS_ERR_OR_NULL(ref)) {
+		pr_err("Failed to duplicate handle\n");
+		return ref;
+	}
 	/* put the extra ref taken using get_dma_buf. */
 	dma_buf_put(h->dmabuf);
 finish:
