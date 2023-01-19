@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
  */
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
@@ -146,9 +146,8 @@ static int tegra186_hv_bpmp_resume(struct tegra_bpmp *bpmp)
 	return 0;
 }
 
-static int tegra186_hv_ivc_notify(struct tegra_bpmp *bpmp)
+static int tegra186_hv_ivc_ring_doorbell(struct tegra_bpmp *bpmp)
 {
-	tegra_hv_ivc_notify(bpmp->tx_channel->hv_ivc);
 	return 0;
 }
 
@@ -293,6 +292,6 @@ const struct tegra_bpmp_ops tegra186_bpmp_hv_ops = {
 	.is_request_channel_free = tegra186_hv_bpmp_is_channel_free,
 	.post_response = tegra186_hv_bpmp_post_message,
 	.post_request = tegra186_hv_bpmp_post_message,
-	.ring_doorbell = tegra186_hv_ivc_notify,
+	.ring_doorbell = tegra186_hv_ivc_ring_doorbell,
 	.resume = tegra186_hv_bpmp_resume,
 };
