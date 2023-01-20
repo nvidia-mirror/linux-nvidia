@@ -1729,6 +1729,11 @@ static int tnvvse_crypto_get_ivc_db(struct tegra_nvvse_get_ivc_db *get_ivc_db)
 		get_ivc_db->ivc_id[i] = hv_vse_db[i].ivc_id;
 		get_ivc_db->se_engine[i] = hv_vse_db[i].se_engine;
 		get_ivc_db->node_id[i] = hv_vse_db[i].node_id;
+		get_ivc_db->priority[i] = hv_vse_db[i].priority;
+		get_ivc_db->max_buffer_size[i] = hv_vse_db[i].max_buffer_size;
+		get_ivc_db->channel_grp_id[i] = hv_vse_db[i].channel_grp_id;
+		get_ivc_db->gcm_dec_supported[i] = hv_vse_db[i].gcm_dec_supported;
+		get_ivc_db->gcm_dec_buffer_size[i] = hv_vse_db[i].gcm_dec_buffer_size;
 	}
 
 	return ret;

@@ -397,6 +397,16 @@ struct tegra_nvvse_get_ivc_db {
 	uint32_t se_engine[MAX_NUMBER_MISC_DEVICES];
 	/** Holds Crypto Dev Node Id */
 	uint32_t node_id[MAX_NUMBER_MISC_DEVICES];
+	/** Holds Priority */
+	uint32_t priority[MAX_NUMBER_MISC_DEVICES];
+	/** Holds Max Buffer Size */
+	uint32_t max_buffer_size[MAX_NUMBER_MISC_DEVICES];
+	/** Holds Channel Group Id */
+	uint32_t channel_grp_id[MAX_NUMBER_MISC_DEVICES];
+	/** Holds GCM dec Support flag */
+	uint32_t gcm_dec_supported[MAX_NUMBER_MISC_DEVICES];
+	/** Holds GCM dec buffer */
+	uint32_t gcm_dec_buffer_size[MAX_NUMBER_MISC_DEVICES];
 };
 #define NVVSE_IOCTL_CMDID_GET_IVC_DB _IOW(TEGRA_NVVSE_IOC_MAGIC, TEGRA_NVVSE_CMDID_GET_IVC_DB, \
 						struct tegra_nvvse_get_ivc_db)

@@ -153,16 +153,18 @@
 #define TEGRA_SE_ENGINE_ID_OFFSET			1U
 #define TEGRA_CRYPTO_DEV_ID_OFFSET			2U
 #define TEGRA_IVC_PRIORITY_OFFSET			3U
-#define TEGRA_CHANNEL_GROUPID_OFFSET			6U
+#define TEGRA_MAX_BUFFER_SIZE				4U
+#define TEGRA_CHANNEL_GROUPID_OFFSET			5U
 #define TEGRA_GCM_SUPPORTED_FLAG_OFFSET			7U
-#define TEGRA_IVCCFG_ARRAY_LEN				8U
+#define TEGRA_GCM_DEC_BUFFER_SIZE			8U
+#define TEGRA_IVCCFG_ARRAY_LEN				9U
 
-#define VSE_MSG_ERR_TSEC_KEYLOAD_FAILED					21U
+#define VSE_MSG_ERR_TSEC_KEYLOAD_FAILED			21U
 #define VSE_MSG_ERR_TSEC_KEYLOAD_STATUS_CHECK_TIMEOUT	20U
 
 #define NVVSE_STATUS_SE_SERVER_TSEC_KEYLOAD_FAILED		76U
 #define NVVSE_STATUS_SE_SERVER_TSEC_KEYLOAD_TIMEOUT		21U
-#define NVVSE_STATUS_SE_SERVER_ERROR					102U
+#define NVVSE_STATUS_SE_SERVER_ERROR				102U
 
 static struct crypto_dev_to_ivc_map g_crypto_to_ivc_map[MAX_NUMBER_MISC_DEVICES];
 
@@ -4651,6 +4653,14 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 		}
 
 		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+				 + TEGRA_MAX_BUFFER_SIZE, &crypto_dev->max_buffer_size);
+		if (err) {
+			pr_err("Error: invalid max buffer size. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
 				 + TEGRA_CHANNEL_GROUPID_OFFSET, &crypto_dev->channel_grp_id);
 		if (err) {
 			pr_err("Error: invalid channel group id. err %d\n", err);
@@ -4662,6 +4672,15 @@ static int tegra_hv_vse_safety_probe(struct platform_device *pdev)
 				 + TEGRA_GCM_SUPPORTED_FLAG_OFFSET, &crypto_dev->gcm_dec_supported);
 		if (err || crypto_dev->gcm_dec_supported > GCM_DEC_OP_SUPPORTED) {
 			pr_err("Error: invalid gcm decrypt supported flag. err %d\n", err);
+			err = -ENODEV;
+			goto exit;
+		}
+
+		err = of_property_read_u32_index(np, "nvidia,ivccfg", cnt * TEGRA_IVCCFG_ARRAY_LEN
+				 + TEGRA_GCM_DEC_BUFFER_SIZE, &crypto_dev->gcm_dec_buffer_size);
+		if (err || (crypto_dev->gcm_dec_supported != GCM_DEC_OP_SUPPORTED &&
+				crypto_dev->gcm_dec_buffer_size != 0)) {
+			pr_err("Error: invalid gcm decrypt buffer size. err %d\n", err);
 			err = -ENODEV;
 			goto exit;
 		}
