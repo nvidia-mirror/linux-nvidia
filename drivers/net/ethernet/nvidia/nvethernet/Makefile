@@ -19,7 +19,7 @@ OSI_DMA := nvethernetrm/osi/dma
 obj-$(CONFIG_NVETHERNET) += nvethernet.o
 
 # These CFLAGS must not be shared/used in OSI. These are local to Linux
-ccflags-y +=  -DLINUX_OS -DNET30 -DNVPKCS_MACSEC -DLINUX_IVC -DUPDATED_PAD_CAL \
+ccflags-y +=  -DLINUX_OS -DNET30 -DNVPKCS_MACSEC -DLINUX_IVC \
               -I$(srctree.nvidia)/drivers/net/ethernet/nvidia/nvethernet/nvethernetrm/include \
 	     -I$(srctree.nvidia)/drivers/net/ethernet/nvidia/nvethernet/nvethernetrm/osi/common/include
 
