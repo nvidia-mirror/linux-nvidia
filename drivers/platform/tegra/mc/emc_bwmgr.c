@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -58,7 +58,7 @@ struct mrq_emc_dvfs_latency_response bwmgr_emc_dvfs;
 #define IS_BWMGR_SUPPORTED(x, err)			\
 do {							\
 	if (x) {					\
-		pr_err("bwmgr API not supported");	\
+		pr_debug("bwmgr API not supported");	\
 		return (err);				\
 	}						\
 } while (0)
@@ -378,7 +378,7 @@ EXPORT_SYMBOL_GPL(tegra_bwmgr_register);
 void tegra_bwmgr_unregister(struct tegra_bwmgr_client *handle)
 {
 	if (bwmgr_disable) {
-		pr_err("bwmgr API not supported");
+		pr_debug("bwmgr API not supported");
 		return;
 	}
 
