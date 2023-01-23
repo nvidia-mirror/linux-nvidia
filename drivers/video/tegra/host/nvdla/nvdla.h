@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host NVDLA
  *
- * Copyright (c) 2016-2022 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023 NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,6 +29,17 @@
 #include "nvdla_buffer.h"
 #include "dla_os_interface.h"
 #include "dla_t19x_fw_version.h"
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+#include <linux/tegra-hsierrrptinj.h>
+
+#define NVDLA0_HSM_REPORTER_ID 0xE085U
+#define NVDLA1_HSM_REPORTER_ID 0xE086U
+
+#define NVDLA0_HSM_ERROR_CODE 0x290BU
+#define NVDLA1_HSM_ERROR_CODE 0x290CU
+
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 
 /*
  * macro to encode firmware version
@@ -485,5 +496,13 @@ int nvdla_get_signal_fences(struct nvdla_queue *queue, void *in_task);
 /** NvDla PM operations */
 extern const struct dev_pm_ops nvdla_module_pm_ops;
 #endif
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+
+int nvdla_error_inj_handler(unsigned int instance_id,
+	struct epl_error_report_frame frame,
+	void *data);
+
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 
 #endif /* End of __NVHOST_NVDLA_H__ */

@@ -1,7 +1,7 @@
 /*
  * NVDLA driver for T194/T23x
  *
- * Copyright (c) 2016-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -34,6 +34,10 @@
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
 #endif
 
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+#include <linux/tegra-hsierrrptinj.h>
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
+
 #include "nvdla.h"
 #include "nvdla_hw_flcn.h"
 #include "nvdla_t194.h"
@@ -42,6 +46,97 @@
 #include "nvdla_buffer.h"
 #include "nvdla_debug.h"
 #include "dla_os_interface.h"
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+int nvdla_error_inj_handler(unsigned int instance_id,
+	struct epl_error_report_frame frame,
+	void *data)
+{
+	int err = 0;
+
+	struct nvdla_device *nvdla_dev = (struct nvdla_device *) data;
+	struct platform_device *pdev = nvdla_dev->pdev;
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	unsigned int device_instance_id;
+	unsigned int device_reporter_id;
+	unsigned int device_error_code;
+
+	if (pdata->class == NV_DLA0_CLASS_ID) {
+		device_instance_id = 0U;
+		device_reporter_id = NVDLA0_HSM_REPORTER_ID;
+		device_error_code = NVDLA0_HSM_ERROR_CODE;
+	} else {
+		device_instance_id = 1U;
+		device_reporter_id = NVDLA1_HSM_REPORTER_ID;
+		device_error_code = NVDLA1_HSM_ERROR_CODE;
+	}
+
+	if (device_instance_id != instance_id) {
+		nvdla_dbg_err(pdev, "Invalid instance ID: %u", instance_id);
+		err = -EINVAL;
+		goto fail;
+	}
+
+	if (device_reporter_id != frame.reporter_id) {
+		nvdla_dbg_err(pdev, "Invalid reporter ID: %u",
+			frame.reporter_id);
+		err = -EINVAL;
+		goto fail;
+	}
+
+	if (device_error_code != frame.error_code) {
+		nvdla_dbg_err(pdev, "Invalid error code: %u",
+			frame.error_code);
+		err = -EINVAL;
+		goto fail;
+	}
+
+	err = nvhost_module_busy(pdev);
+	if (err < 0) {
+		nvdla_dbg_err(pdev, "failed to power on\n");
+		err = -ENODEV;
+		goto fail;
+	}
+
+	host1x_writel(pdev, flcn_safety_erb_r(),
+		flcn_safety_erb_data_uncorrected_err_v());
+
+	nvhost_module_idle(pdev);
+
+fail:
+	return err;
+}
+
+static int nvdla_error_inj_handler_init(struct nvdla_device *nvdla_dev)
+{
+	struct platform_device *pdev = nvdla_dev->pdev;
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	unsigned int instance_id;
+
+	if (pdata->class == NV_DLA0_CLASS_ID)
+		instance_id = 0U;
+	else
+		instance_id = 1U;
+
+	return hsierrrpt_reg_cb(IP_DLA, instance_id,
+				nvdla_error_inj_handler,
+				(void *) nvdla_dev);
+}
+
+static void nvdla_error_inj_handler_deinit(struct nvdla_device *nvdla_dev)
+{
+	struct platform_device *pdev = nvdla_dev->pdev;
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	unsigned int instance_id;
+
+	if (pdata->class == NV_DLA0_CLASS_ID)
+		instance_id = 0U;
+	else
+		instance_id = 1U;
+
+	hsierrrpt_dereg_cb(IP_DLA, instance_id);
+}
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 
 /*
  * Work to handle engine reset for error recovery
@@ -969,10 +1064,26 @@ static int nvdla_probe(struct platform_device *pdev)
 	tegra_soc_hwpm_ip_register(&hwpm_ip_ops);
 #endif
 
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	err = nvdla_error_inj_handler_init(nvdla_dev);
+	if (err) {
+		dev_err(dev, "Failed to register error injection\n");
+		goto err_inj_handler_init;
+	}
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
+
 	nvdla_dbg_info(pdev, "pdata:%p initialized\n", pdata);
 
 	return 0;
 
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+err_inj_handler_init:
+#ifdef CONFIG_TEGRA_SOC_HWPM
+	tegra_soc_hwpm_ip_unregister(&hwpm_ip_ops);
+#endif /* CONFIG_TEGRA_SOC_HWPM */
+	nvdla_free_window_size_memory(pdev);
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 err_alloc_window_size_mem:
 	nvdla_free_utilization_rate_memory(pdev);
 err_alloc_utilization_rate_mem:
@@ -1003,7 +1114,6 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 
 #ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
-
 	nvdla_dbg_info(pdev, "hwpm ip %s unregister", pdev->name);
 	hwpm_ip_ops.ip_dev = (void *)pdev;
 	hwpm_ip_ops.ip_base_address = pdev->resource[0].start;
@@ -1012,6 +1122,10 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 	hwpm_ip_ops.hwpm_ip_reg_op = NULL;
 	tegra_soc_hwpm_ip_unregister(&hwpm_ip_ops);
 #endif
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	nvdla_error_inj_handler_deinit(nvdla_dev);
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 
 	nvhost_syncpt_unit_interface_deinit(pdev);
 	nvdla_queue_deinit(nvdla_dev->pool);

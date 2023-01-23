@@ -1,7 +1,7 @@
 /*
  * NVDLA debug utils
  *
- * Copyright (c) 2016-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1060,6 +1060,103 @@ fail_create_file_suspend:
 }
 #endif
 
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+static ssize_t debug_dla_err_inj_write(struct file *file,
+		const char __user *buffer, size_t count, loff_t *off)
+{
+	int err;
+	struct seq_file *priv_data;
+	struct nvdla_device *nvdla_dev;
+	struct platform_device *pdev;
+	struct epl_error_report_frame frame;
+	unsigned int instance_id;
+	struct nvhost_device_data *pdata;
+	long write_value;
+
+	/* Fetch user requested write-value. */
+	err = kstrtol_from_user(buffer, count, 10, &write_value);
+	if (err < 0)
+		goto fail;
+
+	if (write_value > 0) {
+		/* Trigger error injection */
+		priv_data = file->private_data;
+		if (priv_data == NULL)
+			goto fail;
+
+		nvdla_dev = (struct nvdla_device *) priv_data->private;
+		if (nvdla_dev == NULL)
+			goto fail;
+
+		pdev = nvdla_dev->pdev;
+		if (pdev == NULL)
+			goto fail;
+
+		pdata = platform_get_drvdata(pdev);
+		if (pdata == NULL)
+			goto fail;
+
+		if (pdata->class == NV_DLA0_CLASS_ID) {
+			instance_id = 0U;
+			frame.error_code = NVDLA0_HSM_ERROR_CODE;
+			frame.error_attribute = 0U;
+			frame.timestamp = 0U;
+			frame.reporter_id = NVDLA0_HSM_REPORTER_ID;
+		} else {
+			instance_id = 1U;
+			frame.error_code = NVDLA1_HSM_ERROR_CODE;
+			frame.error_attribute = 0U;
+			frame.timestamp = 0U;
+			frame.reporter_id = NVDLA1_HSM_REPORTER_ID;
+		}
+
+		err = nvdla_error_inj_handler(instance_id, frame,
+				(void *) nvdla_dev);
+		if (err < 0)
+			goto fail;
+	}
+
+	return count;
+
+fail:
+	return -1;
+}
+
+static int debug_dla_err_inj_show(struct seq_file *s, void *data)
+{
+	seq_puts(s, "0\n");
+	return 0;
+}
+
+static int debug_dla_err_inj_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, debug_dla_err_inj_show, inode->i_private);
+}
+
+static const struct file_operations debug_dla_err_inj_fops = {
+	.open		= debug_dla_err_inj_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= debug_dla_err_inj_write,
+};
+
+static void nvdla_err_inj_debugfs_init(struct platform_device *pdev)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	struct nvdla_device *nvdla_dev = pdata->private_data;
+	struct dentry *dla_debugfs_root = pdata->debugfs;
+
+	if (!debugfs_create_file("hsi_error_inject", 0600, dla_debugfs_root,
+			nvdla_dev, &debug_dla_err_inj_fops)) {
+		goto fail_create_file_err_inj;
+	}
+
+fail_create_file_err_inj:
+	return;
+}
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
+
 void nvdla_debug_init(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
@@ -1081,6 +1178,10 @@ void nvdla_debug_init(struct platform_device *pdev)
 	/* Check if isolate context enabled if submit mode is CHANNEL */
 	nvdla_dev->submit_mode = nvdla_dev->submit_mode &&
 				pdata->isolate_contexts;
+
+#if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
+	nvdla_err_inj_debugfs_init(pdev);
+#endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 
 #ifdef CONFIG_PM
 	nvdla_pm_debugfs_init(pdev);
