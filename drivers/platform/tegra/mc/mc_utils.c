@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -78,7 +78,6 @@
 struct emc_params {
 	u32 rank;
 	u32 ecc;
-	u32 ch;
 	u32 dram;
 };
 
@@ -350,7 +349,6 @@ void tegra_mc_utils_init(const struct device_node *np)
 			ch_num = 16;
 	}
 
-	emc_param.ch = ch;
 	emc_param.ecc = ecc;
 	emc_param.rank = rank;
 	emc_param.dram = dram;
