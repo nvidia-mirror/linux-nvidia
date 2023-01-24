@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  */
 
 /**
@@ -61,7 +61,7 @@ typedef struct syncpoint_info {
  *  FB = 32 byte header + (256 x 4) bytes. FB has 256 windows with 4 bytes
  *       of stats data per window.
  *  FM = 32 byte header + (64 x 64 x 2 x 4) bytes. FM can have 64 x 64 windows
- *       with each windows having 2 bytes of data for each color channel.
+ *       with each window having 2 bytes of data for each color channel.
  *  AFM = 32 byte header + 8 byte statistics data + 8 bytes padding per ROI.
  *  LAC = 32 byte header + ( (32 x 32) x ((4 + 2 + 2) x 4) )
  *        Each ROI has 32x32 windows with each window containing 8
@@ -93,7 +93,7 @@ typedef struct syncpoint_info {
 /** Local Tone Mapping (LTM) unit statistics data size in bytes */
 #define ISP5_STATS_LTM_MAX_SIZE		MK_SIZE(1056)
 
-/* Stats buffer addresses muse be aligned to 64 byte (ATOM) boundaries */
+/* Stats buffer addresses must be aligned to 64 byte (ATOM) boundaries */
 #define ISP5_ALIGN_STAT_OFFSET(_offset) \
 	(((uint32_t)(_offset) + MK_U32(63)) & ~(MK_U32(63)))
 
@@ -144,8 +144,8 @@ typedef struct syncpoint_info {
  *  FB = 32 byte header + (512 x 4) bytes. FB has 512 windows with 4 bytes
  *       of stats data per window.
  *  FM = 32 byte header + (64 x 64 x 2 x 4) bytes. FM can have 64 x 64 windows
- *       with each windows having 2 bytes of data for each color channel.
- *  AFM = 32 byte header + 16 byte statistics data per ROI.
+ *       with each window having 2 bytes of data for each color channel.
+ *  AFM = 32 byte header + 8 byte statistics data + 8 byte padding per ROI.
  *  LAC = 32 byte header + ( (32 x 32) x ((4 + 2 + 2) x 4) )
  *        Each ROI has 32x32 windows with each window containing 8
  *        bytes of data per color channel.
@@ -180,7 +180,7 @@ typedef struct syncpoint_info {
 #define ISP6_STATS_HIST_RAW24_MAX_SIZE	MK_SIZE(1056)
 /** Local Tone Mapping (LTM) unit statistics data size in bytes */
 #define ISP6_STATS_LTM_MAX_SIZE		MK_SIZE(1056)
-/* Stats buffer addresses muse be aligned to 64 byte (ATOM) boundaries */
+/* Stats buffer addresses must be aligned to 64 byte (ATOM) boundaries */
 #define ISP6_ALIGN_STAT_OFFSET(_offset) \
 	(((uint32_t)(_offset) + MK_U32(63)) & ~(MK_U32(63)))
 
@@ -223,6 +223,92 @@ typedef struct syncpoint_info {
 /** Total statistics data size in bytes */
 #define ISP6_STATS_TOTAL_SIZE \
 	(ISP6_STATS_LTM_OFFSET + ISP6_STATS_LTM_MAX_SIZE)
+/**@}*/
+
+/**
+ * @defgroup StatsSize Statistics data size defines for ISP7
+ *
+ * The size for each unit includes the standard ISP7 HW stats
+ * header size.
+ *
+ * Size break down for each unit.
+ *  FB = 32 byte header + (512 x 4) bytes. FB has 512 windows with 4 bytes
+ *       of stats data per window.
+ *  FM = 32 byte header + (64 x 64 x 2 x 4) bytes. FM can have 64 x 64 windows
+ *       with each window having 2 bytes of data for each color channel.
+ *  AFM = 32 byte header + 8 byte statistics data + 8 byte padding per ROI.
+ *  LAC = 32 byte header + ( (32 x 32) x ((4 + 2 + 2) x 4) )
+ *        Each ROI has 32x32 windows with each window containing 8
+ *        bytes of data per color channel.
+ *  Hist = Header + (256 x 4 x 4) bytes since Hist unit has 256 bins and
+ *         each bin collects 4 byte data for each color channel + 4 Dwords for
+ *         excluded pixel count due to elliptical mask per color channel.
+ *  DPC  = 32 byte header + (24 x 4) bytes for bad pixel count and accumulated
+ *        pixel adjustment for pixels both inside and outside the ROI.
+ *  LTM = 32 byte header + (128 x 4) bytes for histogram data + (8 x 8 x 4 x 2)
+ *        bytes for soft key average and count. Soft key statistics are
+ *        collected by dividing the frame into a 8x8 array region.
+ * @{
+ */
+/** Statistics unit hardware header size in bytes */
+#define ISP7_STATS_HW_HEADER_SIZE	MK_SIZE(32)
+/** Flicker band (FB) unit statistics data size in bytes */
+#define ISP7_STATS_FB_MAX_SIZE		MK_SIZE(2080)
+/** Focus Metrics (FM) unit statistics data size in bytes */
+#define ISP7_STATS_FM_MAX_SIZE		MK_SIZE(32800)
+/** Auto Focus Metrics (AFM) unit statistics data size in bytes */
+#define ISP7_STATS_AFM_ROI_MAX_SIZE	MK_SIZE(48)
+/** Local Average Clipping (LAC) unit statistics data size in bytes */
+#define ISP7_STATS_LAC_ROI_MAX_SIZE	MK_SIZE(32800)
+/** Histogram unit statistics data size in bytes */
+#define ISP7_STATS_HIST_MAX_SIZE	MK_SIZE(4144)
+/** Pixel Replacement Unit (PRU) unit statistics data size in bytes */
+#define ISP7_STATS_DPC_MAX_SIZE		MK_SIZE(128)
+/** Local Tone Mapping (LTM) unit statistics data size in bytes */
+#define ISP7_STATS_LTM_MAX_SIZE		MK_SIZE(1056)
+/* Stats buffer addresses must be aligned to 64 byte (ATOM) boundaries */
+#define ISP7_ALIGN_STAT_OFFSET(_offset) \
+	(((uint32_t)(_offset) + MK_U32(63)) & ~(MK_U32(63)))
+
+/** Flicker band (FB) unit statistics data offset */
+#define ISP7_STATS_FB_OFFSET		MK_SIZE(0)
+/** Focus Metrics (FM) unit statistics data offset */
+#define ISP7_STATS_FM_OFFSET \
+	(ISP7_STATS_FB_OFFSET + ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_FB_MAX_SIZE))
+/** Auto Focus Metrics (AFM) unit statistics data offset */
+#define ISP7_STATS_AFM_OFFSET \
+	(ISP7_STATS_FM_OFFSET + ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_FM_MAX_SIZE))
+/** Local Average Clipping (LAC0) unit statistics data offset */
+#define ISP7_STATS_LAC0_OFFSET \
+	(ISP7_STATS_AFM_OFFSET + \
+	(ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_AFM_ROI_MAX_SIZE) * MK_SIZE(8)))
+/** Local Average Clipping (LAC1) unit statistics data offset */
+#define ISP7_STATS_LAC1_OFFSET \
+	(ISP7_STATS_LAC0_OFFSET + \
+	(ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_LAC_ROI_MAX_SIZE) * MK_SIZE(4)))
+/** Histogram unit (H0) statistics data offset */
+#define ISP7_STATS_HIST0_OFFSET \
+	(ISP7_STATS_LAC1_OFFSET + \
+	(ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_LAC_ROI_MAX_SIZE) * MK_SIZE(4)))
+/** Histogram unit (H1) statistics data offset */
+#define ISP7_STATS_HIST1_OFFSET \
+	(ISP7_STATS_HIST0_OFFSET + \
+	ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_HIST_MAX_SIZE))
+/** Histogram unit (H2) statistics data offset */
+#define ISP7_STATS_HIST2_OFFSET \
+	(ISP7_STATS_HIST1_OFFSET + \
+	ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_HIST_MAX_SIZE))
+/** Outlier replacement (OR) unit statistics data offset */
+#define ISP7_STATS_DPC_OFFSET \
+	(ISP7_STATS_HIST2_OFFSET + \
+	ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_HIST_MAX_SIZE))
+/** Local Tone Mapping (LTM) unit statistics data offset */
+#define ISP7_STATS_LTM_OFFSET \
+	(ISP7_STATS_DPC_OFFSET + \
+	ISP7_ALIGN_STAT_OFFSET(ISP7_STATS_DPC_MAX_SIZE))
+/** Total statistics data size in bytes */
+#define ISP7_STATS_TOTAL_SIZE \
+	(ISP7_STATS_LTM_OFFSET + ISP7_STATS_LTM_MAX_SIZE)
 /**@}*/
 
 #define ISP_NUM_GOS_TABLES	MK_U32(8)
@@ -2710,7 +2796,10 @@ struct isp5_downscaler_configbuf {
  * Enable ISP6 LTM Softkey automatic update feature
  */
 #define ISP6BLOCK_ENABLED_AP_LTM_SK_UPDATE		MK_BIT32(28)
-
+/**
+ * Enable ISP7 HIST2
+ */
+#define	ISP7BLOCK_ENABLED_HISTOGRAM2			MK_BIT32(29)
 /**
  * @brief ISP overfetch requirements.
  *
@@ -2758,6 +2847,11 @@ struct isp_overfetch {
 #define ISP_TYPE_ID_ISP6 MK_U16(4)
 
 /**
+ * @brief Identifier for ISP7
+ */
+#define ISP_TYPE_ID_ISP7 MK_U16(5)
+
+/**
  * @brief Magic bytes to detect ISP program struct with version information
  */
 
@@ -2798,24 +2892,31 @@ struct isp5_program {
 	/**
 	 * Sources for LS, AP and PRU blocks.
 	 * Format is same as in ISP's XB_SRC_0 register
+	 * For ISP7, this is the stats crossbar used for
+	 * HIST1 and LAC1, with ISP_STATS_XB_SRC register format.
 	 */
 	uint32_t xbsrc0;
 
 	/**
 	 * Sources for AT[0-2] and TF[0-1] blocks
 	 * Format is same as in ISP's XB_SRC_1 register
+	 * For ISP7, this is the output crossbar used for
+	 * TF0, DS[0-2], with ISP_OUT_XB_SRC register format.
 	 */
 	uint32_t xbsrc1;
 
 	/**
 	 * Sources for DS[0-2] and MW[0-2] blocks
 	 * Format is same as in ISP's XB_SRC_2 register
+	 * For ISP7, this is the AT1 MuxSelect used for
+	 * AT1, with ISP_AT1_XB_SRC register format.
 	 */
 	uint32_t xbsrc2;
 
 	/**
 	 * Sources for FB, LAC[0-1] and HIST[0-1] blocks
 	 * Format is same as in ISP's XB_SRC_3 register
+	 * For ISP7, this is not used.
 	 */
 	uint32_t xbsrc3;
 
