@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -62,7 +62,57 @@ struct psc_mbox {
 	struct mbox_vm_chan vm_chan[MBOX_NUM];
 };
 
-static irqreturn_t  psc_mbox_rx_interrupt(int irq, void *p)
+
+#ifdef PSC_HAVE_NUMA
+
+struct io_data {
+	u32 value;
+	void __iomem *addr;
+};
+
+static const struct cpumask *node0mask;
+
+static void write_callback(void *param)
+{
+	struct io_data *data = param;
+
+	writel(data->value, data->addr);
+}
+
+void writel0(u32 value, void __iomem *addr)
+{
+	struct io_data d = {
+		.value = value, .addr = addr
+	};
+
+	if (cpumask_test_cpu(smp_processor_id(), node0mask))
+		writel(value, addr); /* optimization: direct call */
+	else
+		smp_call_function_any(node0mask, write_callback, &d, 1);
+}
+
+static void read_callback(void *param)
+{
+	struct io_data *data = param;
+
+	data->value = readl(data->addr);
+}
+
+u32 readl0(void __iomem *addr)
+{
+	struct io_data d = {
+		.addr = addr
+	};
+
+	if (cpumask_test_cpu(smp_processor_id(), node0mask))
+		return readl(addr);	/* optimization: direct call */
+
+	smp_call_function_any(node0mask, read_callback, &d, 1);
+	return d.value;
+}
+#endif // PSC_HAVE_NUMA
+
+static irqreturn_t psc_mbox_rx_interrupt(int irq, void *p)
 {
 	u32 data[MBOX_MSG_SIZE];
 	struct mbox_chan *chan = p;
@@ -101,17 +151,17 @@ static int psc_mbox_send_data(struct mbox_chan *chan, void *data)
 	int i;
 	u32 ext_ctrl;
 
-	ext_ctrl = readl(vm_chan->base + MBOX_CHAN_EXT_CTRL);
+	ext_ctrl = readl0(vm_chan->base + MBOX_CHAN_EXT_CTRL);
 
 	if ((ext_ctrl & MBOX_IN_VALID) != 0) {
 		dev_err(dev, "%s:pending write.\n", __func__);
 		return -EBUSY;
 	}
 	for (i = 0; i < MBOX_MSG_SIZE; i++)
-		writel(buf[i], vm_chan->base + MBOX_CHAN_TX + i * 4);
+		writel0(buf[i], vm_chan->base + MBOX_CHAN_TX + i * 4);
 
 	ext_ctrl |= MBOX_IN_VALID;
-	writel(ext_ctrl, vm_chan->base + MBOX_CHAN_EXT_CTRL);
+	writel0(ext_ctrl, vm_chan->base + MBOX_CHAN_EXT_CTRL);
 	return 0;
 }
 
@@ -120,7 +170,7 @@ static int psc_mbox_startup(struct mbox_chan *chan)
 	struct mbox_vm_chan  *vm_chan = chan->con_priv;
 	u32 ext_ctrl = LIC_INTR_EN;
 
-	writel(ext_ctrl, vm_chan->base + MBOX_CHAN_EXT_CTRL);
+	writel0(ext_ctrl, vm_chan->base + MBOX_CHAN_EXT_CTRL);
 	chan->txdone_method = TXDONE_BY_ACK;
 	return 0;
 }
@@ -139,7 +189,7 @@ static void psc_mbox_shutdown(struct mbox_chan *chan)
 	dev = vm_chan->parent->dev;
 
 	dev_dbg(dev, "%s\n", __func__);
-	writel(0, vm_chan->base + MBOX_CHAN_EXT_CTRL);
+	writel0(0, vm_chan->base + MBOX_CHAN_EXT_CTRL);
 }
 
 static const struct mbox_chan_ops psc_mbox_ops = {
@@ -159,6 +209,9 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 
 	dev_dbg(dev, "psc driver init\n");
 
+#ifdef PSC_HAVE_NUMA
+	node0mask = cpumask_of_node(0);
+#endif
 	psc = devm_kzalloc(dev, sizeof(*psc), GFP_KERNEL);
 	if (!psc)
 		return -ENOMEM;
@@ -188,13 +241,17 @@ static int tegra234_psc_probe(struct platform_device *pdev)
 			dev_err(dev, "Unable to acquire IRQ %d\n", irq);
 			return ret;
 		}
+
+#ifdef PSC_HAVE_NUMA
+		irq_set_affinity(irq, node0mask);
+#endif
+
 		psc->chan[i].con_priv = &psc->vm_chan[i];
 		psc->vm_chan[i].parent = psc;
 		psc->vm_chan[i].irq = irq;
 		psc->vm_chan[i].base = base + (MBOX_REG_OFFSET * i);
-		dev_dbg(dev, "vm_chan[%d].base:%p, chan_id:0x%x, irq:%d\n",
-			i, psc->vm_chan[i].base,
-			readl(psc->vm_chan[i].base + MBOX_CHAN_ID), irq);
+		dev_dbg(dev, "vm_chan[%d].base:%p, irq:%d\n",
+			i, psc->vm_chan[i].base, irq);
 	}
 	psc->mbox.dev = dev;
 	psc->mbox.chans = &psc->chan[0];	/* mbox_request_channel(cl,0) returns this one */

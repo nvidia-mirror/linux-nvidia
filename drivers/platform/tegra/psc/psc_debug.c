@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -74,10 +74,46 @@ struct psc_debug_dev {
 
 	u8 rx_msg[MBOX_MSG_LEN];
 	struct mbox_controller *mbox;	/* our mbox controller */
+
+	bool is_cfg_inited;	/* did we initialize SIDTABLE, etc? */
 };
 
 static struct psc_debug_dev psc_debug;
 static struct dentry *debugfs_root;
+
+#define NV(x) "nvidia," #x
+static int
+setup_extcfg(struct platform_device *pdev)
+{
+	struct resource *res;
+	void __iomem *base;
+	u32 value;
+
+	/* second mailbox address */
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "extcfg");
+	/* we have res == 0 in case of ACPI and not DT */
+	if (res == NULL)
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(base))
+		return -EINVAL;
+
+	dev_info(&pdev->dev, "ext_cfg base:%p\n", base);
+
+	if (!device_property_read_u8_array(&pdev->dev, NV(sidtable),
+				(u8 *)&value, sizeof(value))) {
+		dev_dbg(&pdev->dev, "sidtable:%08x\n", value);
+		writel0(value, base + EXT_CFG_SIDTABLE); /* PSC_EXT_CFG_SIDTABLE_VM0_0 */
+	}
+
+	if (!device_property_read_u32(&pdev->dev, NV(sidconfig), &value)) {
+		dev_dbg(&pdev->dev, "sidcfg:%08x\n", value);
+		writel0(value, base + EXT_CFG_SIDCONFIG);    /* PSC_EXT_CFG_SIDCONFIG_VM0_0 */
+	}
+
+	return 0;
+}
+
 
 static int psc_debug_open(struct inode *inode, struct file *file)
 {
@@ -88,6 +124,11 @@ static int psc_debug_open(struct inode *inode, struct file *file)
 
 	if (mutex_lock_interruptible(&dbg->lock))
 		return -ERESTARTSYS;
+
+	if (dbg->is_cfg_inited == false) {
+		dbg->is_cfg_inited = true;
+		setup_extcfg(pdev);
+	}
 
 	file->private_data = dbg;
 
@@ -105,6 +146,7 @@ static int psc_debug_open(struct inode *inode, struct file *file)
 
 return_unlock:
 	mutex_unlock(&dbg->lock);
+
 	return ret;
 }
 
@@ -323,41 +365,6 @@ static void psc_chan_rx_callback(struct mbox_client *c, void *msg)
 	complete(&dbg->rx_complete);
 }
 
-#define NV(x) "nvidia," #x
-
-static int
-setup_extcfg(struct platform_device *pdev, struct psc_debug_dev *dbg,
-	struct dentry *root)
-{
-	struct resource *res;
-	void __iomem *base;
-	u32 value;
-
-	/* second mailbox address */
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "extcfg");
-	/* we have res == 0 in case of ACPI and not DT */
-	if (res == NULL)
-		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(base))
-		return -EINVAL;
-
-	dev_info(&pdev->dev, "ext_cfg base:%p\n", base);
-
-	if (!device_property_read_u8_array(&pdev->dev, NV(sidtable),
-				(u8 *)&value, sizeof(value))) {
-		dev_dbg(&pdev->dev, "sidtable:%08x\n", value);
-		writel(value, base + EXT_CFG_SIDTABLE); /* PSC_EXT_CFG_SIDTABLE_VM0_0 */
-	}
-
-	if (!device_property_read_u32(&pdev->dev, NV(sidconfig), &value)) {
-		dev_dbg(&pdev->dev, "sidcfg:%08x\n", value);
-		writel(value, base + EXT_CFG_SIDCONFIG);    /* PSC_EXT_CFG_SIDCONFIG_VM0_0 */
-	}
-
-	return 0;
-}
-
 int psc_debugfs_create(struct platform_device *pdev, struct mbox_controller *mbox)
 {
 	struct psc_debug_dev *dbg = &psc_debug;
@@ -381,6 +388,7 @@ int psc_debugfs_create(struct platform_device *pdev, struct mbox_controller *mbo
 	dbg->cl.knows_txdone = false;
 	dbg->pdev = pdev;
 	dbg->mbox = mbox;	/* our controller */
+	dbg->is_cfg_inited = false;
 
 	mutex_init(&dbg->lock);
 
@@ -388,8 +396,6 @@ int psc_debugfs_create(struct platform_device *pdev, struct mbox_controller *mbo
 			(u64 *)&dbg->cl.tx_tout);
 	debugfs_create_file("mbox_dbg", 0600, debugfs_root,
 			dbg, &psc_debug_fops);
-
-	setup_extcfg(pdev, dbg, debugfs_root);
 
 	dma_set_mask_and_coherent(dev, DMA_BIT_MASK(39));
 
