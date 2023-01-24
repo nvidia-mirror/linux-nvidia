@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: GPL-2.0-only
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -88,8 +88,9 @@ struct hsm_error_report_frame {
  * TSEC  - 1
  * THERM - 1
  * SMMU  - 1
+ * DLA   - 2
  */
-static unsigned int ip_instances[NUM_IPS] = {1, 1, 1, 4, 11, 1, 10, 2, 5, 1, 1, 1};
+static unsigned int ip_instances[NUM_IPS] = {1, 1, 1, 4, 11, 1, 10, 2, 5, 1, 1, 1, 2};
 
 /* This directory entry will point to `/sys/kernel/debug/tegra_hsierrrptinj`. */
 static struct dentry *hsierrrptinj_debugfs_root;
