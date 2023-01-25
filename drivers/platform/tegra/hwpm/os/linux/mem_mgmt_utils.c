@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -32,7 +32,7 @@
 
 #include <os/linux/driver.h>
 
-#if defined(CONFIG_TEGRA_HWPM_OOT)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 #include <linux/module.h>
 MODULE_IMPORT_NS(DMA_BUF);
 #endif
@@ -92,7 +92,7 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	struct tegra_soc_hwpm_alloc_pma_stream *alloc_pma_stream)
 {
 	struct tegra_hwpm_os_linux *hwpm_linux = NULL;
-#if defined(CONFIG_TEGRA_HWPM_OOT)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 	int err = 0;
 #endif
 
@@ -129,12 +129,11 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 	hwpm->mem_mgmt->mem_bytes_buf_va =
 		sg_dma_address(hwpm->mem_mgmt->mem_bytes_sgt->sgl);
 
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 	/*
-	 * Kernel version beyond 5.10 introduces
-	 * dma_buf_map structure (called iosys_map in later versions).
-	 * The kernel Virtual address generated from dma_buf_vmap API
+	 * Kernel version 5.15 and above introduces dma_buf_map structure
+	 * (called iosys_map in versions later than 5.18).
+	 * The kernel virtual address generated from dma_buf_vmap API
 	 * is stored in mem_bytes_map, which is a dma_buf_map structure
 	 */
 	err = dma_buf_vmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
@@ -144,6 +143,7 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
+
 	hwpm->mem_mgmt->mem_bytes_kernel = hwpm->mem_mgmt->mem_bytes_map.vaddr;
 #else
 	hwpm->mem_mgmt->mem_bytes_kernel =
@@ -153,7 +153,6 @@ static int tegra_hwpm_dma_map_mem_bytes_buffer(struct tegra_soc_hwpm *hwpm,
 			"Unable to map mem_bytes buffer into kernel VA space");
 		return -ENOMEM;
 	}
-#endif
 #endif
 
 	memset(hwpm->mem_mgmt->mem_bytes_kernel, 0, 32);
@@ -188,14 +187,12 @@ static int tegra_hwpm_reset_stream_buf(struct tegra_soc_hwpm *hwpm)
 	hwpm->mem_mgmt->stream_dma_buf = NULL;
 
 	if (hwpm->mem_mgmt->mem_bytes_kernel) {
-#if defined(CONFIG_TEGRA_HWPM_OOT)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 		dma_buf_vunmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
 			       &hwpm->mem_mgmt->mem_bytes_map);
 #else
 		dma_buf_vunmap(hwpm->mem_mgmt->mem_bytes_dma_buf,
 			       hwpm->mem_mgmt->mem_bytes_kernel);
-#endif
 #endif
 		hwpm->mem_mgmt->mem_bytes_kernel = NULL;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -15,11 +15,11 @@
 #define TEGRA_HWPM_OS_LINUX_MEM_MGMT_UTILS_H
 
 #include <linux/types.h>
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 #include <linux/iosys-map.h>
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 #include <linux/dma-buf-map.h>
 #endif
 #endif
@@ -46,10 +46,10 @@ struct tegra_hwpm_mem_mgmt {
 	struct dma_buf *mem_bytes_dma_buf;
 	struct dma_buf_attachment *mem_bytes_attach;
 	void *mem_bytes_kernel;
-#if defined(CONFIG_TEGRA_HWPM_OOT)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 	struct iosys_map mem_bytes_map;
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 	struct dma_buf_map mem_bytes_map;
 #endif
 #endif
