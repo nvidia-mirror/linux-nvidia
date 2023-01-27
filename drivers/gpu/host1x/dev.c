@@ -749,7 +749,6 @@ static int host1x_get_syncpt_pools(struct host1x *host)
 static int host1x_probe(struct platform_device *pdev)
 {
 	struct host1x *host;
-	int syncpt_irq;
 	int err;
 
 	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
@@ -784,8 +783,8 @@ static int host1x_probe(struct platform_device *pdev)
 	}
 
 	host->syncpt_irq = platform_get_irq(pdev, 0);
-	if (syncpt_irq < 0)
-		return syncpt_irq;
+	if (host->syncpt_irq < 0)
+		return host->syncpt_irq;
 
 	mutex_init(&host->devices_lock);
 	INIT_LIST_HEAD(&host->devices);
