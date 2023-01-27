@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2017-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -462,11 +462,11 @@ static long isp_channel_ioctl(
 	}
 
 	case _IOC_NR(ISP_CAPTURE_STATUS): {
-		uint32_t status;
+		uint32_t timeout;
 
-		if (copy_from_user(&status, ptr, sizeof(status)))
+		if (copy_from_user(&timeout, ptr, sizeof(timeout)))
 			break;
-		err = isp_capture_status(chan, status);
+		err = isp_capture_status(chan, timeout);
 		if (err)
 			dev_err(chan->isp_dev,
 				"isp process get status failed\n");
