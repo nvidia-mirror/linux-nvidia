@@ -1,7 +1,7 @@
 /*
  * tegra_asoc_xbar_virt_alt.c - Tegra xbar dai link for machine drivers
  *
- * Copyright (c) 2017-2022 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2023 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1088,7 +1088,7 @@ int tegra_virt_put_route(struct snd_kcontrol *kcontrol,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_receive\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 
 		return err;
 	}

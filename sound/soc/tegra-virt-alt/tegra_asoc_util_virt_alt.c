@@ -379,11 +379,13 @@ int tegra_virt_t210sfc_set_in_freq(struct snd_kcontrol *kcontrol,
 	msg.params.sfc_info.in_freq =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -439,11 +441,13 @@ int tegra_virt_t210sfc_set_out_freq(struct snd_kcontrol *kcontrol,
 	msg.params.sfc_info.out_freq =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -498,11 +502,13 @@ int tegra_virt_t210mvc_set_curve_type(struct snd_kcontrol *kcontrol,
 	msg.params.mvc_info.curve_type =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -559,11 +565,13 @@ int tegra_virt_t210mvc_set_tar_vol(struct snd_kcontrol *kcontrol,
 	msg.params.mvc_info.tar_vol =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 	return 0;
@@ -620,11 +628,13 @@ int tegra_virt_t210mvc_set_mute(struct snd_kcontrol *kcontrol,
 	msg.params.mvc_info.mute =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 	return 0;
@@ -844,7 +854,7 @@ int tegra186_virt_asrc_get_hwcomp_disable(struct snd_kcontrol *kcontrol,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -873,11 +883,13 @@ int tegra186_virt_asrc_set_hwcomp_disable(struct snd_kcontrol *kcontrol,
 	msg.params.asrc_info.hwcomp_disable =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -909,7 +921,7 @@ int tegra186_virt_asrc_get_input_threshold(struct snd_kcontrol *kcontrol,
 	ucontrol->value.integer.value[0] = msg.params.sfc_info.out_freq;
 
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -938,11 +950,13 @@ int tegra186_virt_asrc_set_input_threshold(struct snd_kcontrol *kcontrol,
 	msg.params.asrc_info.input_threshold =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -972,7 +986,7 @@ int tegra186_virt_asrc_get_output_threshold(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1003,11 +1017,13 @@ int tegra186_virt_asrc_set_output_threshold(
 	msg.params.asrc_info.output_threshold =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1044,11 +1060,13 @@ int tegra_virt_t210_amx_set_input_stream_enable(
 	msg.params.amx_info.amx_stream_enable =
 		ucontrol->value.integer.value[0];
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1077,7 +1095,7 @@ int tegra186_virt_arad_get_lane_source(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1164,7 +1182,7 @@ int tegra186_virt_arad_get_lane_prescalar(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1209,11 +1227,13 @@ int tegra186_virt_arad_set_lane_prescalar(
 		msg.params.arad_info.den_prescalar = -1;
 	}
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1238,16 +1258,14 @@ int tegra186_virt_arad_get_lane_enable(
 	msg.cmd = NVAUDIO_ARAD_GET_LANE_ENABLE;
 	msg.params.arad_info.id = 0;
 	msg.params.arad_info.lane_id = reg;
-	pr_err(" ivc_send_retry 1\n");
 
 	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
-	pr_err(" ivc_send_retry 2\n");
 	ucontrol->value.integer.value[0] =
 			msg.params.arad_info.lane_enable;
 
@@ -1310,7 +1328,7 @@ int tegra186_virt_arad_get_lane_ratio(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1408,7 +1426,7 @@ int tegra_virt_i2s_get_rate(
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1478,11 +1496,13 @@ int tegra_virt_t210ahub_set_regdump(struct snd_kcontrol *kcontrol,
 	msg.params.ahub_block_info.dump_cmd = ((reg) >>
 				REGDUMP_CMD_SHIFT_VALUE) & 0xFF;
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
@@ -1514,11 +1534,13 @@ int tegra_virt_t210adma_set_regdump(struct snd_kcontrol *kcontrol,
 	msg.cmd = NVAUDIO_ADMA_BLOCK_REGDUMP;
 	msg.params.adma_info.channel_num = (uint32_t)reg;
 
-	err = nvaudio_ivc_send_retry(hivc_client,
+	msg.ack_required = true;
+
+	err = nvaudio_ivc_send_receive(hivc_client,
 			&msg,
 			sizeof(struct nvaudio_ivc_msg));
 	if (err < 0) {
-		pr_err("%s: Timedout on ivc_send_retry\n", __func__);
+		pr_err("%s: error on ivc_send_receive\n", __func__);
 		return err;
 	}
 
