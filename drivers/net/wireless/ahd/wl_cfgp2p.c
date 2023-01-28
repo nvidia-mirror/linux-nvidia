@@ -4,6 +4,7 @@
  * Portions of this code are copyright (c) 2022 Cypress Semiconductor Corporation
  *
  * Copyright (C) 1999-2017, Broadcom Corporation
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -2569,7 +2570,7 @@ wl_cfgp2p_add_p2p_disc_if(struct bcm_cfg80211 *cfg)
 			dhd_bus_mem_dump(dhd);
 		}
 #endif /* BCMPCIE && DHD_FW_COREDUMP */
-		net_os_send_hang_message(bcmcfg_to_prmry_ndev(cfg));
+
 #endif /* OEM_ANDROID */
 		return ERR_PTR(-ENODEV);
 #endif /* EXPLICIT_DISCIF_CLEANUP */
