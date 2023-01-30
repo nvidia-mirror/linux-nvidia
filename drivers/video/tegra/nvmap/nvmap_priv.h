@@ -272,6 +272,10 @@ struct nvmap_handle {
 	struct list_head pg_ref_h;
 	struct mutex pg_ref_h_lock;
 	bool is_subhandle;
+	/*
+	 * waitq to wait on RO dmabuf release completion, if release is already in progress.
+	 */
+	wait_queue_head_t waitq;
 };
 
 struct nvmap_handle_info {

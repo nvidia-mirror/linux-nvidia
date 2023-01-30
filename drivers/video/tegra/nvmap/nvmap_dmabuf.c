@@ -1,7 +1,7 @@
 /*
  * dma_buf exporter for nvmap
  *
- * Copyright (c) 2012-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -217,6 +217,7 @@ static void nvmap_dmabuf_release(struct dma_buf *dmabuf)
 	if (info->is_ro) {
 		BUG_ON(dmabuf != info->handle->dmabuf_ro);
 		info->handle->dmabuf_ro = NULL;
+		wake_up(&info->handle->waitq);
 	} else {
 		BUG_ON(dmabuf != info->handle->dmabuf);
 		info->handle->dmabuf = NULL;

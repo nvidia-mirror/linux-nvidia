@@ -27,6 +27,7 @@
 #include <linux/moduleparam.h>
 #include <linux/nvmap.h>
 #include <linux/version.h>
+#include <linux/wait.h>
 #if KERNEL_VERSION(4, 15, 0) > LINUX_VERSION_CODE
 #include <soc/tegra/chip-id.h>
 #else
@@ -247,6 +248,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	INIT_LIST_HEAD(&h->dmabuf_priv);
 
 	INIT_LIST_HEAD(&h->pg_ref_h);
+	init_waitqueue_head(&h->waitq);
 	/*
 	 * This takes out 1 ref on the dambuf. This corresponds to the
 	 * handle_ref that gets automatically made by nvmap_create_handle().
@@ -474,6 +476,7 @@ struct nvmap_handle_ref *nvmap_dup_handle_ro(struct nvmap_client *client,
 	struct nvmap_handle *h;
 	struct nvmap_handle_ref *ref = NULL;
 	bool dmabuf_created = false;
+	long remain;
 
 	if (!client)
 		return ERR_PTR(-EINVAL);
@@ -488,14 +491,38 @@ struct nvmap_handle_ref *nvmap_dup_handle_ro(struct nvmap_client *client,
 			return ERR_CAST(h);
 	}
 
+	mutex_lock(&h->lock);
 	if (h->dmabuf_ro == NULL) {
 		h->dmabuf_ro = __nvmap_make_dmabuf(client, h, true);
 		if (IS_ERR(h->dmabuf_ro)) {
 			nvmap_handle_put(h);
+			mutex_unlock(&h->lock);
 			return ERR_CAST(h->dmabuf_ro);
 		}
 		dmabuf_created = true;
+	} else {
+		if (!get_file_rcu(h->dmabuf_ro->file)) {
+			mutex_unlock(&h->lock);
+			remain = wait_event_interruptible_timeout(h->waitq,
+					!h->dmabuf_ro, (long)msecs_to_jiffies(100U));
+			if (remain > 0 && !h->dmabuf_ro) {
+				mutex_lock(&h->lock);
+				h->dmabuf_ro = __nvmap_make_dmabuf(client, h, true);
+				if (IS_ERR(h->dmabuf_ro)) {
+					nvmap_handle_put(h);
+					mutex_unlock(&h->lock);
+					return ERR_CAST(h->dmabuf_ro);
+				}
+				dmabuf_created = true;
+			} else {
+				nvmap_handle_put(h);
+				return ERR_PTR(-EINVAL);
+			}
+		} else {
+			dma_buf_put(h->dmabuf_ro);
+		}
 	}
+	mutex_unlock(&h->lock);
 
 	ref = nvmap_duplicate_handle(client, h, false, true);
 	if (!ref) {

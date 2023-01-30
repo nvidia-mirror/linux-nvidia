@@ -3,7 +3,7 @@
  *
  * mapping between nvmap_hnadle and sci_ipc entery
  *
- * Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -22,6 +22,7 @@
 #include <linux/rbtree.h>
 #include <linux/list.h>
 #include <linux/mman.h>
+#include <linux/wait.h>
 
 #include <linux/nvscierror.h>
 #include <linux/nvsciipc_interface.h>
@@ -224,6 +225,7 @@ int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 	struct nvmap_sci_ipc_entry *entry;
 	struct dma_buf *dmabuf = NULL;
 	struct nvmap_handle *h;
+	long remain;
 	int ret = 0;
 	int fd;
 
@@ -245,14 +247,40 @@ int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 
 	h = entry->handle;
 
-	if (is_ro && h->dmabuf_ro == NULL) {
-		h->dmabuf_ro = __nvmap_make_dmabuf(client, h, true);
-		if (IS_ERR(h->dmabuf_ro)) {
-			ret = PTR_ERR(h->dmabuf_ro);
-			goto unlock;
+	mutex_lock(&h->lock);
+	if (is_ro) {
+		if (h->dmabuf_ro == NULL) {
+			h->dmabuf_ro = __nvmap_make_dmabuf(client, h, true);
+			if (IS_ERR(h->dmabuf_ro)) {
+				ret = PTR_ERR(h->dmabuf_ro);
+				mutex_unlock(&h->lock);
+				goto unlock;
+			}
+			dmabuf_created = true;
+		} else {
+			if (!get_file_rcu(h->dmabuf_ro->file)) {
+				mutex_unlock(&h->lock);
+				remain = wait_event_interruptible_timeout(h->waitq,
+						!h->dmabuf_ro, (long)msecs_to_jiffies(100U));
+				if (remain > 0 && !h->dmabuf_ro) {
+					mutex_lock(&h->lock);
+					h->dmabuf_ro = __nvmap_make_dmabuf(client, h, true);
+					if (IS_ERR(h->dmabuf_ro)) {
+						ret = PTR_ERR(h->dmabuf_ro);
+						mutex_unlock(&h->lock);
+						goto unlock;
+					}
+					dmabuf_created = true;
+				} else {
+					ret = -EINVAL;
+					goto unlock;
+				}
+			} else {
+				dma_buf_put(h->dmabuf_ro);
+			}
 		}
-		dmabuf_created = true;
 	}
+	mutex_unlock(&h->lock);
 
 	ref = nvmap_duplicate_handle(client, h, false, is_ro);
 	if (!ref) {
