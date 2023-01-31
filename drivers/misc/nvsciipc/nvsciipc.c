@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -51,7 +51,8 @@
 /* enable it to debug auth API via ioctl.
  * enable LINUX_DEBUG_KMD_API in test_nvsciipc_nvmap tool either.
  */
-//#define DEBUG_AUTH_API
+#define DEBUG_AUTH_API 1
+#define DEBUG_VALIDATE_TOKEN 0
 
 DEFINE_MUTEX(nvsciipc_mutex);
 
@@ -85,7 +86,7 @@ NvSciError NvSciIpcEndpointValidateAuthTokenLinuxCurrent(
 {
 	struct fd f;
 	struct file *filp;
-	int i, ret;
+	int i, ret, devlen;
 	char node[NVSCIIPC_MAX_EP_NAME+16];
 
 	if ((ctx == NULL) || (ctx->set_db_f != true)) {
@@ -100,13 +101,22 @@ NvSciError NvSciIpcEndpointValidateAuthTokenLinuxCurrent(
 	}
 	filp = f.file;
 
+	devlen = strlen(filp->f_path.dentry->d_name.name);
+#if DEBUG_VALIDATE_TOKEN
+	INFO("token: %lld, dev name: %s, devlen: %d\n", authToken,
+		filp->f_path.dentry->d_name.name, devlen);
+#endif
+
 	for (i = 0; i < ctx->num_eps; i++) {
 		ret = snprintf(node, sizeof(node), "%s%d",
 			ctx->db[i]->dev_name, ctx->db[i]->id);
 
-		if ((ret < 0) || (ret >= sizeof(node)))
+		if ((ret < 0) || (ret != devlen))
 			continue;
 
+#if DEBUG_VALIDATE_TOKEN
+		INFO("node:%s, vuid:0x%llx\n", node, ctx->db[i]->vuid);
+#endif
 		/* compare node name itself only (w/o directory) */
 		if (!strncmp(filp->f_path.dentry->d_name.name, node, ret)) {
 			*localUserVuid = ctx->db[i]->vuid;
@@ -220,7 +230,7 @@ static int nvsciipc_dev_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-#if defined(DEBUG_AUTH_API)
+#if DEBUG_AUTH_API
 static int nvsciipc_ioctl_validate_auth_token(struct nvsciipc *ctx,
 	unsigned int cmd, unsigned long arg)
 {
@@ -427,11 +437,6 @@ static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
 	}
 #endif /* CONFIG_ANDROID */
 
-	if ((ctx->num_eps != 0) || (ctx->set_db_f == true)) {
-		ERR("nvsciipc db is set already\n");
-		return -EPERM;
-	}
-
 	if (copy_from_user(&user_db, (void __user *)arg, _IOC_SIZE(cmd))) {
 		ERR("copying user db failed\n");
 		return -EFAULT;
@@ -602,7 +607,7 @@ static long nvsciipc_dev_ioctl(struct file *filp, unsigned int cmd,
 	case NVSCIIPC_IOCTL_GET_DB_SIZE:
 		ret = nvsciipc_ioctl_get_dbsize(ctx, cmd, arg);
 		break;
-#if defined(DEBUG_AUTH_API)
+#if DEBUG_AUTH_API
 	case NVSCIIPC_IOCTL_VALIDATE_AUTH_TOKEN:
 		ret = nvsciipc_ioctl_validate_auth_token(ctx, cmd, arg);
 		break;
