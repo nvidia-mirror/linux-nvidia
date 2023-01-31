@@ -413,7 +413,6 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 {
 	struct max_gmsl_dp_ser_priv *priv;
 	struct i2c_client *client;
-	int ret = 0;
 
 	client = to_i2c_client(dev);
 	priv = i2c_get_clientdata(client);
@@ -486,11 +485,7 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LINK_ENABLE,
 			       MAX_GMSL_DP_SER_LINK_ENABLE_MASK, 0x1);
 
-	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
-	if (ret < 0) {
-		dev_err(dev, "%s: INTR9 register read failed\n", __func__);
-		return -EFAULT;
-	}
+	max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
 
 	if (priv->link_a_is_enabled)
 		max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR2,
@@ -526,7 +521,7 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_U,
 			       MAX_GMSL_DP_SER_VID_TX_MASK, 0x1);
 
-	return ret;
+	return 0;
 }
 
 static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
