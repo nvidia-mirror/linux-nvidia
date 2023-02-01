@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -250,15 +250,24 @@ struct PVA_PACKED pva_task_action_s {
 	} args;
 };
 
+/* This structure is created to ensure dma_info and params_list is always
+ * stored in contiguous memory within the HW task structure. This is done as a perf
+ * optimization so that a single dma copy can be triggered by R5 FW for copying both
+ * the dma_info and param_list.
+ */
+struct pva_dma_info_and_params_list_s {
+	struct pva_dma_info_s dma_info;
+	struct pva_vpu_parameters_s param_list[NVPVA_TASK_MAX_SYMBOLS];
+};
+
 struct pva_hw_task {
 	struct pva_td_s task;
 	struct pva_task_action_s preactions[PVA_MAX_PREACTION_LISTS];
 	struct pva_task_action_s postactions[PVA_MAX_POSTACTION_LISTS];
-	struct pva_dma_info_s dma_info;
+	struct pva_dma_info_and_params_list_s dma_info_and_params_list;
 	struct pva_dma_misr_config_s dma_misr_config;
 	struct pva_dtd_s dma_desc[NVPVA_TASK_MAX_DMA_DESCRIPTORS];
 	struct pva_vpu_parameter_info_s param_info;
-	struct pva_vpu_parameters_s param_list[NVPVA_TASK_MAX_SYMBOLS];
 	struct pva_task_statistics_s statistics;
 	struct pva_circular_buffer_info_s stdout_cb_info;
 };

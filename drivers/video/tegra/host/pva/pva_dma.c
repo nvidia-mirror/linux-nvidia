@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1071,6 +1071,9 @@ int pva_task_write_dma_info(struct pva_submit_task *task,
 	u32 i;
 	u32 j;
 	u32 mask;
+	struct pva_dma_info_s *hw_task_dma_info;
+
+	hw_task_dma_info = &hw_task->dma_info_and_params_list.dma_info;
 
 	if (task->num_dma_descriptors == 0L || task->num_dma_channels == 0L) {
 		nvpva_dbg_info(task->pva, "pva: no DMA resources: NOOP mode");
@@ -1099,7 +1102,7 @@ int pva_task_write_dma_info(struct pva_submit_task *task,
 		/* Configure HWSeq trigger mode selection in DMA Configuration
 		 * Register
 		 */
-		hw_task->dma_info.dma_common_config |=
+		hw_task_dma_info->dma_common_config |=
 			(task->hwseq_config.hwseqTrigMode & 0x1U) << 12U;
 
 		mem = pva_task_pin_mem(task,
@@ -1112,22 +1115,23 @@ int pva_task_write_dma_info(struct pva_submit_task *task,
 
 		hwseqbuf_cpuva = pva_dmabuf_vmap(mem->dmabuf) +
 				 task->hwseq_config.hwseqBuf.offset;
-		hw_task->dma_info.dma_hwseq_base =
-			mem->dma_addr + task->hwseq_config.hwseqBuf.offset;
-		hw_task->dma_info.num_hwseq = task->hwseq_config.hwseqBuf.size;
+		hw_task_dma_info->dma_hwseq_base = mem->dma_addr +
+			task->hwseq_config.hwseqBuf.offset;
+		hw_task_dma_info->num_hwseq =
+			task->hwseq_config.hwseqBuf.size;
 	}
 
 	/* write dma channel info */
-	hw_task->dma_info.num_channels = task->num_dma_channels;
-	hw_task->dma_info.num_descriptors = task->num_dma_descriptors;
-	hw_task->dma_info.descriptor_id = 1U; /* PVA_DMA_DESC0 */
+	hw_task_dma_info->num_channels = task->num_dma_channels;
+	hw_task_dma_info->num_descriptors = task->num_dma_descriptors;
+	hw_task_dma_info->descriptor_id = 1U; /* PVA_DMA_DESC0 */
 	task->desc_hwseq_frm = 0ULL;
 
 	for (i = 0; i < task->num_dma_channels; i++) {
 		ch_num = i + 1; /* Channel 0 can't use */
 		err = nvpva_task_dma_channel_mapping(
 			task,
-			&hw_task->dma_info.dma_channels[i],
+			&hw_task_dma_info->dma_channels[i],
 			hwseqbuf_cpuva,
 			ch_num,
 			hwgen,
@@ -1141,24 +1145,25 @@ int pva_task_write_dma_info(struct pva_submit_task *task,
 		 * mode
 		 */
 		if (!is_hwseq_mode &&
-		    (hw_task->dma_info.dma_channels[i].hwseqcntl != 0U)) {
+		    (hw_task_dma_info->dma_channels[i].hwseqcntl != 0U)) {
 			task_err(task, "invalid HWSeq config in SW mode");
 			err = -EINVAL;
 			goto out;
 		}
 
-		hw_task->dma_info.dma_channels[i].ch_number = ch_num;
+		hw_task_dma_info->dma_channels[i].ch_number = ch_num;
 		mask = task->dma_channels[i].outputEnableMask;
 		for (j = 0; j < 7; j++) {
-			u32 *trig = &(hw_task->dma_info.dma_triggers[j]);
+			u32 *trig = &(hw_task_dma_info->dma_triggers[j]);
 
 			(*trig) |= (((mask >> 2*j) & 1U) << ch_num);
 			(*trig) |= (((mask >> (2*j + 1)) & 1U) << (ch_num + 16U));
 		}
 
-		hw_task->dma_info.dma_triggers[7] |= (((mask >> 14) & 1U) << ch_num);
+		hw_task_dma_info->dma_triggers[7] |=
+			(((mask >> 14) & 1U) << ch_num);
 		if (hwgen == PVA_HW_GEN2) {
-			u32 *trig = &(hw_task->dma_info.dma_triggers[8]);
+			u32 *trig = &(hw_task_dma_info->dma_triggers[8]);
 
 			(*trig) |= (((mask >> 15) & 1U) << ch_num);
 			(*trig) |= (((mask >> 16) & 1U) << (ch_num + 16U));
@@ -1172,12 +1177,13 @@ int pva_task_write_dma_info(struct pva_submit_task *task,
 	}
 
 	hw_task->task.dma_info =
-		task->dma_addr + offsetof(struct pva_hw_task, dma_info);
-	hw_task->dma_info.dma_descriptor_base =
+		task->dma_addr + offsetof(struct pva_hw_task, dma_info_and_params_list)
+		+ offsetof(struct pva_dma_info_and_params_list_s, dma_info);
+	hw_task_dma_info->dma_descriptor_base =
 		task->dma_addr + offsetof(struct pva_hw_task, dma_desc);
 
-	hw_task->dma_info.dma_info_version = PVA_DMA_INFO_VERSION_ID;
-	hw_task->dma_info.dma_info_size = sizeof(struct pva_dma_info_s);
+	hw_task_dma_info->dma_info_version = PVA_DMA_INFO_VERSION_ID;
+	hw_task_dma_info->dma_info_size = sizeof(struct pva_dma_info_s);
 out:
 	if (hwseqbuf_cpuva != NULL)
 		pva_dmabuf_vunmap(mem->dmabuf, hwseqbuf_cpuva);
@@ -1188,7 +1194,8 @@ out:
 int pva_task_write_dma_misr_info(struct pva_submit_task *task,
 				 struct pva_hw_task *hw_task)
 {
-	uint32_t common_config = hw_task->dma_info.dma_common_config;
+	struct pva_dma_info_s *hw_task_dma_info;
+	uint32_t common_config;
 	// MISR channel mask bits in DMA COMMON CONFIG
 	uint32_t common_config_ch_mask = PVA_MASK(31, 16);
 	// AXI output enable bit in DMA COMMON CONFIG
@@ -1198,7 +1205,10 @@ int pva_task_write_dma_misr_info(struct pva_submit_task *task,
 	// MISR TO interrupt enable bit in DMA COMMON CONFIG
 	uint32_t common_config_misr_to_enable_mask = PVA_BIT(0U);
 
-	hw_task->dma_info.dma_misr_base = 0U;
+	hw_task_dma_info = &hw_task->dma_info_and_params_list.dma_info;
+	common_config = hw_task_dma_info->dma_common_config;
+
+	hw_task_dma_info->dma_misr_base = 0U;
 	if (task->dma_misr_config.enable != 0U) {
 		hw_task->dma_misr_config.ref_addr   =
 			task->dma_misr_config.ref_addr;
@@ -1213,7 +1223,7 @@ int pva_task_write_dma_misr_info(struct pva_submit_task *task,
 		hw_task->dma_misr_config.misr_timeout =
 			task->dma_misr_config.misr_timeout;
 
-		hw_task->dma_info.dma_misr_base = task->dma_addr +
+		hw_task_dma_info->dma_misr_base = task->dma_addr +
 			offsetof(struct pva_hw_task, dma_misr_config);
 
 		/* Prepare data to be written to DMA COMMON CONFIG register */
@@ -1229,7 +1239,7 @@ int pva_task_write_dma_misr_info(struct pva_submit_task *task,
 		// Enable MISR TO interrupts
 		common_config = common_config | common_config_misr_to_enable_mask;
 
-		hw_task->dma_info.dma_common_config = common_config;
+		hw_task_dma_info->dma_common_config = common_config;
 	}
 
 	return 0;

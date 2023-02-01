@@ -557,6 +557,7 @@ pva_task_write_vpu_parameter(struct pva_submit_task *task,
 	u32 tail_index = 0U;
 	u8 *tailPtr = NULL;
 	u32 tail_count = 0U;
+	struct pva_vpu_parameters_s *hw_task_param_list;
 
 	if ((task->exe_id == NVPVA_NOOP_EXE_ID) || (task->num_symbols == 0U))
 		goto out;
@@ -579,6 +580,7 @@ pva_task_write_vpu_parameter(struct pva_submit_task *task,
 
 	headPtr = (u8 *)(task->aux_va);
 	tailPtr = (u8 *)(task->aux_va + task->symbol_payload_size);
+	hw_task_param_list = hw_task->dma_info_and_params_list.param_list;
 
 	for (i = 0U; i < task->num_symbols; i++) {
 		symbolId = task->symbols[i].symbol.id;
@@ -620,19 +622,21 @@ pva_task_write_vpu_parameter(struct pva_submit_task *task,
 			(void)memcpy(tailPtr,
 				(task->symbol_payload + task->symbols[i].offset),
 				size);
-			hw_task->param_list[tail_index].param_base =
+			hw_task_param_list[tail_index].param_base =
 						(pva_iova)(symbol_payload +
 						((uintptr_t)(tailPtr) -
 						(uintptr_t)(task->aux_va)));
 			index = tail_index;
 			tail_index--;
 			tail_count++;
-			hw_task->param_list[index].addr = elf->sym[symbolId].addr;
-			hw_task->param_list[index].size = size;
+			hw_task_param_list[index].addr =
+				elf->sym[symbolId].addr;
+			hw_task_param_list[index].size = size;
 			continue;
 		}
 
-		hw_task->param_list[head_index].param_base = (pva_iova)(symbol_payload +
+		hw_task_param_list[head_index].param_base =
+						(pva_iova)(symbol_payload +
 						((uintptr_t)(headPtr) -
 						 (uintptr_t)(task->aux_va)));
 		index = head_index;
@@ -645,19 +649,20 @@ pva_task_write_vpu_parameter(struct pva_submit_task *task,
 			head_index++;
 			head_size += size;
 			head_count++;
-			hw_task->param_list[index].addr = elf->sym[symbolId].addr;
-			hw_task->param_list[index].size = size;
+			hw_task_param_list[index].addr =
+				elf->sym[symbolId].addr;
+			hw_task_param_list[index].size = size;
 		}
 	}
 
 	/* Write info for VPU instance data parameter, if available in elf */
 	for (i = 0U; i < elf->num_symbols; i++) {
 		if (elf->sym[i].is_sys) {
-			hw_task->param_list[task->num_symbols].addr =
+			hw_task_param_list[task->num_symbols].addr =
 			    elf->sym[i].addr;
-			hw_task->param_list[task->num_symbols].size =
+			hw_task_param_list[task->num_symbols].size =
 			    elf->sym[i].size;
-			hw_task->param_list[task->num_symbols].param_base =
+			hw_task_param_list[task->num_symbols].param_base =
 			    PVA_SYS_INSTANCE_DATA_V1_IOVA;
 			++task->num_symbols;
 		}
@@ -673,7 +678,8 @@ pva_task_write_vpu_parameter(struct pva_submit_task *task,
 			(head_count + tail_count);
 
 	hw_task->param_info.parameter_data_iova = task->dma_addr
-			+ offsetof(struct pva_hw_task, param_list);
+			+ offsetof(struct pva_hw_task, dma_info_and_params_list)
+			+ offsetof(struct pva_dma_info_and_params_list_s, param_list);
 
 	hw_task->task.num_parameters = task->num_symbols;
 
