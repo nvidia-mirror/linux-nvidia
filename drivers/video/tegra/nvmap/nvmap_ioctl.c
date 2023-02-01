@@ -1131,7 +1131,16 @@ int nvmap_ioctl_get_handle_parameters(struct file *filp, void __user *arg)
 
 	op.size = handle->size;
 
-	if (handle->userflags & NVMAP_HANDLE_PHYS_CONTIG) {
+	/*
+	 * Check handle is allocated or not while setting contig.
+	 * If heap type is IOVMM, check if it has flag set for contiguous memory
+	 * allocation request. Otherwise, if handle belongs to any carveout then
+	 * all allocations are contiguous, hence set contig flag to true.
+	 */
+	if (handle->alloc &&
+	    ((handle->heap_type == NVMAP_HEAP_IOVMM &&
+	    handle->userflags & NVMAP_HANDLE_PHYS_CONTIG) ||
+	    handle->heap_type != NVMAP_HEAP_IOVMM)) {
 		op.contig = 1U;
 	} else {
 		op.contig = 0U;
