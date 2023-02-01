@@ -1372,6 +1372,16 @@ struct memoryinfo_surface {
 };
 
 /**
+ * @brief Watermark offset for specifying address within watermark ring buffer.
+ */
+struct watermark_mem_offset {
+	/** Index within watermark buffer */
+	uint32_t buff_idx;
+	/** Size of watermark */
+	uint32_t size;
+} CAPTURE_IVC_ALIGN;
+
+/**
  * @brief VI capture descriptor memory information
  *
  * VI capture descriptor memory information shared between
@@ -1385,8 +1395,10 @@ struct capture_descriptor_memoryinfo {
 	uint64_t engine_status_surface_base_address;
 	/** Size of engine status surface */
 	uint64_t engine_status_surface_size;
+	/** Memory surface for watermark ring buffer written by VI FW */
+	struct memoryinfo_surface watermark_surface;
 	/** pad for alignment */
-	uint32_t reserved32[12];
+	uint32_t reserved32[8];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
@@ -1421,8 +1433,14 @@ struct capture_descriptor {
 	/** Capture result record – written by RCE */
 	struct capture_status status;
 
+	/** Unique ID for the output buffer used for watermarking */
+	uint64_t output_buffer_id;
+
+	/** Offset for the next watermark within the watermark surface */
+	struct watermark_mem_offset watermark_offset;
+
 	/** Reserved */
-	uint32_t pad32__[14];
+	uint32_t pad32__[10];
 
 } CAPTURE_DESCRIPTOR_ALIGN;
 
@@ -2465,11 +2483,17 @@ struct isp_program_descriptor {
 	/** ISP program request status written by RCE */
 	struct capture_isp_program_status isp_program_status;
 
+	/** Unique ID for ISP stats buffer */
+	uint64_t isp_stats_buffer_id;
+
+	/** Unique ID for ISP program buffer */
+	uint64_t isp_program_buffer_id;
+
 	/** Activation condition for given ISP program. See @ref IspActivateFlag "Activation flags" */
 	uint32_t activate_flags;
 
 	/** Pad to aligned size */
-	uint32_t pad__[5];
+	uint8_t pad__[4];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
@@ -2563,6 +2587,8 @@ struct isp_capture_descriptor {
 		uint16_t width;
 		/** Height of the output surface in pixels */
 		uint16_t height;
+		/** Unique ID for the output buffer used for watermarking */
+		uint64_t output_buffer_id;
 	} outputs_mw[ISP_MAX_OUTPUTS];
 
 	/** Flicker band (FB) statistics buffer */
@@ -2668,11 +2694,17 @@ struct isp_capture_descriptor {
 	/** Frame processing result record – written by RTCPU */
 	struct capture_isp_status status;
 
+	/** Offset for the next watermark within the watermark surface */
+	struct watermark_mem_offset watermark_offset;
+
+	/** Unique ID for ISP input buffer */
+	uint64_t input_buffer_id;
+
 	/* Information regarding the ISP program bound to this capture */
 	uint32_t program_buffer_index;
 
 	/** Reserved */
-	uint32_t pad__[15];
+	uint32_t pad__[5];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
@@ -2715,8 +2747,10 @@ struct isp_capture_descriptor_memoryinfo {
 	struct memoryinfo_surface isp_pb2_mem; 				// TODO move to programm desc meminfo
 	/** Engine result record – written by Falcon */
 	struct memoryinfo_surface engine_status;
+	/** Memory surface for watermark ring buffer written by ISP FW */
+	struct memoryinfo_surface watermark_surface;
 	/* Reserved */
-	uint64_t reserved[4];
+	uint64_t reserved[2];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
