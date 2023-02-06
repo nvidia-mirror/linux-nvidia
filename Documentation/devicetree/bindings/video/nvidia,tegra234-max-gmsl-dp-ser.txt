@@ -1,40 +1,48 @@
 Maxim GMSL DP Serializer Driver
 
 Required properties:
-- compatible : should be "maxim,max_gmsl_dp_ser".
-- reg : I2C address of the Maxim display serializer.
+- compatible            : should be "maxim,max_gmsl_dp_ser".
+- reg                   : I2C address of the Maxim display serializer.
 - max_gmsl_dp_ser-pwrdn : GPIO pin number of the PWRDN pin.
                           This is the pin that's used to power
                           up the Maxim display serializer chip.
-- gmsl-link-select : This property is an array of 4 unsigned 8 bit values
-                     that determines which GMSL output link will be enabled
-                     for each video pipe X, Y, Z, and U..
-                     The possible values for each pipe are:
-                     - 0x0 (Link A),
-                     - 0x1 (Link B),
-                     - 0x2 (Link A + B).
+- gmsl-link-select      : This property is an array of 4 unsigned 8 bit values
+                          that determines which GMSL output link will be enabled
+                          for each video pipe X, Y, Z, and U.
+                          The possible values for each pipe are:
+                          - 0x0 (Link A),
+                          - 0x1 (Link B),
+                          - 0x2 (Link A + B).
 
 Optional properties:
-- dprx-link-rate : Configures the DP link rate of the serializer chip.
-                   The default value is 0x1E (HBR3). The possible values are:
-                   - 0xA (HBR),
-                   - 0x14 (HBR2),
-                   - 0x1E (HBR3).
-- dprx-lane-count : Configures the DP lane count of the serializer chip.
-                    The default value is 0x4. The possible values are:
-                    - 0x1,
-                    - 0x2,
-                    - 0x4.
-- ser-errb : GPIO pin number of the ERRB pin. This pin is used for error
-             and fault reporting by the serializer chip.
-- enable-mst : This is a boolean property. If this property is present
-               the driver will enable MST mode.
-- mst-payload-ids : This property is an array of 4 unsigned 8 bit values which
-                    represent MST payload IDs of pipe X, Y, Z, U. This property
-                    is mandatory if enable-mst property is mentioned in dt.
-- gmsl-stream-ids : This property is an array of 4 unsigned 8 bit values which
-                    represent GMSL stream IDs of pipe X, Y, Z, U. This property
-                    is mandatory if enable-mst property is mentioned in dt.
+- dprx-link-rate        : Configures the DP link rate of the serializer chip.
+                          The default value is 0x1E (HBR3). The possible values are:
+                          - 0xA (HBR),
+                          - 0x14 (HBR2),
+                          - 0x1E (HBR3).
+- dprx-lane-count       : Configures the DP lane count of the serializer chip.
+                          The default value is 0x4. The possible values are:
+                          - 0x1,
+                          - 0x2,
+                          - 0x4.
+- ser-errb              : GPIO pin number of the ERRB pin. This pin is used for error
+                          and fault reporting by the serializer chip.
+- enable-mst            : This is a boolean property. If this property is present
+                          the driver will enable MST mode.
+- mst-payload-ids       : This property is an array of 4 unsigned 8 bit values which
+                          represent MST payload IDs of pipe X, Y, Z, U. This property
+                          is mandatory if enable-mst property is mentioned in dt.
+- gmsl-stream-ids       : This property is an array of 4 unsigned 8 bit values which
+                          represent GMSL stream IDs of pipe X, Y, Z, U. This property
+                          is mandatory if enable-mst property is mentioned in dt.
+- enable-gmsl-fec       : This is a boolean property. If this property is set to true,
+                          the driver will enable GMSL-FEC.
+                          These settings are applicable to both Link A and Link B.
+- enable-gmsl3          : This is a boolean property. If this property is set to true,
+                          then PAM4 mode is enabled and 12 Gbps link rate is set.
+                          When GMSL3 is enabled, it will enable GMSL-FEC by default.
+                          If GMSL3 is not set, the link rate is set to 6 Gbps.
+                          These settings are applicable to both Link A and Link B.
 
 Example:
 
@@ -52,7 +60,9 @@ Example:
 			dprx-lane-count = <0x4>;
 			enable-mst;
 			mst-payload-ids  = /bits/ 8 <0x1 0x2 0x3 0x4>;
-                        gmsl-stream-ids  = /bits/ 8 <0x0 0x1 0x2 0x3>;
-                        gmsl-link-select = /bits/ 8 <0x0 0x1 0x2 0x1>;
+			gmsl-stream-ids  = /bits/ 8 <0x0 0x1 0x2 0x3>;
+			gmsl-link-select = /bits/ 8 <0x0 0x1 0x2 0x1>;
+			enable-gmsl-fec;
+			enable-gmsl3;
 		};
 	};

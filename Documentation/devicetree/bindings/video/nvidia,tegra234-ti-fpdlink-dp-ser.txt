@@ -1,0 +1,57 @@
+TI FPDLink DP Serializer Driver
+
+Required properties:
+- compatible              : should be "ti,ti_fpdlink_dp_ser".
+- reg                     : I2C address of the TI FPDLink display serializer.
+- ti_fpdlink_dp_ser-pwrdn : GPIO pin number of the PWRDN pin.
+                            This pin is used to power up the
+                            TI display serializer chip.
+- timings-phandle         : This property specifies the phandle that contains
+                            the mode timings that the SOC will use to send
+                            the video stream to the serializer.
+- fpd-link-select         : This property is an array of two unsigned 8-bit
+                            values that represent FPDlink port IDs. First field
+                            is for link A and the second is for link B. Value 0
+                            indicates that the link is disabled and value 1
+                            indicates that the link is enabled. At any given time,
+                            only one link is supported.
+
+Optional properties:
+- dprx-link-rate          : Configures the DP link rate of the serializer chip.
+                            The default value is 0x1E (HBR3). The possible values are:
+                            - 0xA (HBR),
+                            - 0x14 (HBR2),
+                            - 0x1E (HBR3).
+- dprx-lane-count         : Configures the DP lane count of the serializer chip.
+                            The default value is 0x4. The possible values are:
+                            - 0x1,
+                            - 0x2,
+                            - 0x4.
+
+Example:
+
+	i2c@31e0000 { /* i2c8 */
+		status = "okay";
+		ti_ser: ti_fpdlink_dp_ser@18 {
+			compatible = "ti,ti_fpdlink_dp_ser";
+			reg = <0x18>;
+			status = "okay";
+			ti_fpdlink_dp_ser-pwrdn = <&tegra_main_gpio TEGRA234_MAIN_GPIO(G, 3) GPIO_ACTIVE_HIGH>;
+			dprx-link-rate = <0x0A>;
+			dprx-lane-count = <0x4>;
+			timings-phandle = <&mode0>;
+			fpd-link-select = <0x1 0x0>;
+	};
+
+	mode0: 1920-1080-60Hz {
+		clock-frequency-khz = <148500>;
+		hactive = <1920>;
+		vactive = <1080>;
+		hfront-porch = <88>;
+		hback-porch = <148>;
+		hsync-len = <44>;
+		vfront-porch = <4>;
+		vback-porch = <36>;
+		vsync-len = <5>;
+		rrx1k = <60000>;
+	};
