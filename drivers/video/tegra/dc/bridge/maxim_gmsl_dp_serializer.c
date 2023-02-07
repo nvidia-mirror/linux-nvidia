@@ -139,6 +139,9 @@
 
 #define MAX_GMSL_ARRAY_SIZE		4
 
+#define MAX_GMSL_LINKS			2
+#define MAX_GMSL_LINK_A			0
+#define MAX_GMSL_LINK_B			1
 
 struct max_gmsl_dp_ser_source {
 	struct fwnode_handle *fwnode;
@@ -159,13 +162,12 @@ struct max_gmsl_dp_ser_priv {
 	int ser_errb;
 	unsigned int ser_irq;
 	bool enable_mst;
-	bool enable_gmsl3;
-	bool enable_gmsl_fec;
 	u32 mst_payload_ids[MAX_GMSL_ARRAY_SIZE];
 	u32 gmsl_stream_ids[MAX_GMSL_ARRAY_SIZE];
 	u32 gmsl_link_select[MAX_GMSL_ARRAY_SIZE];
-	bool link_a_is_enabled;
-	bool link_b_is_enabled;
+	bool link_is_enabled[MAX_GMSL_LINKS];
+	u32 enable_gmsl3[MAX_GMSL_LINKS];
+	u32 enable_gmsl_fec[MAX_GMSL_LINKS];
 };
 
 static int max_gmsl_dp_ser_read(struct max_gmsl_dp_ser_priv *priv, int reg)
@@ -248,6 +250,26 @@ static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 		MAX_GMSL_DP_SER_VID_TX_U,
 	};
 
+	static const int max_gmsl_ser_tx0_link_regs[] = {
+		MAX_GMSL_DP_SER_TX0_LINK_A,
+		MAX_GMSL_DP_SER_TX0_LINK_B,
+	};
+
+	static const int max_gmsl_ser_lctrl0_regs[] = {
+		MAX_GMSL_DP_SER_LCTRL0_A,
+		MAX_GMSL_DP_SER_LCTRL0_B,
+	};
+
+	static const int max_gmsl_ser_reg4_mask[] = {
+		MAX_GMSL_DP_SER_REG_4_GMSL_A,
+		MAX_GMSL_DP_SER_REG_4_GMSL_B,
+	};
+
+	static const int max_gmsl_ser_reg4_value[] = {
+		MAX_GMSL_DP_SER_REG_4_GMSL_A_PAM4_VAL,
+		MAX_GMSL_DP_SER_REG_4_GMSL_B_PAM4_VAL,
+	};
+
 	/*
 	 * Just enable "Loss of Training" and "Register control" events.
 	 * Mask rest of event which can trigger HPD_IRQ.
@@ -287,38 +309,24 @@ static void max_gmsl_dp_ser_setup(struct max_gmsl_dp_ser_priv *priv)
 			       MAX_GMSL_DP_SER_I2C_SPEED_CAPABILITY_MASK,
 			       MAX_GMSL_DP_SER_I2C_SPEED_CAPABILITY_100KBPS);
 
-	if (priv->enable_gmsl_fec || priv->enable_gmsl3) {
-		if (priv->link_a_is_enabled) {
-			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_TX0_LINK_A,
-							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK,
-							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL);
-		}
-		if (priv->link_b_is_enabled) {
-			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_TX0_LINK_B,
-							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK,
-							MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL);
-		}
-	}
+	for (i = 0; i < MAX_GMSL_LINKS; i++) {
+		if (!priv->link_is_enabled[i])
+			continue;
 
-	if (priv->enable_gmsl3) {
-		if (priv->link_a_is_enabled) {
-			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LCTRL0_A,
-							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK,
-							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS);
+		if (priv->enable_gmsl_fec[i] || priv->enable_gmsl3[i]) {
+			max_gmsl_dp_ser_update(priv, max_gmsl_ser_tx0_link_regs[i],
+						MAX_GMSL_DP_SER_TX0_FEC_ENABLE_MASK,
+						MAX_GMSL_DP_SER_TX0_FEC_ENABLE_VAL);
+		}
+
+		if (priv->enable_gmsl3[i]) {
+			max_gmsl_dp_ser_update(priv, max_gmsl_ser_lctrl0_regs[i],
+						MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK,
+						MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS);
 
 			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_REG_4,
-							MAX_GMSL_DP_SER_REG_4_GMSL_A,
-							MAX_GMSL_DP_SER_REG_4_GMSL_A_PAM4_VAL);
-		}
-
-		if (priv->link_b_is_enabled) {
-			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_LCTRL0_B,
-							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_MASK,
-							MAX_GMSL_DP_SER_LCTRL0_TX_RATE_VAL_12GBPS);
-
-			max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_REG_4,
-							MAX_GMSL_DP_SER_REG_4_GMSL_B,
-							MAX_GMSL_DP_SER_REG_4_GMSL_B_PAM4_VAL);
+						max_gmsl_ser_reg4_mask[i],
+						max_gmsl_ser_reg4_value[i]);
 		}
 	}
 
@@ -379,12 +387,12 @@ static void max_gmsl_detect_remote_error(struct max_gmsl_dp_ser_priv *priv,
 
 	ret = max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR3);
 
-	if (priv->link_a_is_enabled) {
+	if (priv->link_is_enabled[MAX_GMSL_LINK_A]) {
 		if ((ret & MAX_GMSL_DP_SER_REM_ERR_FLAG_A) != 0)
 			dev_err(dev, "%s: Remote deserializer error detected on Link A\n", __func__);
 	}
 
-	if (priv->link_b_is_enabled) {
+	if (priv->link_is_enabled[MAX_GMSL_LINK_B]) {
 		if ((ret & MAX_GMSL_DP_SER_REM_ERR_FLAG_B) != 0)
 			dev_err(dev, "%s: Remote deserializer error detected on Link B\n", __func__);
 	}
@@ -467,12 +475,12 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 	 * Write RESET_LINK = 0 (for both Phy A, 0x29, and Phy B, 0x33)
 	 * to initiate the GMSL link lock process.
 	 */
-	if (priv->link_a_is_enabled)
+	if (priv->link_is_enabled[MAX_GMSL_LINK_A])
 		max_gmsl_dp_ser_update(priv,
 				       MAX_GMSL_DP_SER_LINK_CTRL_PHY_A,
 				       MAX_GMSL_DP_SER_LINK_CTRL_A_MASK,
 				       0x0);
-	if (priv->link_b_is_enabled)
+	if (priv->link_is_enabled[MAX_GMSL_LINK_B])
 		max_gmsl_dp_ser_update(priv,
 				       MAX_GMSL_DP_SER_LINK_CTRL_PHY_B,
 				       MAX_GMSL_DP_SER_LINK_CTRL_B_MASK,
@@ -487,11 +495,11 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 
 	max_gmsl_dp_ser_read(priv, MAX_GMSL_DP_SER_INTR9);
 
-	if (priv->link_a_is_enabled)
+	if (priv->link_is_enabled[MAX_GMSL_LINK_A])
 		max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR2,
 				   MAX_GMSL_DP_SER_REM_ERR_OEN_A_MASK,
 				   MAX_GMSL_DP_SER_REM_ERR_OEN_A_VAL);
-	if (priv->link_b_is_enabled)
+	if (priv->link_is_enabled[MAX_GMSL_LINK_B])
 		max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_INTR2,
 				   MAX_GMSL_DP_SER_REM_ERR_OEN_B_MASK,
 				   MAX_GMSL_DP_SER_REM_ERR_OEN_B_VAL);
@@ -539,20 +547,6 @@ static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
 	else
 		dev_info(dev, "%s: MST mode not enabled\n", __func__);
 
-	priv->enable_gmsl3 = of_property_read_bool(ser,
-						 "enable-gmsl3");
-	if (priv->enable_gmsl3)
-		dev_info(dev, "%s: GMSL3 mode enabled\n", __func__);
-	else
-		dev_info(dev, "%s: GMSL3 mode not enabled\n", __func__);
-
-	priv->enable_gmsl_fec = of_property_read_bool(ser,
-						 "enable-gmsl-fec");
-	if (priv->enable_gmsl_fec)
-		dev_info(dev, "%s: GMSL FEC enabled\n", __func__);
-	else
-		dev_info(dev, "%s: GMSL FEC not enabled\n", __func__);
-
 	if (priv->enable_mst) {
 		err = of_property_read_variable_u32_array(ser,
 							 "mst-payload-ids",
@@ -593,6 +587,69 @@ static int max_gmsl_dp_ser_parse_mst_props(struct i2c_client *client,
 	}
 
 	return 0;
+}
+
+static int max_gmsl_dp_ser_parse_gmsl_props(struct i2c_client *client,
+					   struct max_gmsl_dp_ser_priv *priv)
+{
+	struct device *dev = &priv->client->dev;
+	struct device_node *ser = dev->of_node;
+	int err = 0;
+
+	err = of_property_read_variable_u32_array(ser, "enable-gmsl3",
+						 priv->enable_gmsl3, 1,
+						 ARRAY_SIZE(priv->enable_gmsl3));
+	if (err < 0) {
+		if (err == -EINVAL) {
+			dev_info(dev,
+				 "%s: enable-gmsl3 property not found\n",
+				 __func__);
+		} else {
+			dev_err(dev,
+				 "%s: enable-gmsl3 property does not have valid data\n",
+				 __func__);
+			return -EINVAL;
+		}
+	}
+
+	err = of_property_read_variable_u32_array(ser, "enable-gmsl-fec",
+						 priv->enable_gmsl_fec, 1,
+						 ARRAY_SIZE(priv->enable_gmsl_fec));
+	if (err < 0) {
+		if (err == -EINVAL) {
+			dev_info(dev,
+				 "%s: enable-gmsl-fec property not found\n",
+				 __func__);
+		} else {
+			dev_err(dev,
+				 "%s: enable-gmsl-fec property does not have valid data\n",
+				 __func__);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int max_gmsl_dp_ser_parse_dt_props(struct i2c_client *client,
+					   struct max_gmsl_dp_ser_priv *priv)
+{
+	struct device *dev = &priv->client->dev;
+	int err = 0;
+
+	err = max_gmsl_dp_ser_parse_mst_props(client, priv);
+	if (err != 0) {
+		dev_err(dev, "%s: error parsing MST props\n", __func__);
+		return -EFAULT;
+	}
+
+	err = max_gmsl_dp_ser_parse_gmsl_props(client, priv);
+	if (err != 0) {
+		dev_err(dev, "%s: error parsing GMSL props\n", __func__);
+		return -EFAULT;
+	}
+
+	return err;
 }
 
 static int max_gmsl_dp_ser_parse_dt(struct i2c_client *client,
@@ -655,11 +712,11 @@ static int max_gmsl_dp_ser_parse_dt(struct i2c_client *client,
 		if ((priv->gmsl_link_select[i] == MAX_GMSL_DP_SER_ENABLE_LINK_A)
 		    || (priv->gmsl_link_select[i] ==
 		    MAX_GMSL_DP_SER_ENABLE_LINK_AB)) {
-			priv->link_a_is_enabled = true;
+			priv->link_is_enabled[MAX_GMSL_LINK_A] = true;
 		} else if ((priv->gmsl_link_select[i] == MAX_GMSL_DP_SER_ENABLE_LINK_B)
 		    || (priv->gmsl_link_select[i] ==
 		    MAX_GMSL_DP_SER_ENABLE_LINK_AB)) {
-			priv->link_b_is_enabled = true;
+			priv->link_is_enabled[MAX_GMSL_LINK_B] = true;
 		} else {
 			dev_info(dev,
 				 "%s: GMSL Link select values are invalid\n",
@@ -668,9 +725,9 @@ static int max_gmsl_dp_ser_parse_dt(struct i2c_client *client,
 		}
 	}
 
-	err = max_gmsl_dp_ser_parse_mst_props(client, priv);
+	err = max_gmsl_dp_ser_parse_dt_props(client, priv);
 	if (err != 0) {
-		dev_err(dev, "%s: error parsing MST props\n", __func__);
+		dev_err(dev, "%s: error parsing DT props\n", __func__);
 		return -EFAULT;
 	}
 
