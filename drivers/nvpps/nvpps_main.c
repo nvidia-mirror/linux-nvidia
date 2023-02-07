@@ -100,6 +100,8 @@ struct nvpps_device_data {
 	bool		only_timer_mode;
 	bool		pri_ptp_failed;
 	bool 		sec_ptp_failed;
+	uint8_t		k_int_val;
+	uint16_t	lock_threshold_val;
 };
 
 
@@ -137,6 +139,7 @@ struct nvpps_file_data {
 #define TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET	0x10c
 #define TSC_LOCKING_ADJUST_NUM_CONTROL_OFFSET			0x110
 #define TSC_LOCKING_ADJUST_DELTA_CONTROL_OFFSET			0x114
+#define TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET_K_INT_SHIFT	8
 
 #define SRC_SELECT_BIT_OFFSET	8
 #define SRC_SELECT_BITS	0xff
@@ -879,14 +882,38 @@ static void nvpps_fill_default_mac_phc_info(struct platform_device *pdev,
 
 static void nvpps_ptp_tsc_sync_config(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
 	uint32_t tsc_config_ptx_0;
 	struct nvpps_device_data *pdev_data = platform_get_drvdata(pdev);
 
+#define DEFAULT_K_INT_VAL			0x70
+#define DEFAULT_LOCK_THRESHOLD_20US	0x26c
+
+	//Set default K_INT & LOCK Threshold value
+	pdev_data->k_int_val = DEFAULT_K_INT_VAL;
+	pdev_data->lock_threshold_val = DEFAULT_LOCK_THRESHOLD_20US;
+
+	//Override default K_INT value
+	if (of_property_read_u8(np, "ptp_tsc_k_int", &pdev_data->k_int_val) == 0) {
+		dev_info(&pdev->dev, "Using K_INT value : 0x%x\n", pdev_data->k_int_val);
+	}
+
+	//Override default Lock Threshold value
+	if (of_property_read_u16(np, "ptp_tsc_lock_threshold", &pdev_data->lock_threshold_val) == 0) {
+		if (pdev_data->lock_threshold_val < 0x1F) {
+			//Use default value
+			dev_warn(&pdev->dev, "ptp_tsc_lock_threshold value should be minimum 1us(i.e 0x1F). Using default value 20us(i.e 0x26c)\n");
+			pdev_data->lock_threshold_val = DEFAULT_LOCK_THRESHOLD_20US;
+		}
+		dev_info(&pdev->dev, "Using Lock threshold value : 0x%x\n", pdev_data->lock_threshold_val);
+	}
+
 	//onetime config to init PTP TSC Sync logic
 	writel(0x119, pdev_data->tsc_reg_map_base + TSC_LOCKING_CONFIGURATION_OFFSET);
-	writel(0x26c, pdev_data->tsc_reg_map_base + TSC_LOCKING_DIFF_CONFIGURATION_OFFSET);
+	writel(pdev_data->lock_threshold_val, pdev_data->tsc_reg_map_base + TSC_LOCKING_DIFF_CONFIGURATION_OFFSET);
 	writel(0x1, pdev_data->tsc_reg_map_base + TSC_LOCKING_CONTROL_OFFSET);
-	writel(0x57011, pdev_data->tsc_reg_map_base + TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET);
+	writel((0x50011 | (pdev_data->k_int_val << TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET_K_INT_SHIFT)),
+		   pdev_data->tsc_reg_map_base + TSC_LOCKING_FAST_ADJUST_CONFIGURATION_OFFSET);
 	writel(0x67, pdev_data->tsc_reg_map_base + TSC_LOCKING_ADJUST_DELTA_CONTROL_OFFSET);
 	writel(0x313, pdev_data->tsc_reg_map_base + TSC_CAPTURE_CONFIGURATION_PTX_OFFSET);
 	writel(0x1, pdev_data->tsc_reg_map_base + TSC_STSCRSR_OFFSET);
