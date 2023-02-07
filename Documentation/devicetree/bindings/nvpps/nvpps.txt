@@ -18,6 +18,17 @@ Optional properties:
 - sec_interface: NW interface name to be used to calculate PTP Time offset.
 				 set to 'eqos_0', 'mgbe0_0', 'mgbe1_0', 'mgbe2_0' or 'mgbe3_0' for Orin.
 				 For Xavier, Leave this undefined. For Orin, If undef default to 'eqos_0'
+- ptp_tsc_k_int: Specifies the integer part of the factor used to calculate the delta to
+				 apply to NUM when the fast convergence algorithm is enabled when syncing
+				 or locking TSC time with PTP time domain.
+				 The value is a 8bit hexa-decimal value. If unspecified, NvPPS driver uses
+				 0x70 as default value
+- ptp_tsc_lock_threshold: specifies the threshold value which is used by HW to determine
+				 if the TSC PTP sync/Lock is lost. The lock is deemed to be lost if the HW
+				 determined absolute diff between PTP & TSC time exceed this value.
+				 The value is a 16bit hexa-decimal value. The minimum value(0x1F) supported
+				 correspond to 1us and max value(0xFFFF) supported correspond to approx 2.1ms.
+				 If unspecified, NvPPS driver uses 0x26C(corresponding to 20us) by default
 
 Example:
 
@@ -45,6 +56,8 @@ nvpps {
 	gpios = <&tegra_aon_gpio TEGRA234_AON_GPIO(EE, 6) GPIO_ACTIVE_HIGH>;
 	interface = "mgbe2_0";
 	sec_interface = "eqos_0";
+	ptp_tsc_k_int = /bits/ 8 <0x70>;
+	ptp_tsc_lock_threshold = /bits/ 16 <0x26C>
 };
 
 Example: GPIO as optional
