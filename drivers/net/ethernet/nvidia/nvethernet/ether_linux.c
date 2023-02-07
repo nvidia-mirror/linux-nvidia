@@ -5375,8 +5375,8 @@ static int ether_parse_residual_queue(struct ether_priv_data *pdata,
 	if ((ret < 0) ||
 	    (*pval >= osi_core->num_mtl_queues) ||
 	    (*pval == 0U)) {
-		dev_err(pdata->dev, "No/incorrect residual queue defined\n");
-		/* TODO we should return -EINVAL */
+		dev_info(pdata->dev,
+			 "No residual queue defined, set default\n");
 		*pval = 0x2U;
 	}
 
@@ -5529,7 +5529,7 @@ static int ether_parse_dt(struct ether_priv_data *pdata)
 	ret = of_property_read_u32(np, "nvidia,ptp_ref_clock_speed",
 				   &pdata->ptp_ref_clock_speed);
 	if (ret != 0) {
-		dev_err(dev, "setting default PTP clk rate as 312.5MHz\n");
+		dev_info(dev, "setting default PTP clk rate as 312.5MHz\n");
 		pdata->ptp_ref_clock_speed = ETHER_DFLT_PTP_CLK;
 	}
 	/* read promiscuous mode supported or not */
@@ -5617,8 +5617,8 @@ static int ether_parse_dt(struct ether_priv_data *pdata)
 				break;
 		}
 		if (i == osi_core->num_mtl_queues) {
-			dev_err(dev, "Invalid PTP RX queue in DT:%d\n",
-				osi_core->ptp_config.ptp_rx_queue);
+			dev_info(dev, "Invalid PTP RX queue in DT:%d\n",
+				 osi_core->ptp_config.ptp_rx_queue);
 			osi_core->ptp_config.ptp_rx_queue =
 				ETHER_DEFAULT_PTP_QUEUE;
 		}
