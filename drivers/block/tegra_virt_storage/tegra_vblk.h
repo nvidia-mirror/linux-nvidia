@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -109,7 +109,6 @@ struct vblk_dev {
 	uint32_t hsierror_status;
 	struct completion hsierror_handle;
 #endif
-	struct mutex req_lock;
 	struct mutex ivc_lock;
 	enum vblk_queue_state queue_state;
 	struct completion req_queue_empty;
