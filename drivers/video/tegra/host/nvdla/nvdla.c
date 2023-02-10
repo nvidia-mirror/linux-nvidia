@@ -58,35 +58,27 @@ int nvdla_error_inj_handler(unsigned int instance_id,
 	struct platform_device *pdev = nvdla_dev->pdev;
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	unsigned int device_instance_id;
-	unsigned int device_reporter_id;
-	unsigned int device_error_code;
+	unsigned int device_ue_reporter_id;
+	unsigned int device_ce_reporter_id;
+	unsigned int device_ue_error_code;
+	unsigned int device_ce_error_code;
 
 	if (pdata->class == NV_DLA0_CLASS_ID) {
 		device_instance_id = 0U;
-		device_reporter_id = NVDLA0_HSM_REPORTER_ID;
-		device_error_code = NVDLA0_HSM_ERROR_CODE;
+		device_ue_reporter_id = NVDLA0_UE_HSM_REPORTER_ID;
+		device_ce_reporter_id = NVDLA0_CE_HSM_REPORTER_ID;
+		device_ue_error_code = NVDLA0_UE_HSM_ERROR_CODE;
+		device_ce_error_code = NVDLA0_CE_HSM_ERROR_CODE;
 	} else {
 		device_instance_id = 1U;
-		device_reporter_id = NVDLA1_HSM_REPORTER_ID;
-		device_error_code = NVDLA1_HSM_ERROR_CODE;
+		device_ue_reporter_id = NVDLA1_UE_HSM_REPORTER_ID;
+		device_ce_reporter_id = NVDLA1_CE_HSM_REPORTER_ID;
+		device_ue_error_code = NVDLA1_UE_HSM_ERROR_CODE;
+		device_ce_error_code = NVDLA1_CE_HSM_ERROR_CODE;
 	}
 
 	if (device_instance_id != instance_id) {
 		nvdla_dbg_err(pdev, "Invalid instance ID: %u", instance_id);
-		err = -EINVAL;
-		goto fail;
-	}
-
-	if (device_reporter_id != frame.reporter_id) {
-		nvdla_dbg_err(pdev, "Invalid reporter ID: %u",
-			frame.reporter_id);
-		err = -EINVAL;
-		goto fail;
-	}
-
-	if (device_error_code != frame.error_code) {
-		nvdla_dbg_err(pdev, "Invalid error code: %u",
-			frame.error_code);
 		err = -EINVAL;
 		goto fail;
 	}
@@ -98,8 +90,21 @@ int nvdla_error_inj_handler(unsigned int instance_id,
 		goto fail;
 	}
 
-	host1x_writel(pdev, flcn_safety_erb_r(),
-		flcn_safety_erb_data_uncorrected_err_v());
+	if ((frame.reporter_id == device_ue_reporter_id) &&
+		 (frame.error_code == device_ue_error_code)) {
+		/* Inject uncorrected error. */
+		host1x_writel(pdev, flcn_safety_erb_r(),
+			flcn_safety_erb_data_uncorrected_err_v());
+	} else if ((frame.reporter_id == device_ce_reporter_id) &&
+		 (frame.error_code == device_ce_error_code)) {
+		/* Inject corrected error. */
+		host1x_writel(pdev, flcn_safety_erb_r(),
+			flcn_safety_erb_data_corrected_err_v());
+	} else {
+		nvdla_dbg_err(pdev, "Invalid Reported ID: %x, Error Code: %x",
+			frame.reporter_id, frame.error_code);
+		err = -EINVAL;
+	}
 
 	nvhost_module_idle(pdev);
 

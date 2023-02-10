@@ -303,6 +303,11 @@ static inline u32 flcn_safety_erb_r(void)
 	return 0x000012ec;
 }
 
+static inline u32 flcn_safety_erb_data_corrected_err_v(void)
+{
+	return 0xeafe0c00;
+}
+
 static inline u32 flcn_safety_erb_data_uncorrected_err_v(void)
 {
 	return 0xeafe1cff;

@@ -1098,16 +1098,32 @@ static ssize_t debug_dla_err_inj_write(struct file *file,
 
 		if (pdata->class == NV_DLA0_CLASS_ID) {
 			instance_id = 0U;
-			frame.error_code = NVDLA0_HSM_ERROR_CODE;
 			frame.error_attribute = 0U;
 			frame.timestamp = 0U;
-			frame.reporter_id = NVDLA0_HSM_REPORTER_ID;
+			if (write_value == 1) {
+				frame.reporter_id = NVDLA0_UE_HSM_REPORTER_ID;
+				frame.error_code = NVDLA0_UE_HSM_ERROR_CODE;
+			} else if (write_value == 2) {
+				frame.reporter_id = NVDLA0_CE_HSM_REPORTER_ID;
+				frame.error_code = NVDLA0_CE_HSM_ERROR_CODE;
+			} else {
+				nvdla_dbg_err(pdev, "Write value out of range: [0,2]");
+				goto fail;
+			}
 		} else {
 			instance_id = 1U;
-			frame.error_code = NVDLA1_HSM_ERROR_CODE;
 			frame.error_attribute = 0U;
 			frame.timestamp = 0U;
-			frame.reporter_id = NVDLA1_HSM_REPORTER_ID;
+			if (write_value == 1) {
+				frame.reporter_id = NVDLA1_UE_HSM_REPORTER_ID;
+				frame.error_code = NVDLA1_UE_HSM_ERROR_CODE;
+			} else if (write_value == 2) {
+				frame.reporter_id = NVDLA1_CE_HSM_REPORTER_ID;
+				frame.error_code = NVDLA1_CE_HSM_ERROR_CODE;
+			} else {
+				nvdla_dbg_err(pdev, "Write value out of range: [0,2]");
+				goto fail;
+			}
 		}
 
 		err = nvdla_error_inj_handler(instance_id, frame,
