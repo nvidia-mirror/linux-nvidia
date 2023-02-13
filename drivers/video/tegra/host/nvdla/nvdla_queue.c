@@ -1,7 +1,7 @@
 /*
  * NVDLA queue and task management for T194
  *
- * Copyright (c) 2016-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -322,7 +322,7 @@ static inline size_t nvdla_profile_status_offset(struct nvdla_task *task)
 	return offset;
 }
 
-static void nvdla_queue_update(void *priv, int nr_completed)
+static void nvdla_queue_update(void *priv, int unused)
 {
 	int task_complete;
 	struct nvdla_task *task, *safe;
@@ -331,6 +331,7 @@ static void nvdla_queue_update(void *priv, int nr_completed)
 	struct nvhost_notification *tsp_notifier;
 	u64 timestamp_start, timestamp_end;
 	u64 *timestamp_ptr;
+	int n_tasks_completed = 0;
 
 	mutex_lock(&queue->list_lock);
 
@@ -371,10 +372,12 @@ static void nvdla_queue_update(void *priv, int nr_completed)
 				timestamp_end);
 
 			nvdla_task_free_locked(task);
+			n_tasks_completed++;
 		}
 	}
+
 	/* put pm refcount */
-	nvhost_module_idle_mult(pdev, nr_completed);
+	nvhost_module_idle_mult(pdev, n_tasks_completed);
 
 	mutex_unlock(&queue->list_lock);
 }
