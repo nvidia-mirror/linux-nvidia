@@ -28,6 +28,7 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/pm_runtime.h>
 #include <soc/tegra/fuse-helper.h>
 #include <uapi/linux/nvhost_nvdla_ioctl.h>
 #ifdef CONFIG_TEGRA_SOC_HWPM
@@ -1171,12 +1172,18 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int nvdla_module_runtime_suspend(struct device *dev)
 {
-	return nvhost_module_pm_ops.runtime_suspend(dev);
+	if (nvhost_module_pm_ops.runtime_suspend != NULL)
+		return nvhost_module_pm_ops.runtime_suspend(dev);
+
+	return -EOPNOTSUPP;
 }
 
 static int nvdla_module_runtime_resume(struct device *dev)
 {
-	return nvhost_module_pm_ops.runtime_resume(dev);
+	if (nvhost_module_pm_ops.runtime_resume != NULL)
+		return nvhost_module_pm_ops.runtime_resume(dev);
+
+	return -EOPNOTSUPP;
 }
 
 static int nvdla_module_suspend(struct device *dev)
@@ -1185,10 +1192,18 @@ static int nvdla_module_suspend(struct device *dev)
 	struct nvhost_device_data *pdata = dev_get_drvdata(dev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
 
-	err = nvhost_module_pm_ops.suspend(dev);
-	if (err != 0) {
-		dev_err(dev, "(FAIL) NvHost suspend\n");
-		goto fail_nvhost_module_suspend;
+	if (nvhost_module_pm_ops.suspend != NULL) {
+		err = nvhost_module_pm_ops.suspend(dev);
+		if (err != 0) {
+			dev_err(dev, "(FAIL) NvHost suspend\n");
+			goto fail_nvhost_module_suspend;
+		}
+	} else {
+		err = pm_runtime_force_suspend(dev);
+		if (err != 0) {
+			dev_err(dev, "(FAIL) PM suspend\n");
+			goto fail_nvhost_module_suspend;
+		}
 	}
 
 	/* Mark module to be in suspend state. */
@@ -1210,10 +1225,18 @@ static int nvdla_module_resume(struct device *dev)
 		goto fail_not_in_suspend;
 	}
 
-	err = nvhost_module_pm_ops.resume(dev);
-	if (err != 0) {
-		dev_err(dev, "(FAIL) NvHost resume\n");
-		goto fail_nvhost_module_resume;
+	if (nvhost_module_pm_ops.resume != NULL) {
+		err = nvhost_module_pm_ops.resume(dev);
+		if (err != 0) {
+			dev_err(dev, "(FAIL) NvHost resume\n");
+			goto fail_nvhost_module_resume;
+		}
+	} else {
+		err = pm_runtime_force_resume(dev);
+		if (err != 0) {
+			dev_err(dev, "(FAIL) PM resume\n");
+			goto fail_nvhost_module_resume;
+		}
 	}
 
 	return 0;
@@ -1243,11 +1266,20 @@ static int nvdla_module_prepare_suspend(struct device *dev)
 	}
 
 	/* NvHost prepare suspend - callback */
-	err = nvhost_module_pm_ops.prepare(dev);
-	if (err != 0) {
-		dev_err(dev, "(FAIL) NvHost prepare suspend\n");
-		goto fail_nvhost_module_prepare_suspend;
+	if (nvhost_module_pm_ops.prepare != NULL) {
+		err = nvhost_module_pm_ops.prepare(dev);
+		if (err != 0) {
+			dev_err(dev, "(FAIL) NvHost prepare suspend\n");
+			goto fail_nvhost_module_prepare_suspend;
+		}
+	} else {
+		/* If we took an extra reference, drop it now to prevent
+		 * the device from automatically resuming upon system
+		 * resume.
+		 */
+		pm_runtime_put_sync(dev);
 	}
+
 
 	return 0;
 
@@ -1262,7 +1294,12 @@ static void nvdla_module_complete_resume(struct device *dev)
 	struct nvhost_device_data *pdata = dev_get_drvdata(dev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
 
-	nvhost_module_pm_ops.complete(dev);
+	if (nvhost_module_pm_ops.complete != NULL) {
+		nvhost_module_pm_ops.complete(dev);
+	} else {
+		/* Retake reference dropped above */
+		pm_runtime_get_noresume(dev);
+	}
 
 	/* Module is no longer in suspend and has resumed successfully */
 	nvdla_dev->is_suspended = false;
