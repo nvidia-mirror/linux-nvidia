@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA Corporation. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -670,6 +670,9 @@ int nvhost_flcn_finalize_poweron(struct platform_device *pdev)
 		return err;
 	}
 
+	if (pdata->flcn_isr)
+		enable_irq(pdata->irq);
+
 	return 0;
 }
 EXPORT_SYMBOL(nvhost_flcn_finalize_poweron);
@@ -918,9 +921,6 @@ static int nvhost_module_runtime_resume(struct device *dev)
 
 	/* Load clockgating registers */
 	nvhost_module_load_regs(pdev, pdata->engine_can_cg);
-
-	if (pdata->flcn_isr)
-		enable_irq(pdata->irq);
 
 	if (pdata->finalize_poweron)
 		err = pdata->finalize_poweron(pdev);
