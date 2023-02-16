@@ -103,13 +103,9 @@ static int ofa_init(struct host1x_client *client)
 		goto free_channel;
 	}
 
-	pm_runtime_enable(client->dev);
-	pm_runtime_use_autosuspend(client->dev);
-	pm_runtime_set_autosuspend_delay(client->dev, 500);
-
 	err = tegra_drm_register_client(tegra, drm);
 	if (err < 0)
-		goto disable_rpm;
+		goto free_syncpt;
 
 	/*
 	 * Inherit the DMA parameters (such as maximum segment size) from the
@@ -119,9 +115,7 @@ static int ofa_init(struct host1x_client *client)
 
 	return 0;
 
-disable_rpm:
-	pm_runtime_dont_use_autosuspend(client->dev);
-	pm_runtime_force_suspend(client->dev);
+free_syncpt:
 	host1x_syncpt_put(client->syncpts[0]);
 free_channel:
 	host1x_channel_put(ofa->channel);
@@ -366,6 +360,10 @@ static int ofa_probe(struct platform_device *pdev)
 		goto exit_falcon;
 	}
 
+	pm_runtime_enable(dev);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_set_autosuspend_delay(dev, 500);
+
 	return 0;
 
 exit_falcon:
@@ -378,6 +376,8 @@ static int ofa_remove(struct platform_device *pdev)
 {
 	struct ofa *ofa = platform_get_drvdata(pdev);
 	int err;
+
+	pm_runtime_disable(&pdev->dev);
 
 	err = host1x_client_unregister(&ofa->client.base);
 	if (err < 0) {
