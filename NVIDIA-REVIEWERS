@@ -1,4 +1,4 @@
-/* Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved. */
+/* Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved. */
 
 This is a reviewers file that can be parsed by get_nv_reviewers.py that
 internally uses scripts/get_maintainer.pl from kernel.
@@ -204,12 +204,6 @@ F:	drivers/gpu/drm/*
 F:	drivers/gpu/host1x/*
 F:	drivers/video/tegra/host/
 F:	drivers/video/tegra/host/nvdla/
-
-HV_SECCAN
-M:	Yong Zhang <yongz@nvidia.com>
-B:	Embedded Virtualization
-S:	Supported
-F:	drivers/net/can/nvsec/*
 
 INPUT
 M:	Jordan Nien <JNien@nvidia.com>
