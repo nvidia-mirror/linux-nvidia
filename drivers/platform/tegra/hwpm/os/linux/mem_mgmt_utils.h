@@ -19,7 +19,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 #include <linux/iosys-map.h>
 #else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 #include <linux/dma-buf-map.h>
 #endif
 #endif
@@ -49,7 +49,7 @@ struct tegra_hwpm_mem_mgmt {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 	struct iosys_map mem_bytes_map;
 #else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 	struct dma_buf_map mem_bytes_map;
 #endif
 #endif
