@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -1569,15 +1569,21 @@ int esc_mods_irq_handled(struct mods_client       *client,
 int esc_mods_map_irq(struct mods_client  *client,
 		     struct MODS_DT_INFO *p)
 {
+	/* irq parameters */
+	struct of_phandle_args oirq;
+	/* platform device handle */
+	struct platform_device *pdev = NULL;
+	struct device_node *np;
 	int err = 0;
 	/* the physical irq */
 	int hwirq;
-	/* platform device handle */
-	struct platform_device *pdev = NULL;
-	/* irq parameters */
-	struct of_phandle_args oirq;
+
+	/* Make sure strings from userspace are null-terminated */
+	p->dt_name[sizeof(p->dt_name) - 1] = 0;
+	p->full_name[sizeof(p->full_name) - 1] = 0;
+
 	/* Search for the node by device tree name */
-	struct device_node *np = of_find_node_by_name(NULL, p->dt_name);
+	np = of_find_node_by_name(NULL, p->dt_name);
 
 	if (!np) {
 		cl_error("node %s is not valid\n", p->full_name);
@@ -1652,11 +1658,16 @@ int esc_mods_map_irq_to_gpio(struct mods_client    *client,
 			     struct MODS_GPIO_INFO *p)
 {
 	//TODO: Make sure you are allocating gpio properly
+	struct device_node *np;
 	int gpio_handle;
 	int irq;
 	int err = 0;
 
-	struct device_node *np = of_find_node_by_name(NULL, p->dt_name);
+	/* Make sure strings from userspace are null-terminated */
+	p->dt_name[sizeof(p->dt_name) - 1] = 0;
+	p->full_name[sizeof(p->full_name) - 1] = 0;
+
+	np = of_find_node_by_name(NULL, p->dt_name);
 
 	if (!np) {
 		cl_error("node %s is not valid\n", p->full_name);
