@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2015-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA Corporation. All rights reserved.
  */
 
 #include <linux/platform_device.h>
@@ -181,21 +181,6 @@ int falcon_boot(struct falcon *falcon)
 	for (offset = 0; offset < falcon->firmware.code.size; offset += 256)
 		falcon_copy_chunk(falcon, falcon->firmware.code.offset + offset,
 				  offset, FALCON_MEMORY_IMEM);
-
-	/* setup falcon interrupts */
-	falcon_writel(falcon, FALCON_IRQMSET_EXT(0xff) |
-			      FALCON_IRQMSET_SWGEN1 |
-			      FALCON_IRQMSET_SWGEN0 |
-			      FALCON_IRQMSET_EXTERR |
-			      FALCON_IRQMSET_HALT |
-			      FALCON_IRQMSET_WDTMR,
-		      FALCON_IRQMSET);
-	falcon_writel(falcon, FALCON_IRQDEST_EXT(0xff) |
-			      FALCON_IRQDEST_SWGEN1 |
-			      FALCON_IRQDEST_SWGEN0 |
-			      FALCON_IRQDEST_EXTERR |
-			      FALCON_IRQDEST_HALT,
-		      FALCON_IRQDEST);
 
 	/* enable interface */
 	falcon_writel(falcon, FALCON_ITFEN_MTHDEN |
