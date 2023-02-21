@@ -3,6 +3,9 @@
 ccflags-y += -I$(srctree.nvidia)/include
 ccflags-y += -DMODS_HAS_TEGRA
 
+LINUX_VERSION := $(shell expr $(VERSION) \* 256 + $(PATCHLEVEL))
+LINUX_VERSION_6_2 := $(shell expr 6 \* 256 + 2)
+
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
 CONFIG_MODS := m
 endif
@@ -15,8 +18,12 @@ mods-y                             += mods_mem.o
 
 mods-$(CONFIG_ACPI)                += mods_acpi.o
 mods-$(CONFIG_TEGRA_NVADSP)        += mods_adsp.o
+# mods_arm_ffa and mods_bpmpipc are currently broken for Linux v6.2
+# and so skip for Linux v6.2+
+ifeq ($(shell test $(LINUX_VERSION) -lt $(LINUX_VERSION_6_2); echo $$?),0)
 mods-$(CONFIG_ARM_FFA_TRANSPORT)   += mods_arm_ffa.o
 mods-$(CONFIG_TEGRA_IVC)           += mods_bpmpipc.o
+endif
 mods-$(CONFIG_COMMON_CLK)          += mods_clock.o
 mods-$(CONFIG_DEBUG_FS)            += mods_debugfs.o
 mods-$(CONFIG_DMA_ENGINE)          += mods_dma.o
