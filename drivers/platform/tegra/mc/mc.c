@@ -476,7 +476,10 @@ static int tegra_mc_resume_early(struct device *dev)
 			__raw_writel(nvlink_reg_val[i],
 					mssnvlink_regs[i] + MSSNVLINK_CYA_DESIGN_MODES);
 	}
-	tegra_mcerr_resume();
+
+	if (!is_tegra_hypervisor_mode())
+		tegra_mcerr_resume();
+
 	return 0;
 }
 
