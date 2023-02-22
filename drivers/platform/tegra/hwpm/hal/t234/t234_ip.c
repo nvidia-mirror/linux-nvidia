@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -188,6 +188,91 @@ fail:
 	return ret;
 }
 
+static int t234_hwpm_validate_emc_config(struct tegra_soc_hwpm *hwpm)
+{
+	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
+	struct hwpm_ip *chip_ip = NULL;
+	struct hwpm_ip_inst *ip_inst = NULL;
+	u32 emc_disable_fuse_val = 0U;
+	u32 emc_disable_fuse_val_mask = 0xFU;
+	u32 emc_element_floorsweep_mask = 0U;
+	u32 idx = 0U, inst_idx = 0U;
+	u32 element_mask_max = 0U;
+	int err;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+#define TEGRA_FUSE_EMC_DISABLE			0x8c0U
+	err = tegra_hwpm_fuse_readl(hwpm,
+		TEGRA_FUSE_EMC_DISABLE, &emc_disable_fuse_val);
+	if (err != 0) {
+		tegra_hwpm_err(hwpm, "emc_disable fuse read failed");
+		return err;
+	}
+
+	/*
+	 * In floorsweep fuse value,
+	 * each bit corresponds to 4 elements.
+	 * Bit value 0 indicates those elements are
+	 * available and bit value 1 indicates
+	 * corresponding elements are floorswept.
+	 *
+	 * Convert floorsweep fuse value to available EMC elements.
+	 */
+	do {
+		if (emc_disable_fuse_val & 0x1U) {
+			emc_element_floorsweep_mask =
+				(emc_element_floorsweep_mask << 4U) | 0xFU;
+		}
+		emc_disable_fuse_val = (emc_disable_fuse_val >> 1U);
+		emc_disable_fuse_val_mask = (emc_disable_fuse_val_mask >> 1U);
+	} while (emc_disable_fuse_val_mask != 0U);
+
+	/* Set fuse value in MSS IP instances */
+	for (idx = 0U; idx < active_chip->get_ip_max_idx(hwpm); idx++) {
+		switch (idx) {
+#if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL)
+		case T234_HWPM_IP_MSS_CHANNEL:
+#endif
+#if defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS)
+		case T234_HWPM_IP_MSS_ISO_NISO_HUBS:
+#endif
+#if defined(CONFIG_T234_HWPM_IP_MSS_MCF)
+		case T234_HWPM_IP_MSS_MCF:
+#endif
+# if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL) || \
+	defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS) || \
+	defined(CONFIG_T234_HWPM_IP_MSS_MCF)
+			chip_ip = active_chip->chip_ips[idx];
+			for (inst_idx = 0U; inst_idx < chip_ip->num_instances;
+				inst_idx++) {
+				ip_inst = &chip_ip->ip_inst_static_array[
+					inst_idx];
+
+				/*
+				 * Hence use max element mask to get correct
+				 * fs info to use in HWPM driver.
+				 */
+				element_mask_max = tegra_hwpm_safe_sub_u32(
+					tegra_hwpm_safe_cast_u64_to_u32(BIT(
+					ip_inst->num_core_elements_per_inst)),
+					1U);
+				ip_inst->fuse_fs_mask =
+					(emc_element_floorsweep_mask &
+					element_mask_max);
+				tegra_hwpm_dbg(hwpm, hwpm_info,
+					"ip %d, fuse_mask 0x%x",
+					idx, ip_inst->fuse_fs_mask);
+			}
+			break;
+#endif
+		default:
+			continue;
+		}
+	}
+	return 0;
+}
+
 int t234_hwpm_validate_current_config(struct tegra_soc_hwpm *hwpm)
 {
 	u32 production_mode = 0U;
@@ -203,6 +288,12 @@ int t234_hwpm_validate_current_config(struct tegra_soc_hwpm *hwpm)
 
 	if (!tegra_hwpm_is_platform_silicon()) {
 		return 0;
+	}
+
+	err = t234_hwpm_validate_emc_config(hwpm);
+	if (err != 0) {
+		tegra_hwpm_err(hwpm, "failed to validate emc config");
+		return err;
 	}
 
 	/* Read production mode fuse */

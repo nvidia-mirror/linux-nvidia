@@ -317,6 +317,12 @@ struct hwpm_ip_inst {
 	struct tegra_hwpm_ip_ops ip_ops;
 
 	/*
+	 * Some IPs set fuses to indicate floorsweeping info on platforms.
+	 * This mask will contain fuse fs info if any.
+	 */
+	u32 fuse_fs_mask;
+
+	/*
 	 * An IP contains perfmux-perfmon groups that correspond to each other.
 	 * If a perfmux is present, it indicates that the corresponding
 	 * perfmon is present.

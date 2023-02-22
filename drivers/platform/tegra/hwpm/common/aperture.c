@@ -291,9 +291,21 @@ static int tegra_hwpm_func_single_element(struct tegra_soc_hwpm *hwpm,
 		e_info->element_arr[idx] = element;
 		break;
 	case TEGRA_HWPM_UPDATE_IP_INST_MASK:
-		/* HWPM perfmuxes can be assumed to be available */
+		/* HWPM perfmuxes (PMA,RTR) can be assumed to be available */
 		if (element->element_type == HWPM_ELEMENT_PERFMUX) {
 			break;
+		}
+
+		/* Handle IPs with some value of fuse_fs_mask */
+		if (ip_inst->fuse_fs_mask != 0U) {
+			if ((element->element_index_mask &
+				ip_inst->fuse_fs_mask) == 0U) {
+				/* This element is floorswept */
+				tegra_hwpm_dbg(hwpm, hwpm_dbg_floorsweep_info,
+					"skip floorswept element 0x%llx",
+					element->start_abs_pa);
+				break;
+			}
 		}
 
 		/* Validate perfmux availability by reading 1st alist offset */
