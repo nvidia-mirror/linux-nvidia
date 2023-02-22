@@ -546,7 +546,7 @@ int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
 		return -EINVAL;
 	}
 
-	if (args->flags & !(DRM_TEGRA_SUBMIT_SECONDARY_SYNCPT)) {
+	if (args->flags & ~(DRM_TEGRA_SUBMIT_SECONDARY_SYNCPT)) {
 		SUBMIT_ERR(context, "invalid flags '%#x'", args->flags);
 		goto unlock;
 	}
