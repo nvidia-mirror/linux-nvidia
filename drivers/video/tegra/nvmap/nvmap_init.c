@@ -398,7 +398,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 
-	if (unlikely(size > (mem->size << PAGE_SHIFT)))
+	if (unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
 		goto err;
 
 	if ((mem->flags & DMA_MEMORY_NOMAP) &&
@@ -507,7 +507,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		mem_addr =  mem->virt_base;
 
 	if (mem && cpu_addr >= mem_addr &&
-	    cpu_addr - mem_addr < mem->size << PAGE_SHIFT) {
+	    cpu_addr - mem_addr < (u64)mem->size << PAGE_SHIFT) {
 		unsigned int page = (cpu_addr - mem_addr) >> PAGE_SHIFT;
 		unsigned long flags;
 		unsigned int count;
