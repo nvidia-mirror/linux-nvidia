@@ -2567,6 +2567,8 @@ struct isp_capture_descriptor {
 	struct stats_surface h0_surface;
 	/** Histogram (H1) unit 1 statistics buffer */
 	struct stats_surface h1_surface;
+	/** Histogram (H2) unit 2 statistics buffer for ISP7 only */
+	struct stats_surface h2_surface;
 	/** Pixel Replacement Unit (PRU) statistics buffer */
 	struct stats_surface pru_bad_surface;
 	/** RAW24 Histogram Unit statistics buffer */
@@ -2658,7 +2660,7 @@ struct isp_capture_descriptor {
 	uint32_t program_buffer_index;
 
 	/** Reserved */
-	uint32_t pad__[1];
+	uint32_t pad__[15];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
@@ -2689,6 +2691,8 @@ struct isp_capture_descriptor_memoryinfo {
 	struct memoryinfo_surface h0_surface;
 	/** Histogram (H1) unit 1 statistics buffer */
 	struct memoryinfo_surface h1_surface;
+	/** Histogram (H2) unit 2 statistics buffer for ISP7 only */
+	struct memoryinfo_surface h2_surface;
 	/** Pixel Replacement Unit (PRU) statistics buffer */
 	struct memoryinfo_surface pru_bad_surface;
 	/** Local Tone Mapping statistics buffer */
@@ -2700,7 +2704,7 @@ struct isp_capture_descriptor_memoryinfo {
 	/** Engine result record – written by Falcon */
 	struct memoryinfo_surface engine_status;
 	/* Reserved */
-	uint64_t reserved[6];
+	uint64_t reserved[4];
 } CAPTURE_DESCRIPTOR_ALIGN;
 
 /**
