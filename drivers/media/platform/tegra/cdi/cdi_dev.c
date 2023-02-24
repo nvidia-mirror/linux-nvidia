@@ -1,7 +1,7 @@
 /*
  * cdi_dev.c - CDI generic i2c driver.
  *
- * Copyright (c) 2015-2022, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2015-2023, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -670,6 +670,9 @@ static int cdi_dev_probe(struct i2c_client *client,
 			else if (of_property_read_bool(child,
 						"cam-pwr-nvccp"))
 				info->cam_pwr_method = CAM_PWR_NVCCP;
+			else if (of_property_read_bool(child,
+						"cam-pwr-tps2h160b"))
+				info->cam_pwr_method = CAM_PWR_TPS160;
 			else
 				info->cam_pwr_method = CAM_PWR_NO_PWR;
 
