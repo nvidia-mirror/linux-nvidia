@@ -82,6 +82,8 @@ struct tegra_virtual_se_aes_context {
 	uint32_t node_id;
 	/* Flag to indicate user nonce*/
 	uint8_t user_nonce;
+	/* Flag to indicate first request*/
+	uint8_t b_is_first;
 };
 
 /* Security Engine/TSEC AES CMAC context */

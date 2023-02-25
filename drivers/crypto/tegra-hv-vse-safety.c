@@ -1519,8 +1519,13 @@ static void tegra_hv_vse_safety_prepare_cmd(struct tegra_virtual_se_dev *se_dev,
 				TEGRA_VIRTUAL_SE_AES_LCTR_SIZE);
 		if (req_ctx->op_mode == AES_CTR)
 			aes->op.ctr_cntn = TEGRA_VIRTUAL_SE_AES_LCTR_CNTN;
-		else if (req_ctx->op_mode == AES_CBC)
-			aes->op.ivsel = AES_IV_REG;
+		else if (req_ctx->op_mode == AES_CBC) {
+			if (req_ctx->encrypt == true && aes_ctx->user_nonce == 1U &&
+			    aes_ctx->b_is_first != 1U)
+				aes->op.ivsel = AES_UPDATED_IV;
+			else
+				aes->op.ivsel = AES_IV_REG;
+		}
 		else
 			aes->op.ivsel = AES_ORIGINAL_IV;
 	}
@@ -1663,6 +1668,7 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 	/*
 	 * If req->iv[0] is 1 and the request is for AES CBC/CTR encryption,
 	 * it means that generation of random IV is required.
+	 * If userNonce is not provided random IV generation is needed.
 	 */
 	if (req_ctx->encrypt &&
 			(req_ctx->op_mode == AES_CBC ||
@@ -1677,6 +1683,7 @@ static int tegra_hv_vse_safety_process_aes_req(struct tegra_virtual_se_dev *se_d
 	priv->cmd = VIRTUAL_SE_AES_CRYPTO;
 
 	tegra_hv_vse_safety_prepare_cmd(se_dev, ivc_tx, req_ctx, aes_ctx, req);
+
 	aes->op.src_addr.lo = priv->buf_addr;
 	aes->op.src_addr.hi = req->cryptlen;
 	aes->op.dst_addr.lo = priv->buf_addr;

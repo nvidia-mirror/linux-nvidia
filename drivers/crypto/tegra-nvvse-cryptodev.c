@@ -195,6 +195,21 @@ static int wait_async_op(struct tnvvse_crypto_completion *tr, int ret)
 	return ret;
 }
 
+static void update_counter(uint8_t *next_block_iv, int size)
+{
+	uint32_t counter_val;
+
+	counter_val =  (next_block_iv[12] << 24);
+	counter_val |= (next_block_iv[13] << 16);
+	counter_val |= (next_block_iv[14] << 8);
+	counter_val |= (next_block_iv[15] << 0);
+	counter_val += (uint32_t)size/16;
+	next_block_iv[12] = (counter_val >> 24) & 0xFFU;
+	next_block_iv[13] = (counter_val >> 16) & 0xFFU;
+	next_block_iv[14] = (counter_val >> 8) & 0xFFU;
+	next_block_iv[15] = (counter_val >> 0) & 0xFFU;
+}
+
 static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
 		struct tegra_nvvse_sha_init_ctl *init_ctl)
 {
@@ -1031,9 +1046,8 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	const char *driver_name;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	char *pbuf;
-	uint8_t next_block_iv[TEGRA_NVVSE_AES_IV_LEN];
+	uint8_t next_block_iv[TEGRA_NVVSE_AES_IV_LEN], *p_next_block_iv;
 	bool first_loop = true;
-	uint32_t counter_val;
 
 	if (aes_enc_dec_ctl->aes_mode >= TEGRA_NVVSE_AES_MODE_MAX) {
 		pr_err("%s(): The requested AES ENC/DEC (%d) is not supported\n",
@@ -1054,6 +1068,7 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	aes_ctx = crypto_skcipher_ctx(tfm);
 	aes_ctx->node_id = ctx->node_id;
 	aes_ctx->user_nonce = aes_enc_dec_ctl->user_nonce;
+	aes_ctx->b_is_first = 1U;
 
 	req = skcipher_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1118,6 +1133,8 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	else
 		memset(next_block_iv, 0, TEGRA_NVVSE_AES_IV_LEN);
 
+	pr_debug("%s(): %scryption\n", __func__, (aes_enc_dec_ctl->is_encryption ? "en" : "de"));
+
 	while (total > 0) {
 		size = (total < PAGE_SIZE) ? total : PAGE_SIZE;
 		ret = copy_from_user((void *)xbuf[0], (void __user *)aes_enc_dec_ctl->src_buffer, size);
@@ -1137,6 +1154,7 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 
 		/* Set first byte of next_block_iv to 1 for first encryption request and 0 for other
 		 * encryption requests. This is used to invoke generation of random IV.
+		 * If userNonce is not provided random IV generation is needed.
 		 */
 		if (aes_enc_dec_ctl->is_encryption && (aes_enc_dec_ctl->user_nonce == 0U)) {
 			if (first_loop && !aes_enc_dec_ctl->is_non_first_call)
@@ -1144,7 +1162,6 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 			else
 				next_block_iv[0] = 0;
 		}
-
 		ret = aes_enc_dec_ctl->is_encryption ? crypto_skcipher_encrypt(req) :
 						crypto_skcipher_decrypt(req);
 		if ((ret == -EINPROGRESS) || (ret == -EBUSY)) {
@@ -1186,18 +1203,19 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 				pbuf = (char *)xbuf[0];
 				memcpy(next_block_iv, pbuf + size - TEGRA_NVVSE_AES_IV_LEN, TEGRA_NVVSE_AES_IV_LEN);
 			}  else if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR) {
-				counter_val =  (next_block_iv[12] << 24);
-				counter_val |= (next_block_iv[13] << 16);
-				counter_val |= (next_block_iv[14] << 8);
-				counter_val |= (next_block_iv[15] << 0);
-				counter_val += size/16;
-				next_block_iv[12] = (counter_val >> 24)	& 0xFFU;
-				next_block_iv[13] = (counter_val >> 16)	& 0xFFU;
-				next_block_iv[14] = (counter_val >> 8)	& 0xFFU;
-				next_block_iv[15] = (counter_val >> 0)	& 0xFFU;
+				p_next_block_iv = &next_block_iv[0];
+				update_counter(p_next_block_iv, size);
 			}
 		}
 		first_loop = false;
+		aes_ctx->b_is_first = 0U;
+		if (aes_enc_dec_ctl->is_encryption && aes_enc_dec_ctl->user_nonce == 1U) {
+			if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR) {
+				p_next_block_iv = &next_block_iv[0];
+				update_counter(p_next_block_iv, size);
+			}
+		}
+
 		total -= size;
 		aes_enc_dec_ctl->dest_buffer += size;
 		aes_enc_dec_ctl->src_buffer += size;
@@ -1384,6 +1402,7 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 	else if (enc && !aes_enc_dec_ctl->is_non_first_call)
 		/* Set first byte of iv to 1 for first encryption request. This is used to invoke
 		 * generation of random IV.
+		 * If userNonce is not provided random IV generation is needed.
 		 */
 		iv[0] = 1;
 
