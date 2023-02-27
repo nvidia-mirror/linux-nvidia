@@ -41,7 +41,7 @@ int tegra_hwpm_read_sticky_bits_impl(struct tegra_soc_hwpm *hwpm,
 	return 0;
 }
 
-static int fake_readl(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_fake_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 offset, u32 *val)
 {
 	if (!hwpm->fake_registers_enabled) {
@@ -53,7 +53,7 @@ static int fake_readl(struct tegra_soc_hwpm *hwpm,
 	return 0;
 }
 
-static int fake_writel(struct tegra_soc_hwpm *hwpm,
+int tegra_hwpm_fake_writel_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 offset, u32 val)
 {
 	if (!hwpm->fake_registers_enabled) {
@@ -77,7 +77,7 @@ static int ip_readl(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 		aperture->start_abs_pa, aperture->end_abs_pa, offset);
 
 	if (hwpm->fake_registers_enabled) {
-		return fake_readl(hwpm, aperture, offset, val);
+		return tegra_hwpm_fake_readl(hwpm, aperture, offset, val);
 	} else {
 		struct tegra_hwpm_ip_ops *ip_ops_ptr = &ip_inst->ip_ops;
 		if (ip_ops_ptr->hwpm_ip_reg_op != NULL) {
@@ -125,7 +125,7 @@ static int ip_writel(struct tegra_soc_hwpm *hwpm, struct hwpm_ip_inst *ip_inst,
 		aperture->start_abs_pa, aperture->end_abs_pa, offset, val);
 
 	if (hwpm->fake_registers_enabled) {
-		return fake_writel(hwpm, aperture, offset, val);
+		return tegra_hwpm_fake_writel(hwpm, aperture, offset, val);
 	} else {
 		struct tegra_hwpm_ip_ops *ip_ops_ptr = &ip_inst->ip_ops;
 		if (ip_ops_ptr->hwpm_ip_reg_op != NULL) {
@@ -173,7 +173,7 @@ static int hwpm_readl(struct tegra_soc_hwpm *hwpm,
 		aperture->start_abs_pa, aperture->end_abs_pa, offset);
 
 	if (hwpm->fake_registers_enabled) {
-		return fake_readl(hwpm, aperture, offset, val);
+		return tegra_hwpm_fake_readl(hwpm, aperture, offset, val);
 	} else {
 		if (aperture->dt_mmio == NULL) {
 			tegra_hwpm_err(hwpm,
@@ -194,14 +194,12 @@ static int hwpm_readl(struct tegra_soc_hwpm *hwpm,
 static int hwpm_writel(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 offset, u32 val)
 {
-	int err = 0;
-
 	tegra_hwpm_dbg(hwpm, hwpm_register,
 		"Aperture (0x%llx-0x%llx) offset(0x%llx) val(0x%x)",
 		aperture->start_abs_pa, aperture->end_abs_pa, offset, val);
 
 	if (hwpm->fake_registers_enabled) {
-		err = fake_writel(hwpm, aperture, offset, val);
+		return tegra_hwpm_fake_writel(hwpm, aperture, offset, val);
 	} else {
 		if (aperture->dt_mmio == NULL) {
 			tegra_hwpm_err(hwpm,
@@ -212,7 +210,7 @@ static int hwpm_writel(struct tegra_soc_hwpm *hwpm,
 		writel(val, aperture->dt_mmio + offset);
 	}
 
-	return err;
+	return 0;
 }
 
 /*
@@ -287,9 +285,6 @@ int tegra_hwpm_regops_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
 	u64 addr, u32 *val)
 {
-	u64 reg_offset = 0ULL;
-	int err = 0;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (!aperture) {
@@ -297,20 +292,29 @@ int tegra_hwpm_regops_readl_impl(struct tegra_soc_hwpm *hwpm,
 		return -ENODEV;
 	}
 
-	/*
-	 * Register address passed to this function always belong to
-	 * virtual address range of the aperture.
-	 * Hence, subtract start_abs_pa from given addr for offset.
-	 */
-	reg_offset = tegra_hwpm_safe_sub_u64(addr, aperture->start_abs_pa);
-
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||
 		(aperture->element_type == HWPM_ELEMENT_PERFMUX)) {
-		err = hwpm_readl(hwpm, aperture, reg_offset, val);
+		/*
+		 * Register address passed to this function always belong to
+		 * virtual address range of the aperture.
+		 * Hence, subtract start_abs_pa from given addr for offset.
+		 */
+		u64 reg_offset = tegra_hwpm_safe_sub_u64(addr,
+			aperture->start_abs_pa);
+
+		return hwpm_readl(hwpm, aperture, reg_offset, val);
 	} else {
-		err = ip_readl(hwpm, ip_inst, aperture, reg_offset, val);
+		/*
+		 * Register address passed to this function always belong to
+		 * virtual address range of the aperture.
+		 * Hence, subtract start_abs_pa from given addr for offset.
+		 */
+		u64 reg_offset = tegra_hwpm_safe_sub_u64(addr,
+			aperture->start_abs_pa);
+
+		return ip_readl(hwpm, ip_inst, aperture, reg_offset, val);
 	}
-	return err;
+	return 0;
 }
 
 /*
@@ -321,9 +325,6 @@ int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_inst *ip_inst, struct hwpm_ip_aperture *aperture,
 	u64 addr, u32 val)
 {
-	u64 reg_offset = 0ULL;
-	int err = 0;
-
 	tegra_hwpm_fn(hwpm, " ");
 
 	if (!aperture) {
@@ -331,18 +332,27 @@ int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 		return -ENODEV;
 	}
 
-	/*
-	 * Register address passed to this function always belong to
-	 * virtual address range of the aperture.
-	 * Hence, subtract start_abs_pa from given addr for offset.
-	 */
-	reg_offset = tegra_hwpm_safe_sub_u64(addr, aperture->start_abs_pa);
-
 	if ((aperture->element_type == HWPM_ELEMENT_PERFMON) ||
 		(aperture->element_type == HWPM_ELEMENT_PERFMUX)) {
-		err = hwpm_writel(hwpm, aperture, reg_offset, val);
+		/*
+		 * Register address passed to this function always belong to
+		 * virtual address range of the aperture.
+		 * Hence, subtract start_abs_pa from given addr for offset.
+		 */
+		u64 reg_offset = tegra_hwpm_safe_sub_u64(addr,
+			aperture->start_abs_pa);
+
+		return hwpm_writel(hwpm, aperture, reg_offset, val);
 	} else {
-		err = ip_writel(hwpm, ip_inst, aperture, reg_offset, val);
+		/*
+		 * Register address passed to this function always belong to
+		 * virtual address range of the aperture.
+		 * Hence, subtract start_abs_pa from given addr for offset.
+		 */
+		u64 reg_offset = tegra_hwpm_safe_sub_u64(addr,
+			aperture->start_abs_pa);
+
+		return ip_writel(hwpm, ip_inst, aperture, reg_offset, val);
 	}
-	return err;
+	return 0;
 }

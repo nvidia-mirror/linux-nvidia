@@ -111,9 +111,9 @@ int tegra_hwpm_obtain_floorsweep_info(struct tegra_soc_hwpm *hwpm,
 				hwpm, fs_info->ip_fsinfo[i].ip),
 			&fs_info->ip_fsinfo[i].ip_inst_mask,
 			&fs_info->ip_fsinfo[i].status);
-		if (ret < 0) {
-			/* Print error for debug purpose. */
-			tegra_hwpm_err(hwpm, "Failed to get fs_info");
+		if (ret != 0) {
+			tegra_hwpm_err(hwpm,
+				"Failed to get fs_info query %d", i);
 		}
 
 		tegra_hwpm_dbg(hwpm, hwpm_info | hwpm_dbg_floorsweep_info,

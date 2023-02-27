@@ -363,6 +363,13 @@ int tegra_hwpm_update_mem_bytes(struct tegra_soc_hwpm *hwpm,
 
 	tegra_hwpm_fn(hwpm, " ");
 
+	if (hwpm->mem_mgmt == NULL) {
+		/* Memory buffer was not initialized */
+		tegra_hwpm_dbg(hwpm, hwpm_dbg_alloc_pma_stream,
+			"mem_mgmt struct was uninitialized in this sesion");
+		return -ENXIO;
+	}
+
 	if (!hwpm->mem_mgmt->mem_bytes_kernel) {
 		tegra_hwpm_err(hwpm,
 			"mem_bytes buffer is not mapped in the driver");

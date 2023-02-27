@@ -57,6 +57,38 @@ fail:
 	return err;
 }
 
+static int tegra_hwpm_element_enable(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *element)
+{
+	int err = 0;
+
+	tegra_hwpm_fn(hwpm, " ");
+
+	switch (element->element_type) {
+	case HWPM_ELEMENT_PERFMON:
+		err = hwpm->active_chip->perfmon_enable(hwpm, element);
+		if (err != 0) {
+			tegra_hwpm_err(hwpm, "Element mask 0x%x disable failed",
+				element->element_index_mask);
+			goto fail;
+		}
+		break;
+	case HWPM_ELEMENT_PERFMUX:
+	case IP_ELEMENT_PERFMUX:
+	case IP_ELEMENT_BROADCAST:
+		/* Nothing to do here */
+		break;
+	case HWPM_ELEMENT_INVALID:
+	default:
+		tegra_hwpm_err(hwpm, "Invalid element type %d",
+			element->element_type);
+		return -EINVAL;
+	}
+
+fail:
+	return err;
+}
+
 static int tegra_hwpm_element_disable(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *element)
 {
@@ -165,7 +197,7 @@ static int tegra_hwpm_alloc_dynamic_inst_element_array(
 
 	tegra_hwpm_fn(hwpm, " ");
 
-	if (inst_a_info->range_start == 0ULL) {
+	if (inst_a_info->range_end == 0ULL) {
 		tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
 			"No a_type = %d elements in IP", a_type);
 		return 0;
@@ -188,6 +220,11 @@ static int tegra_hwpm_alloc_dynamic_inst_element_array(
 	for (idx = 0U; idx < inst_a_info->inst_slots; idx++) {
 		inst_a_info->inst_arr[idx] = NULL;
 	}
+
+	tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
+		"IP inst range(0x%llx-0x%llx) a_type = %d inst_slots %d",
+		inst_a_info->range_start, inst_a_info->range_end,
+		a_type, inst_a_info->inst_slots);
 
 	return 0;
 }
@@ -377,14 +414,13 @@ static int tegra_hwpm_func_single_element(struct tegra_soc_hwpm *hwpm,
 				ip_idx, a_type, static_aperture_idx);
 			goto fail;
 		}
-		if (element->element_type == HWPM_ELEMENT_PERFMON) {
-			err = hwpm->active_chip->perfmon_enable(hwpm, element);
-			if (err != 0) {
-				tegra_hwpm_err(hwpm, "IP %d element"
-					" type %d idx %d enable failed",
-					ip_idx, a_type, static_aperture_idx);
-				goto fail;
-			}
+
+		err = tegra_hwpm_element_enable(hwpm, element);
+		if (err != 0) {
+			tegra_hwpm_err(hwpm, "IP %d element"
+				" type %d idx %d enable failed",
+				ip_idx, a_type, static_aperture_idx);
+			goto fail;
 		}
 		break;
 	case TEGRA_HWPM_UNBIND_RESOURCES:
@@ -455,8 +491,8 @@ static int tegra_hwpm_func_all_elements_of_type(struct tegra_soc_hwpm *hwpm,
 		if (e_info->num_element_per_inst == 0U) {
 			/* no a_type elements in this IP */
 			tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
-				"No a_type = %d elements in IP %d",
-				a_type, ip_idx);
+				"No a_type = %d elements in IP %d stat inst %d",
+				a_type, ip_idx, static_inst_idx);
 			return 0;
 		}
 
@@ -478,6 +514,14 @@ static int tegra_hwpm_func_all_elements_of_type(struct tegra_soc_hwpm *hwpm,
 		for (idx = 0U; idx < e_info->element_slots; idx++) {
 			e_info->element_arr[idx] = NULL;
 		}
+
+		tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
+			"iia_func %d IP %d static inst %d a_type %d"
+			" element range(0x%llx-0x%llx) element_slots %d "
+			"num_element_per_inst %d",
+			iia_func, ip_idx, static_inst_idx, a_type,
+			e_info->range_start, e_info->range_end,
+			e_info->element_slots, e_info->num_element_per_inst);
 	}
 
 	if (iia_func == TEGRA_HWPM_UPDATE_IP_INST_MASK) {
@@ -559,7 +603,7 @@ static int tegra_hwpm_func_single_inst(struct tegra_soc_hwpm *hwpm,
 			inst_a_info = &chip_ip->inst_aperture_info[a_type];
 			e_info = &ip_inst->element_info[a_type];
 
-			if (inst_a_info->range_start == 0ULL) {
+			if (inst_a_info->range_end == 0ULL) {
 				tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
 				"No a_type = %d elements in IP %d",
 				a_type, ip_idx);
@@ -575,9 +619,11 @@ static int tegra_hwpm_func_single_inst(struct tegra_soc_hwpm *hwpm,
 				inst_offset / inst_a_info->inst_stride);
 
 			tegra_hwpm_dbg(hwpm, hwpm_dbg_driver_init,
-				"IP %d a_type %d "
+				"IP %d a_type %d inst range start 0x%llx"
+				"element range start 0x%llx"
 				" static inst idx %d == dynamic idx %d",
-				ip_idx, a_type, static_inst_idx, idx);
+				ip_idx, a_type, inst_a_info->range_start,
+				e_info->range_start, static_inst_idx, idx);
 
 			/* Set perfmux slot pointer */
 			inst_a_info->inst_arr[idx] = ip_inst;

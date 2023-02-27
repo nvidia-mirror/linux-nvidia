@@ -37,9 +37,16 @@ int tegra_hwpm_perfmon_reserve_impl(struct tegra_soc_hwpm *hwpm,
 	}
 
 	/* Reserve */
-	/* Make sure that resource exists in device node */
-	res = platform_get_resource(hwpm_linux->pdev,
-		IORESOURCE_MEM, perfmon->device_index);
+	if ((perfmon->element_type == HWPM_ELEMENT_PERFMON) ||
+		(perfmon->element_type == HWPM_ELEMENT_PERFMUX)) {
+		/* Make sure that resource exists in device node */
+		res = platform_get_resource(hwpm_linux->pdev,
+			IORESOURCE_MEM, perfmon->device_index);
+	} else {
+		tegra_hwpm_err(hwpm,
+			"Unknown perfmon type, execution shouldn't reach here");
+		return -EINVAL;
+	}
 	if ((!res) || (res->start == 0) || (res->end == 0)) {
 		tegra_hwpm_err(hwpm, "Failed to get perfmon %s", perfmon->name);
 		return -ENOMEM;

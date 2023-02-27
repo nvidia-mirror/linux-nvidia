@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -58,6 +58,18 @@ int tegra_hwpm_read_sticky_bits_impl(struct tegra_soc_hwpm *hwpm,
 	return -EINVAL;
 }
 
+int tegra_hwpm_fake_readl_impl(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 offset, u32 *val)
+{
+	return -EINVAL;
+}
+
+int tegra_hwpm_fake_writel_impl(struct tegra_soc_hwpm *hwpm,
+	struct hwpm_ip_aperture *aperture, u64 offset, u32 val)
+{
+	return -EINVAL;
+}
+
 int tegra_hwpm_readl_impl(struct tegra_soc_hwpm *hwpm,
 	struct hwpm_ip_aperture *aperture, u64 addr, u32 *val)
 {
@@ -87,6 +99,12 @@ int tegra_hwpm_regops_writel_impl(struct tegra_soc_hwpm *hwpm,
 
 #define tegra_hwpm_read_sticky_bits(hwpm, reg_base, reg_offset, val) \
 	tegra_hwpm_read_sticky_bits_impl(hwpm, reg_base, reg_offset, val)
+
+#define tegra_hwpm_fake_readl(hwpm, aperture, addr, val)	\
+	tegra_hwpm_fake_readl_impl(hwpm, aperture, addr, val)
+
+#define tegra_hwpm_fake_writel(hwpm, aperture, addr, val)	\
+	tegra_hwpm_fake_writel_impl(hwpm, aperture, addr, val)
 
 #define tegra_hwpm_readl(hwpm, aperture, addr, val)	\
 	tegra_hwpm_readl_impl(hwpm, aperture, addr, val)
