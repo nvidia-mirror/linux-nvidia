@@ -748,6 +748,7 @@ static int host1x_get_syncpt_pools(struct host1x *host)
 
 static int host1x_probe(struct platform_device *pdev)
 {
+	struct resource *res;
 	struct host1x *host;
 	int err;
 
@@ -758,8 +759,6 @@ static int host1x_probe(struct platform_device *pdev)
 	host->info = of_device_get_match_data(&pdev->dev);
 
 	if (host->info->has_hypervisor) {
-		struct resource *res;
-
 		host->regs = devm_platform_ioremap_resource_byname(pdev, "vm");
 		if (IS_ERR(host->regs))
 			return PTR_ERR(host->regs);
@@ -780,6 +779,13 @@ static int host1x_probe(struct platform_device *pdev)
 		host->regs = devm_platform_ioremap_resource(pdev, 0);
 		if (IS_ERR(host->regs))
 			return PTR_ERR(host->regs);
+	}
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "actmon");
+	if (res) {
+		host->actmon_regs = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(host->actmon_regs))
+			return PTR_ERR(host->actmon_regs);
 	}
 
 	host->syncpt_irq = platform_get_irq(pdev, 0);

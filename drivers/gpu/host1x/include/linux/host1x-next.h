@@ -506,4 +506,6 @@ static inline void host1x_memory_context_put(struct host1x_memory_context *cd)
 }
 #endif
 
+int host1x_actmon_read_avg_count(struct host1x_client *client);
+
 #endif

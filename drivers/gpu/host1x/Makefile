@@ -15,6 +15,7 @@ host1x-next-y = \
 	debug.o \
 	mipi.o \
 	fence.o \
+	actmon.o \
 	hw/host1x01.o \
 	hw/host1x02.o \
 	hw/host1x04.o \
