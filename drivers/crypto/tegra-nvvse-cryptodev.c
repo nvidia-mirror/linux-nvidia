@@ -490,14 +490,9 @@ static int tnvvtsec_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 		priv_data.request_type = CMAC_SIGN;
 	else
 		priv_data.request_type = CMAC_VERIFY;
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-						aes_cmac_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while setting key for cmac-tsec(aes): %d\n",
-				__func__, ret);
-		ret = -EINVAL;
-		goto free_req;
-	}
+
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, aes_cmac_ctl->key_slot, KEYSLOT_SIZE_BYTES);
 
 	req->priv = &priv_data;
 	priv_data.result = 0;
@@ -639,14 +634,9 @@ static int tnvvse_crypto_aes_cmac_sign_verify(struct tnvvse_crypto_ctx *ctx,
 		priv_data.request_type = CMAC_SIGN;
 	else
 		priv_data.request_type = CMAC_VERIFY;
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-						aes_cmac_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while setting key for cmac-vse(aes): %d\n",
-				__func__, ret);
-		ret = -EINVAL;
-		goto free_xbuf;
-	}
+
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, aes_cmac_ctl->key_slot, KEYSLOT_SIZE_BYTES);
 
 	req->priv = &priv_data;
 	priv_data.result = 0;
@@ -771,13 +761,8 @@ static int tnvvse_crypto_aes_gmac_init(struct tnvvse_crypto_ctx *ctx,
 	init_completion(&sha_state->sha_complete.restart);
 	sha_state->sha_complete.req_err = 0;
 
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x", gmac_init_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while setting key for gmac-vse(aes): %d\n",
-					__func__, ret);
-		ret = -EINVAL;
-		goto free_req;
-	}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, gmac_init_ctl->key_slot, KEYSLOT_SIZE_BYTES);
 
 	klen = gmac_init_ctl->key_length;
 	ret = crypto_ahash_setkey(tfm, key_as_keyslot, klen);
@@ -855,14 +840,9 @@ static int tnvvse_crypto_aes_gmac_sign_verify_init(struct tnvvse_crypto_ctx *ctx
 	init_completion(&sha_state->sha_complete.restart);
 	sha_state->sha_complete.req_err = 0;
 
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-					gmac_sign_verify_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while setting key for gmac-vse(aes): %d\n",
-					__func__, ret);
-		ret = -EINVAL;
-		goto free_xbuf;
-	}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, gmac_sign_verify_ctl->key_slot,
+		KEYSLOT_SIZE_BYTES);
 
 	klen = gmac_sign_verify_ctl->key_length;
 	ret = crypto_ahash_setkey(tfm, key_as_keyslot, klen);
@@ -1050,7 +1030,6 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	char aes_algo[5][15] = {"cbc-vse(aes)", "ecb-vse(aes)", "ctr-vse(aes)"};
 	const char *driver_name;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
-	int klen;
 	char *pbuf;
 	uint8_t next_block_iv[TEGRA_NVVSE_AES_IV_LEN];
 	bool first_loop = true;
@@ -1103,22 +1082,10 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 
 	crypto_skcipher_clear_flags(tfm, ~0);
 
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-			   aes_enc_dec_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while preparing key for %s: %d\n",
-					__func__, aes_algo[aes_enc_dec_ctl->aes_mode], ret);
-		ret = -EINVAL;
-		goto free_req;
-	}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, aes_enc_dec_ctl->key_slot,
+		KEYSLOT_SIZE_BYTES);
 
-	klen = strlen(key_as_keyslot);
-	if (klen != 16) {
-		pr_err("%s(): key length is invalid, length %d, key %s\n", __func__, klen,
-			key_as_keyslot);
-		ret = -EINVAL;
-		goto free_req;
-	}
 	/* Null key is only allowed in SE driver */
 	if (!strstr(driver_name, "tegra")) {
 		ret = -EINVAL;
@@ -1383,14 +1350,9 @@ static int tnvvse_crypto_aes_enc_dec_gcm(struct tnvvse_crypto_ctx *ctx,
 
 	crypto_aead_clear_flags(tfm, ~0);
 
-	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES %x",
-			aes_enc_dec_ctl->key_slot);
-	if (ret >= AES_KEYSLOT_NAME_SIZE) {
-		pr_err("%s(): Buffer overflow while preparing key for gcm(aes): %d\n",
-					__func__, ret);
-		ret = -EINVAL;
-		goto free_req;
-	}
+	ret = snprintf(key_as_keyslot, AES_KEYSLOT_NAME_SIZE, "NVSEAES ");
+	memcpy(key_as_keyslot + KEYSLOT_OFFSET_BYTES, aes_enc_dec_ctl->key_slot,
+		KEYSLOT_SIZE_BYTES);
 
 	ret = crypto_aead_setkey(tfm, key_as_keyslot, aes_enc_dec_ctl->key_length);
 	if (ret < 0) {

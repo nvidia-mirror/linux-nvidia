@@ -6,6 +6,9 @@
 #ifndef __TEGRA_HV_VSE_H
 #define __TEGRA_HV_VSE_H
 
+#define KEYSLOT_SIZE_BYTES		16
+#define KEYSLOT_OFFSET_BYTES		8
+
 struct tegra_vse_soc_info {
 	bool cmac_hw_padding_supported;
 	bool gcm_decrypt_supported;
@@ -66,7 +69,7 @@ struct tegra_virtual_se_aes_context {
 	struct tegra_virtual_se_dev *se_dev;
 	struct skcipher_request *req;
 	/* Security Engine key slot */
-	u32 aes_keyslot;
+	u8 aes_keyslot[KEYSLOT_SIZE_BYTES];
 	/* key length in bytes */
 	u32 keylen;
 	/* AES operation mode */
@@ -88,7 +91,7 @@ struct tegra_virtual_se_aes_cmac_context {
 	dma_addr_t hash_result_addr;	/* Intermediate hash result dma addr */
 	bool is_first;			/* Represents first block */
 	bool req_context_initialized;	/* Mark initialization status */
-	u32 aes_keyslot;
+	u8 aes_keyslot[KEYSLOT_SIZE_BYTES];
 	/* key length in bits */
 	u32 keylen;
 	bool is_key_slot_allocated;
@@ -102,7 +105,7 @@ struct tegra_virtual_se_aes_gmac_context {
 	u32 authsize;
 	/* Mark initialization status */
 	bool req_context_initialized;
-	u32 aes_keyslot;
+	u8 aes_keyslot[KEYSLOT_SIZE_BYTES];
 	/* key length in bits */
 	u32 keylen;
 	bool is_key_slot_allocated;

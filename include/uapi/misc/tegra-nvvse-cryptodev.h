@@ -21,6 +21,7 @@
 
 #include <asm-generic/ioctl.h>
 
+#define KEYSLOT_SIZE_BYTES				16
 #define TEGRA_NVVSE_IOC_MAGIC				0x98
 #define MAX_NUMBER_MISC_DEVICES				46U
 
@@ -163,7 +164,7 @@ struct  tegra_nvvse_aes_enc_dec_ctl {
 	 * '0' value indicates First call and Non zero value indicates it is not the first call */
 	uint8_t		is_non_first_call;
 	/** [in] Holds a keyslot number */
-	uint32_t	key_slot;
+	uint8_t	key_slot[KEYSLOT_SIZE_BYTES];
 	/** [in] Holds the Key length */
 	/** Supported keylengths are 16 and 32 bytes */
 	uint8_t		key_length;
@@ -239,7 +240,7 @@ struct  tegra_nvvse_aes_enc_dec_ctl {
  */
 struct tegra_nvvse_aes_gmac_init_ctl {
 	/** [in] Holds a keyslot number */
-	uint32_t   key_slot;
+	uint8_t	key_slot[KEYSLOT_SIZE_BYTES];
 	/** [in] Holds the Key length */
 	/** Supported keylengths are 16 and 32 bytes */
 	uint8_t   key_length;
@@ -269,7 +270,7 @@ struct tegra_nvvse_aes_gmac_sign_verify_ctl {
 	 */
 	uint8_t  is_last;
 	/** [in] Holds a keyslot handle which is used for GMAC operation */
-	uint32_t  key_slot;
+	uint8_t	key_slot[KEYSLOT_SIZE_BYTES];
 	/** [in] Holds the Key length
 	 * Supported keylength is only 16 bytes and 32 bytes
 	 */
@@ -333,7 +334,7 @@ struct tegra_nvvse_aes_cmac_sign_verify_ctl {
 	 */
 	uint8_t  is_last;
 	/** [in] Holds a keyslot handle which is used for CMAC operation */
-	uint32_t  key_slot;
+	uint8_t	key_slot[KEYSLOT_SIZE_BYTES];
 	/** [in] Holds the Key length
 	 * Supported keylength is only 16 bytes and 32 bytes
 	 */
