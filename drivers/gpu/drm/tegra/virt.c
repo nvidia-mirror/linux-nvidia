@@ -3,6 +3,8 @@
  * Copyright (c) 2022, NVIDIA Corporation.
  */
 
+#include <linux/clk.h>
+#include <linux/debugfs.h>
 #include <linux/host1x-next.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -10,6 +12,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/seq_file.h>
 #include <linux/version.h>
 
 #include <soc/tegra/virt/hv-ivc.h>
@@ -39,6 +42,9 @@ struct virt_engine {
 	int connection_id;
 
 	struct tegra_drm_client client;
+
+	struct dentry *actmon_debugfs_dir;
+	struct clk *clk;
 };
 
 static DEFINE_MUTEX(ivc_cookie_lock);
@@ -242,6 +248,60 @@ static int virt_engine_resume(struct device *dev)
 	return virt_engine_transfer(&msg, sizeof(msg));
 }
 
+static int actmon_debugfs_usage_show(struct seq_file *s, void *unused)
+{
+	struct virt_engine *virt = s->private;
+	unsigned long rate;
+	int count;
+
+	rate = clk_get_rate(virt->clk);
+	if (rate == 0) {
+		seq_printf(s, "0\n");
+		return 0;
+	}
+
+	count = host1x_actmon_read_avg_count(&virt->client.base);
+	if (count < 0)
+		return count;
+
+	/* Based on configuration in NvHost Server */
+#define ACTMON_SAMPLE_PERIOD_US		100
+	/* Rate in MHz cancels out microseconds */
+	int cycles_per_actmon_sample = (rate / 1000000) * ACTMON_SAMPLE_PERIOD_US;
+
+	seq_printf(s, "%d\n", (count * 1000) / cycles_per_actmon_sample);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(actmon_debugfs_usage);
+
+static void virt_engine_setup_actmon_debugfs(struct virt_engine *virt)
+{
+	const char *name;
+
+	switch (virt->client.base.class) {
+	case HOST1X_CLASS_VIC:
+		name = "vic";
+		break;
+	case HOST1X_CLASS_NVENC:
+		name = "msenc";
+		break;
+	case HOST1X_CLASS_NVDEC:
+		name = "nvdec";
+		break;
+	default:
+		return;
+	}
+
+	virt->actmon_debugfs_dir = debugfs_create_dir(name, NULL);
+	debugfs_create_file("usage", S_IRUGO, virt->actmon_debugfs_dir, virt, &actmon_debugfs_usage_fops);
+}
+
+static void virt_engine_cleanup_actmon_debugfs(struct virt_engine *virt)
+{
+	debugfs_remove_recursive(virt->actmon_debugfs_dir);
+}
+
 static const struct of_device_id tegra_virt_engine_of_match[] = {
 	{ .compatible = "nvidia,tegra234-host1x-virtual-engine" },
 	{ },
@@ -280,6 +340,12 @@ static int virt_engine_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, virt);
 
+	virt->clk = devm_clk_get_optional(&pdev->dev, NULL);
+	if (IS_ERR(virt->clk)) {
+		dev_err(dev, "could not get clock: %d\n", PTR_ERR(virt->clk));
+		return PTR_ERR(virt->clk);
+	}
+
 	INIT_LIST_HEAD(&virt->client.base.list);
 	virt->client.base.ops = &virt_engine_client_ops;
 	virt->client.base.dev = dev;
@@ -312,6 +378,8 @@ static int virt_engine_probe(struct platform_device *pdev)
 		goto cleanup_ivc;
 	}
 
+	virt_engine_setup_actmon_debugfs(virt);
+
 	return 0;
 
 cleanup_ivc:
@@ -327,6 +395,7 @@ static int virt_engine_remove(struct platform_device *pdev)
 	struct virt_engine *virt_engine = platform_get_drvdata(pdev);
 	int err;
 
+	virt_engine_cleanup_actmon_debugfs(virt_engine);
 	virt_engine_cleanup();
 
 	err = host1x_client_unregister(&virt_engine->client.base);
