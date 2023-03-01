@@ -475,7 +475,6 @@ struct nvmap_handle_ref *nvmap_dup_handle_ro(struct nvmap_client *client,
 {
 	struct nvmap_handle *h;
 	struct nvmap_handle_ref *ref = NULL;
-	bool dmabuf_created = false;
 	long remain;
 
 	if (!client)
@@ -499,7 +498,6 @@ struct nvmap_handle_ref *nvmap_dup_handle_ro(struct nvmap_client *client,
 			mutex_unlock(&h->lock);
 			return ERR_CAST(h->dmabuf_ro);
 		}
-		dmabuf_created = true;
 	} else {
 		if (!get_file_rcu(h->dmabuf_ro->file)) {
 			mutex_unlock(&h->lock);
@@ -513,30 +511,21 @@ struct nvmap_handle_ref *nvmap_dup_handle_ro(struct nvmap_client *client,
 					mutex_unlock(&h->lock);
 					return ERR_CAST(h->dmabuf_ro);
 				}
-				dmabuf_created = true;
 			} else {
 				nvmap_handle_put(h);
 				return ERR_PTR(-EINVAL);
 			}
-		} else {
-			dma_buf_put(h->dmabuf_ro);
 		}
 	}
 	mutex_unlock(&h->lock);
 
 	ref = nvmap_duplicate_handle(client, h, false, true);
-	if (!ref) {
-		nvmap_handle_put(h);
-		return ref;
-	}
 	/*
-	 * When new dmabuf created (only RO dmabuf is getting created in this function)
-	 * it's counter is incremented one extra time in nvmap_duplicate_handle. Hence
-	 * decrement it by one.
+	 * When new RO dmabuf created or duplicated, one extra dma_buf refcount is taken so to
+	 * avoid getting it freed by another process, until duplication completes. Decrement that
+	 * extra refcount here.
 	 */
-	if (dmabuf_created)
-		dma_buf_put(h->dmabuf_ro);
-
+	dma_buf_put(h->dmabuf_ro);
 	nvmap_handle_put(h);
 
 	return ref;

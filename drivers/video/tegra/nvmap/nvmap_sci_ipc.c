@@ -220,7 +220,7 @@ found:
 int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 		u64 sci_ipc_id, NvSciIpcEndpointVuid localu_vuid, u32 *handle)
 {
-	bool is_ro = (flags == PROT_READ) ? true : false, dmabuf_created = false;
+	bool is_ro = (flags == PROT_READ) ? true : false;
 	struct nvmap_handle_ref *ref = NULL;
 	struct nvmap_sci_ipc_entry *entry;
 	struct dma_buf *dmabuf = NULL;
@@ -256,7 +256,6 @@ int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 				mutex_unlock(&h->lock);
 				goto unlock;
 			}
-			dmabuf_created = true;
 		} else {
 			if (!get_file_rcu(h->dmabuf_ro->file)) {
 				mutex_unlock(&h->lock);
@@ -270,31 +269,30 @@ int nvmap_get_handle_from_sci_ipc_id(struct nvmap_client *client, u32 flags,
 						mutex_unlock(&h->lock);
 						goto unlock;
 					}
-					dmabuf_created = true;
 				} else {
 					ret = -EINVAL;
 					goto unlock;
 				}
-			} else {
-				dma_buf_put(h->dmabuf_ro);
 			}
 		}
 	}
 	mutex_unlock(&h->lock);
 
 	ref = nvmap_duplicate_handle(client, h, false, is_ro);
-	if (!ref) {
+	/*
+	 * When new RO dmabuf created or duplicated, one extra dma_buf refcount is taken so to
+	 * avoid getting it freed by another process, until duplication completes. Decrement that
+	 * extra refcount here.
+	 */
+	if (is_ro)
+		dma_buf_put(h->dmabuf_ro);
+
+	if (IS_ERR(ref)) {
 		ret = -EINVAL;
 		goto unlock;
 	}
 	nvmap_handle_put(h);
-	/*
-	 * When new dmabuf created (only RO dmabuf is getting created in this function)
-	 * it's counter is incremented one extra time in nvmap_duplicate_handle. Hence
-	 * decrement it by one.
-	 */
-	if (dmabuf_created)
-		dma_buf_put(h->dmabuf_ro);
+
 	if (!IS_ERR(ref)) {
 		u32 id = 0;
 
