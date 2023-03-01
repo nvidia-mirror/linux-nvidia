@@ -30,7 +30,11 @@ static const struct ffa_device_id mods_ffa_device_id[] = {
 
 struct mods_ffa_ctx {
 	struct ffa_device        *ffa_dev;
+#if KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION
+	const struct ffa_msg_ops *ffa_ops;
+#else
 	const struct ffa_dev_ops *ffa_ops;
+#endif
 };
 
 static struct mods_ffa_ctx mods_ffa_info;
@@ -38,9 +42,17 @@ static struct mods_ffa_ctx mods_ffa_info;
 static int ffa_probe(struct ffa_device *ffa_dev)
 {
 	int ret = 0;
+
+#if KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION
+	const struct ffa_msg_ops *ffa_ops = NULL;
+
+	if (ffa_dev->ops)
+		ffa_ops = ffa_dev->ops->msg_ops;
+#else
 	const struct ffa_dev_ops *ffa_ops;
 
 	ffa_ops = ffa_dev_ops_get(ffa_dev);
+#endif
 	if (!ffa_ops) {
 		mods_error_printk("failed \"method\" init: ffa\n");
 		return -ENOENT;
