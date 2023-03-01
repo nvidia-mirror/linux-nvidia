@@ -1040,9 +1040,7 @@ static int mods_krnl_close(struct inode *ip, struct file *fp)
 #endif
 
 #if defined(CONFIG_TEGRA_IVC)
-#if (KERNEL_VERSION(6, 2, 0) > LINUX_VERSION_CODE)
 	mods_bpmpipc_cleanup();
-#endif
 #endif
 
 	mods_disable_all_devices(client);
@@ -2744,13 +2742,11 @@ static long mods_krnl_ioctl(struct file  *fp,
 		break;
 
 #ifdef CONFIG_TEGRA_IVC
-#if (KERNEL_VERSION(6, 2, 0) > LINUX_VERSION_CODE)
 	case MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN:
 		MODS_IOCTL(MODS_ESC_BPMP_UPHY_LANE_EOM_SCAN,
 			   esc_mods_bpmp_uphy_lane_eom_scan,
 			   MODS_BPMP_UPHY_LANE_EOM_SCAN_PARAMS);
 		break;
-#endif
 #endif
 
 	default:

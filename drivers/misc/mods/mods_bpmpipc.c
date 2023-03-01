@@ -26,6 +26,11 @@
 
 #include <soc/tegra/ivc.h>
 #include <soc/tegra/bpmp.h>
+#include <linux/version.h>
+
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+#include <linux/iosys-map.h>
+#endif
 
 #define IVC_CHANNEL_SIZE  256
 #define MRQ_MSG_SIZE      128
@@ -81,6 +86,18 @@ static int bpmp_ipc_send(struct mods_client *client,
 			 const void *data,
 			 size_t sz)
 {
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+	int err;
+	struct iosys_map ob;
+
+	err = tegra_ivc_write_get_next_frame(ivc, &ob);
+	if (err) {
+		cl_error("failed to get next tegra-ivc output frame!\n");
+		iosys_map_clear(&ob);
+		return err;
+	}
+	iosys_map_memcpy_to(&ob, 0, data, sz);
+#else
 	void *frame;
 
 	frame = tegra_ivc_write_get_next_frame(ivc);
@@ -90,10 +107,9 @@ static int bpmp_ipc_send(struct mods_client *client,
 	}
 
 	memcpy_toio(frame, data, sz);
+#endif
 
-	tegra_ivc_write_advance(ivc);
-
-	return 0;
+	return tegra_ivc_write_advance(ivc);
 }
 
 static int bpmp_ipc_recv(struct mods_client *client,
@@ -103,10 +119,32 @@ static int bpmp_ipc_recv(struct mods_client *client,
 			 u32 timeout_ms)
 {
 	int err;
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+	struct iosys_map ib;
+#else
 	const void *frame;
+#endif
 	ktime_t end;
 
 	end = ktime_add_ms(ktime_get(), timeout_ms);
+
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+	do {
+		err = tegra_ivc_read_get_next_frame(ivc, &ib);
+		if (!err)
+			break;
+	} while (ktime_before(ktime_get(), end));
+	if (err) {
+		iosys_map_clear(&ib);
+		err = tegra_ivc_read_get_next_frame(ivc, &ib);
+		if (err) {
+			cl_error("get next tegra-ivc input frame timeout\n");
+			iosys_map_clear(&ib);
+			return err;
+		}
+	}
+	iosys_map_memcpy_from(data, &ib, 0, sz);
+#else
 	do {
 		frame = tegra_ivc_read_get_next_frame(ivc);
 		if (!IS_ERR(frame))
@@ -121,8 +159,8 @@ static int bpmp_ipc_recv(struct mods_client *client,
 			return -ETIMEDOUT;
 		}
 	}
-
 	memcpy_fromio(data, frame, sz);
+#endif
 
 	err = tegra_ivc_read_advance(ivc);
 	if (err < 0)

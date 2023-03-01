@@ -22,8 +22,8 @@ mods-$(CONFIG_TEGRA_NVADSP)        += mods_adsp.o
 # and so skip for Linux v6.2+
 ifeq ($(shell test $(LINUX_VERSION) -lt $(LINUX_VERSION_6_2); echo $$?),0)
 mods-$(CONFIG_ARM_FFA_TRANSPORT)   += mods_arm_ffa.o
-mods-$(CONFIG_TEGRA_IVC)           += mods_bpmpipc.o
 endif
+mods-$(CONFIG_TEGRA_IVC)           += mods_bpmpipc.o
 mods-$(CONFIG_COMMON_CLK)          += mods_clock.o
 mods-$(CONFIG_DEBUG_FS)            += mods_debugfs.o
 mods-$(CONFIG_DMA_ENGINE)          += mods_dma.o
