@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -18,7 +18,13 @@
 /* Timeout in milliseconds */
 #define TIMEOUT		5U
 
-#define IOVA_UNI_CODE   0xFE0D
+/* Unique signature for HSP Data */
+#define IOVA_UNI_CODE	0xFE0D
+#define PM_STATE_UNI_CODE	0xFDED
+
+/* State Management */
+#define PM_SUSPEND	6U
+#define PM_SHUTDOWN	PM_SUSPEND
 
 /*Data type for mailbox client and channel details*/
 struct fsi_hsp_sm {
@@ -45,6 +51,22 @@ static struct dma_buf *dmabuf;
 static struct task_struct *task;
 
 static struct fsi_hsp *fsi_hsp_v;
+
+static int fsicom_fsi_pm_notify(u32 state)
+{
+	uint32_t pdata[4] = {0};
+	int ret = 0;
+
+	pdata[0] = state;
+	pdata[1] = state;
+	pdata[2] = state;
+	pdata[3] = PM_STATE_UNI_CODE;
+
+	/* send pm state to fsi */
+	ret = mbox_send_message(fsi_hsp_v->tx.chan,
+		(void *)pdata);
+	return ret < 0 ? ret : 0;
+}
 
 static void fsicom_send_signal(int sig, int32_t data)
 {
@@ -268,6 +290,14 @@ static int fsicom_client_probe(struct platform_device *pdev)
 	return ret;
 }
 
+static void fsicom_client_shutdown(struct platform_device *pdev)
+{
+	if (fsicom_fsi_pm_notify(PM_SHUTDOWN) < 0)
+		pr_err("Unable to send notification to fsi\n");
+
+	fsicom_unregister_device();
+}
+
 static int fsicom_client_remove(struct platform_device *pdev)
 {
 	fsicom_unregister_device();
@@ -277,7 +307,8 @@ static int fsicom_client_remove(struct platform_device *pdev)
 static int __maybe_unused fsicom_client_suspend(struct device *dev)
 {
 	dev_dbg(dev, "suspend called\n");
-	return 0;
+
+	return fsicom_fsi_pm_notify(PM_SUSPEND);
 }
 
 static int __maybe_unused fsicom_client_resume(struct device *dev)
@@ -297,8 +328,9 @@ static struct platform_driver fsicom_client = {
 		.of_match_table = of_match_ptr(fsicom_client_dt_match),
 		.pm = pm_ptr(&fsicom_client_pm),
 	},
-	.probe          = fsicom_client_probe,
-	.remove         = fsicom_client_remove,
+	.probe		= fsicom_client_probe,
+	.shutdown	= fsicom_client_shutdown,
+	.remove		= fsicom_client_remove,
 };
 
 module_platform_driver(fsicom_client);
