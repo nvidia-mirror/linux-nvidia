@@ -6450,12 +6450,6 @@ static int ether_probe(struct platform_device *pdev)
 		goto err_init_res;
 	}
 
-	ret = ether_get_mac_address(pdata);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to get MAC address\n");
-		goto err_dma_mask;
-	}
-
 	ioctl_data.cmd = OSI_CMD_GET_HW_FEAT;
 	ret = osi_handle_ioctl(osi_core, &ioctl_data);
 	if (ret < 0) {
@@ -6465,6 +6459,12 @@ static int ether_probe(struct platform_device *pdev)
 	osi_core->mac_ver = ioctl_data.arg1_u32;
 	memcpy(&pdata->hw_feat, &ioctl_data.hw_feat,
 	       sizeof(struct osi_hw_features));
+
+	ret = ether_get_mac_address(pdata);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to get MAC address\n");
+		goto err_dma_mask;
+	}
 
 	ret = ether_set_dma_mask(pdata);
 	if (ret < 0) {
