@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Virtualization Communication Framework
  *
- * Copyright (c) 2013-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2013-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,9 +29,14 @@
 #include <linux/kthread.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
-#include <linux/tegra-ivc.h>
 #include <linux/tegra_gr_comm.h>
 #include <linux/module.h>
+
+#ifdef CONFIG_TEGRA_OOT_MODULE
+#include <soc/tegra/virt/hv-ivc.h>
+#else
+#include <linux/tegra-ivc.h>
+#endif
 
 #define NUM_QUEUES   5
 #define NUM_CONTEXTS 1
@@ -625,3 +630,5 @@ void tegra_gr_comm_oob_put_ptr(void *handle)
 	mutex_unlock(&queue->mempool_lock);
 }
 EXPORT_SYMBOL(tegra_gr_comm_oob_put_ptr);
+
+MODULE_LICENSE("GPL v2");
