@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra_bootloader_debug.c
  *
- * Copyright (C) 2014-2022 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2023 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -87,7 +87,8 @@ struct spi_boot_rx_frame_full {
 static spinlock_t tegra_bl_lock;
 static struct kobject *boot_profiler_kobj;
 static void *tegra_bl_mapped_prof_start;
-static void *tegra_bl_mapped_full_carveout;
+static void *tegra_bl_mapped_prof_ro_start;
+static bool is_privileged_vm;
 
 #ifdef CONFIG_DEBUG_FS
 static const uint32_t gr_mb1 = enum_gr_mb1;
@@ -152,22 +153,15 @@ struct profiler_record {
 	uint64_t timestamp;
 } __packed;
 
-static ssize_t profiler_show(struct kobject *kobj,
-			struct kobj_attribute *attr,
-			char *buf)
+static void profiler_show_entries(void *addr, int size)
 {
 	struct profiler_record *profiler_data;
 	int count = 0;
 	int i = 0;
 	int prof_data_section_valid = 0;
 
-	if (!tegra_bl_mapped_full_carveout) {
-		pr_err("%s\n", "Error mapping profiling data\n");
-		return 0;
-	}
-
-	profiler_data = (struct profiler_record *)tegra_bl_mapped_full_carveout;
-	count = SIZE_OF_FULL_CARVEOUT / sizeof(struct profiler_record);
+	profiler_data = (struct profiler_record *)addr;
+	count = size / sizeof(struct profiler_record);
 	i = -1;
 	pr_info("\n");
 	while (count--) {
@@ -186,6 +180,27 @@ static ssize_t profiler_show(struct kobject *kobj,
 			profiler_data[i].timestamp - profiler_data[i - 1].timestamp);
 		}
 		prof_data_section_valid = 1;
+	}
+}
+
+static ssize_t profiler_show(struct kobject *kobj,
+			struct kobj_attribute *attr,
+			char *buf)
+{
+	if (is_privileged_vm) {
+		if (!tegra_bl_mapped_prof_ro_start) {
+			pr_err("%s\n", "Error mapping RO profiling data\n");
+			return -EINVAL;
+		}
+
+		profiler_show_entries(tegra_bl_mapped_prof_ro_start, tegra_bl_prof_ro_size);
+	} else {
+		if (!tegra_bl_mapped_prof_start) {
+			pr_err("%s\n", "Error mapping RW profiling data\n");
+			return -EINVAL;
+		}
+
+		profiler_show_entries(tegra_bl_mapped_prof_start, tegra_bl_prof_size);
 	}
 
 	return 0;
@@ -317,9 +332,9 @@ static int dbg_golden_register_open_cpu_bl( __attribute((unused))struct inode *i
 
 static int __init tegra_bootloader_debuginit(void)
 {
-	void __iomem *ptr_bl_full_carveout = NULL;
+	void __iomem *ptr_bl_prof_ro_carveout = NULL;
+	void __iomem *ptr_bl_prof_carveout = NULL;
 	int bl_debug_verify_file_entry;
-	phys_addr_t tegra_bl_full_carveout;
 #ifdef CONFIG_DEBUG_FS
 	void __iomem *ptr_bl_debug_data_start = NULL;
 	void __iomem *ptr_bl_boot_cfg_start = NULL;
@@ -437,36 +452,43 @@ ignore_debugfs_failure:
 		goto out_err;
 	}
 
-	/* MB1 guarantees 64kb alignment during allocation,
-	 * below arithmetic gives address of full carveout
-	 */
-	tegra_bl_full_carveout =
-		tegra_bl_prof_start & (~(SIZE_OF_FULL_CARVEOUT - 1));
-	if (tegra_bl_full_carveout != 0
-			&& !pfn_valid(__phys_to_pfn(tegra_bl_full_carveout))) {
-		ptr_bl_full_carveout = ioremap(tegra_bl_full_carveout,
-				SIZE_OF_FULL_CARVEOUT);
-
-		WARN_ON(!ptr_bl_full_carveout);
-		if (!ptr_bl_full_carveout) {
-			pr_err("%s: Failed to map tegra_bl_full_carveout%08x\n",
-				__func__, (unsigned int)tegra_bl_full_carveout);
+	if (tegra_bl_prof_start != 0 && tegra_bl_prof_size != 0 &&
+			!pfn_valid(__phys_to_pfn(tegra_bl_prof_start))) {
+		ptr_bl_prof_carveout = ioremap(tegra_bl_prof_start, tegra_bl_prof_size);
+		if (!ptr_bl_prof_carveout) {
+			pr_err("%s: failed to map tegra_bl_prof_start\n", __func__);
 			goto out_err;
 		}
-		pr_info("Remapped tegra_bl_full_carveout(0x%llx) "
-			"to address 0x%llx, size(0x%llx)\n",
-			(u64)tegra_bl_full_carveout,
-			(__force u64)ptr_bl_full_carveout,
-			(u64)SIZE_OF_FULL_CARVEOUT);
 
-		tegra_bl_mapped_full_carveout = (__force void *)ptr_bl_full_carveout;
+		pr_info("Remapped tegra_bl_prof_start(0x%llx) "
+			"to address 0x%llx, size(0x%llx)\n",
+			(u64)tegra_bl_prof_start,
+			(__force u64)ptr_bl_prof_carveout,
+			(u64)tegra_bl_prof_size);
+
+		tegra_bl_mapped_prof_start = (__force void *)ptr_bl_prof_carveout;
 	}
 
-	tegra_bl_mapped_prof_start = tegra_bl_mapped_full_carveout +
-		(tegra_bl_prof_start - tegra_bl_full_carveout);
-	pr_info("tegra_bl_prof_start(0x%llx) size(0x%llx)\n",
-		(u64)tegra_bl_prof_start,
-		(u64)tegra_bl_prof_size);
+	if (tegra_bl_prof_ro_start != 0 && tegra_bl_prof_ro_size != 0 &&
+			!pfn_valid(__phys_to_pfn(tegra_bl_prof_ro_start))) {
+		ptr_bl_prof_ro_carveout = ioremap(tegra_bl_prof_ro_start, tegra_bl_prof_ro_size);
+		if (!ptr_bl_prof_ro_carveout) {
+			pr_err("%s: failed to map tegra_bl_prof_ro_start\n", __func__);
+			goto out_err;
+		}
+
+		pr_info("Remapped tegra_bl_prof_ro_start(0x%llx) "
+			"to address 0x%llx, size(0x%llx)\n",
+			(u64)tegra_bl_prof_ro_start,
+			(__force u64)ptr_bl_prof_ro_carveout,
+			(u64)tegra_bl_prof_ro_size);
+
+		tegra_bl_mapped_prof_ro_start = (__force void *)ptr_bl_prof_ro_carveout;
+
+		is_privileged_vm = true;
+	} else {
+		is_privileged_vm = false;
+	}
 
 	usc = ioremap(TEGRA_US_COUNTER_REG, 4);
 	if (!usc) {
@@ -487,8 +509,10 @@ out_err:
 	if (ptr_bl_boot_cfg_start)
 		iounmap(ptr_bl_boot_cfg_start);
 #endif
-	if (ptr_bl_full_carveout)
-		iounmap(ptr_bl_full_carveout);
+	if (ptr_bl_prof_carveout)
+		iounmap(ptr_bl_prof_carveout);
+	if (ptr_bl_prof_ro_carveout)
+		iounmap(ptr_bl_prof_ro_carveout);
 
 	if (boot_profiler_kobj) {
 		sysfs_remove_file(boot_profiler_kobj,
@@ -566,8 +590,11 @@ static void __exit tegra_bl_debuginit_module_exit(void)
 	if (tegra_bl_mapped_boot_cfg_start)
 		iounmap((void __iomem *)tegra_bl_mapped_boot_cfg_start);
 #endif
-	if (tegra_bl_mapped_full_carveout)
-		iounmap((void __iomem *)tegra_bl_mapped_full_carveout);
+	if (tegra_bl_mapped_prof_ro_start)
+		iounmap((void __iomem *)tegra_bl_mapped_prof_ro_start);
+
+	if (tegra_bl_mapped_prof_start)
+		iounmap((void __iomem *)tegra_bl_mapped_prof_start);
 
 	if (boot_profiler_kobj) {
 		sysfs_remove_file(boot_profiler_kobj,

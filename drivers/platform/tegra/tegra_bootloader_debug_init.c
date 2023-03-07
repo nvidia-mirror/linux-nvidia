@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra_bootloader_debug_init.c
  *
- * Copyright (C) 2014-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2023 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -33,6 +33,12 @@ EXPORT_SYMBOL(tegra_bl_prof_start);
 
 phys_addr_t tegra_bl_prof_size;
 EXPORT_SYMBOL(tegra_bl_prof_size);
+
+phys_addr_t tegra_bl_prof_ro_start;
+EXPORT_SYMBOL(tegra_bl_prof_ro_start);
+
+phys_addr_t tegra_bl_prof_ro_size;
+EXPORT_SYMBOL(tegra_bl_prof_ro_size);
 
 phys_addr_t tegra_bl_bcp_start;
 EXPORT_SYMBOL(tegra_bl_bcp_start);
@@ -72,8 +78,41 @@ static int __init tegra_bl_prof_arg(char *option)
 
 	return 0;
 }
-
 early_param("bl_prof_dataptr", tegra_bl_prof_arg);
+
+static int __init tegra_bl_prof_ro_arg(char *option)
+{
+	char *p = option;
+
+	tegra_bl_prof_ro_size = memparse(p, &p);
+
+	if (!p)
+		return -EINVAL;
+	if (*p != '@')
+		return -EINVAL;
+
+	tegra_bl_prof_ro_start = memparse(p + 1, &p);
+
+	if (!tegra_bl_prof_ro_size || !tegra_bl_prof_ro_start) {
+		tegra_bl_prof_ro_size = 0;
+		tegra_bl_prof_ro_start = 0;
+		return -ENXIO;
+	}
+
+	if (pfn_valid(__phys_to_pfn(tegra_bl_prof_ro_start))) {
+		if (memblock_reserve(tegra_bl_prof_ro_start, tegra_bl_prof_ro_size)) {
+			pr_err("Failed to reserve bl_prof_ro_data %08llx@%08llx\n",
+				(u64)tegra_bl_prof_ro_size,
+				(u64)tegra_bl_prof_ro_start);
+			tegra_bl_prof_ro_size = 0;
+			tegra_bl_prof_ro_start = 0;
+			return -ENXIO;
+		}
+	}
+
+	return 0;
+}
+early_param("bl_prof_ro_ptr", tegra_bl_prof_ro_arg);
 
 static int __init tegra_bl_debug_data_arg(char *options)
 {
