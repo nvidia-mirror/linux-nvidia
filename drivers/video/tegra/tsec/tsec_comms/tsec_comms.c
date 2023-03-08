@@ -56,7 +56,7 @@ struct TSEC_BOOT_INFO {
  */
 static bool s_init_msg_rcvd;
 static u8 s_init_tsec_msg[TSEC_MAX_MSG_SIZE];
-
+static bool is_comms_initialized;
 /*
  * Array of structs to register client callback function
  * for every sw unit/module within tsec
@@ -419,13 +419,20 @@ void tsec_comms_initialize(u64 ipc_co_va, u64 ipc_co_va_size)
 	(void)ipc_co_va;
 	(void)ipc_co_va_size;
 #endif
+	is_comms_initialized = true;
 }
 
 void *tsec_comms_get_gscco_page(u32 page_number, u32 *gscco_offset)
 {
 #ifdef DO_IPC_OVER_GSC_CO
 	u8 *page_va;
+#endif
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
+		return NULL;
+	}
 
+#ifdef DO_IPC_OVER_GSC_CO
 	if (!s_ipc_gscco_page_base || (page_number >= s_ipc_gscco_page_count)) {
 		plat_print(LVL_ERR,
 			"%s: No reserved memory for Page %d\n",
@@ -454,7 +461,14 @@ void *tsec_comms_alloc_mem_from_gscco(u32 size_in_bytes, u32 *gscco_offset)
 	void *page_va;
 	u32 page_number;
 	u64 mask;
+#endif
 
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
+		return NULL;
+	}
+
+#ifdef DO_IPC_OVER_GSC_CO
 	/* memory allocated must fit within 1 page */
 	if (size_in_bytes > s_ipc_gscco_page_size) {
 		plat_print(LVL_ERR,
@@ -499,7 +513,14 @@ void tsec_comms_free_gscco_mem(void *page_va)
 		(s_ipc_gscco_page_count * s_ipc_gscco_page_size);
 	u64 page_number = (page_addr - gscco_page_start) /
 		s_ipc_gscco_page_size;
+#endif
 
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
+		return;
+	}
+
+#ifdef DO_IPC_OVER_GSC_CO
 	if ((page_addr >= gscco_page_start) &&
 	    (page_addr < gscco_page_end) &&
 	    (!(page_addr % s_ipc_gscco_page_size)))
@@ -527,6 +548,11 @@ int tsec_comms_send_cmd(void *cmd, u32 queue_id,
 
 	if (!s_init_msg_rcvd) {
 		plat_print(LVL_ERR, "TSEC RISCV hasn't booted successfully\n");
+		return -TSEC_ENODEV;
+	}
+
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
 		return -TSEC_ENODEV;
 	}
 
@@ -634,6 +660,11 @@ int tsec_comms_set_init_cb(callback_func_t cb_func, void *cb_ctx)
 {
 	int err = 0;
 
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
+		return -TSEC_ENODEV;
+	}
+
 	tsec_plat_acquire_comms_mutex();
 
 	if (s_callbacks[RM_GSP_UNIT_INIT].cb_func) {
@@ -678,6 +709,11 @@ EXPORT_SYMBOL_COMMS(tsec_comms_set_init_cb);
 
 void tsec_comms_clear_init_cb(void)
 {
+	if (!is_comms_initialized) {
+		plat_print(LVL_DBG, "Communication with TSEC not supported\n");
+		return;
+	}
+
 	tsec_plat_acquire_comms_mutex();
 	s_callbacks[RM_GSP_UNIT_INIT].cb_func = NULL;
 	s_callbacks[RM_GSP_UNIT_INIT].cb_ctx  = NULL;

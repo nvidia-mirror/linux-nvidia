@@ -506,7 +506,8 @@ int tsec_finalize_poweron(struct platform_device *dev)
 	 */
 	tsec_writel(pdata, tsec_riscv_irqmclr_r(), tsec_riscv_irqmclr_swgen1_set_f());
 	/* initialise the comms library before enabling msg interrupt */
-	tsec_comms_initialize((__force u64)ipc_co_va, ipc_co_info.size);
+	if (of_property_read_bool((&dev->dev)->of_node, "support_comms"))
+		tsec_comms_initialize((__force u64)ipc_co_va, ipc_co_info.size);
 	/* enable message interrupt from tsec to ccplex */
 	enable_irq(pdata->irq);
 
