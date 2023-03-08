@@ -543,7 +543,7 @@ void *nvmap_dma_mark_declared_memory_occupied(struct device *dev,
 	spin_lock_irqsave(&mem->spinlock, flags);
 	pos = PFN_DOWN(device_addr - mem->device_base);
 	pageno = bitmap_find_next_zero_area(mem->bitmap, mem->size, pos, alloc_size, 0);
-	if (pageno >= mem->size)
+	if (pageno != pos)
 		goto error;
 	bitmap_set(mem->bitmap, pageno, alloc_size);
 	spin_unlock_irqrestore(&mem->spinlock, flags);
