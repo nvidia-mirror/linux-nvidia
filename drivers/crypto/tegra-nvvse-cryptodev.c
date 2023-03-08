@@ -68,6 +68,9 @@
 /** Defines the Maximum Random Number length supported */
 #define NVVSE_MAX_RANDOM_NUMBER_LEN_SUPPORTED		512U
 
+#define INT32_BYTES 4U
+#define CTR_TO_INT32 4U
+
 /**
  * Define preallocated SHA result buffer size, if digest size is bigger
  * than this then allocate new buffer
@@ -111,6 +114,7 @@ struct crypto_sha_state {
 struct tnvvse_crypto_ctx {
 	struct mutex			lock;
 	struct crypto_sha_state		sha_state;
+	uint8_t				intermediate_counter[TEGRA_NVVSE_AES_IV_LEN];
 	char				*rng_buff;
 	uint32_t			max_rng_buff;
 	char				*sha_result;
@@ -195,19 +199,44 @@ static int wait_async_op(struct tnvvse_crypto_completion *tr, int ret)
 	return ret;
 }
 
-static void update_counter(uint8_t *next_block_iv, int size)
+static int update_counter(uint8_t *pctr_be, uint32_t size)
 {
-	uint32_t counter_val;
+	int status;
+	uint32_t index;
+	int32_t  count;
+	uint64_t ctr_le[CTR_TO_INT32] = {0};
+	uint64_t result_le[CTR_TO_INT32];
+	uint64_t increment;
 
-	counter_val =  (next_block_iv[12] << 24);
-	counter_val |= (next_block_iv[13] << 16);
-	counter_val |= (next_block_iv[14] << 8);
-	counter_val |= (next_block_iv[15] << 0);
-	counter_val += (uint32_t)size/16;
-	next_block_iv[12] = (counter_val >> 24) & 0xFFU;
-	next_block_iv[13] = (counter_val >> 16) & 0xFFU;
-	next_block_iv[14] = (counter_val >> 8) & 0xFFU;
-	next_block_iv[15] = (counter_val >> 0) & 0xFFU;
+	for (index = 0U; index < TEGRA_NVVSE_AES_CTR_LEN; index++) {
+		ctr_le[index / INT32_BYTES] |= (((uint64_t)(pctr_be[index]))
+			<< (8U * (INT32_BYTES - (index % INT32_BYTES) - 1U)));
+	}
+
+	increment = size;
+	/* As the constant CTR_TO_INT32 - 1U is converted, overflow is not possible */
+	for (count = (int32_t)(CTR_TO_INT32 - 1U); count >= 0; count--) {
+		result_le[count] = ctr_le[count] + increment;
+		increment = result_le[count] >> 32U;
+		result_le[count] = result_le[count] & 0xFFFFFFFFU;
+	}
+
+	if (increment != 0U) {
+		pr_err("%s():AES-CTR Counter overflowed", __func__);
+		status = 60;	//NVVSE_STATUS_INVALID_PARAMETER;
+		goto fail;
+	}
+
+	for (index = 0U; index < TEGRA_NVVSE_AES_CTR_LEN; index++) {
+		pctr_be[index] =
+		    (uint8_t)((result_le[index / INT32_BYTES] >>
+			(8U * (INT32_BYTES - (index % INT32_BYTES) - 1U))) & 0xFFU);
+	}
+
+	status = 0;	// NVVSE_STATUS_OK;
+
+fail:
+	return status;
 }
 
 static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
@@ -1046,7 +1075,7 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	const char *driver_name;
 	char key_as_keyslot[AES_KEYSLOT_NAME_SIZE] = {0,};
 	char *pbuf;
-	uint8_t next_block_iv[TEGRA_NVVSE_AES_IV_LEN], *p_next_block_iv;
+	uint8_t next_block_iv[TEGRA_NVVSE_AES_IV_LEN];
 	bool first_loop = true;
 
 	if (aes_enc_dec_ctl->aes_mode >= TEGRA_NVVSE_AES_MODE_MAX) {
@@ -1068,7 +1097,12 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 	aes_ctx = crypto_skcipher_ctx(tfm);
 	aes_ctx->node_id = ctx->node_id;
 	aes_ctx->user_nonce = aes_enc_dec_ctl->user_nonce;
-	aes_ctx->b_is_first = 1U;
+	if (aes_enc_dec_ctl->is_non_first_call != 0U)
+		aes_ctx->b_is_first = 0U;
+	else {
+		aes_ctx->b_is_first = 1U;
+		memset(ctx->intermediate_counter, 0, TEGRA_NVVSE_AES_IV_LEN);
+	}
 
 	req = skcipher_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
@@ -1126,13 +1160,22 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 					tnvvse_crypto_complete, &tcrypt_complete);
 
 	total = aes_enc_dec_ctl->data_length;
-	if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CBC)
-		memcpy(next_block_iv, aes_enc_dec_ctl->initial_vector, TEGRA_NVVSE_AES_IV_LEN);
-	else if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR)
-		memcpy(next_block_iv, aes_enc_dec_ctl->initial_counter, TEGRA_NVVSE_AES_CTR_LEN);
-	else
-		memset(next_block_iv, 0, TEGRA_NVVSE_AES_IV_LEN);
 
+	if (aes_ctx->b_is_first == 1U || !aes_enc_dec_ctl->is_encryption) {
+		if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CBC)
+			memcpy(next_block_iv, aes_enc_dec_ctl->initial_vector,
+				TEGRA_NVVSE_AES_IV_LEN);
+		else if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR)
+			memcpy(next_block_iv, aes_enc_dec_ctl->initial_counter,
+				TEGRA_NVVSE_AES_CTR_LEN);
+		else
+			memset(next_block_iv, 0, TEGRA_NVVSE_AES_IV_LEN);
+	} else {
+		if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR)
+			memcpy(next_block_iv, ctx->intermediate_counter, TEGRA_NVVSE_AES_CTR_LEN);
+		else		//As ecb does not need IV, and CBC uses IV stored in SE server
+			memset(next_block_iv, 0, TEGRA_NVVSE_AES_IV_LEN);
+	}
 	pr_debug("%s(): %scryption\n", __func__, (aes_enc_dec_ctl->is_encryption ? "en" : "de"));
 
 	while (total > 0) {
@@ -1203,20 +1246,34 @@ static int tnvvse_crypto_aes_enc_dec(struct tnvvse_crypto_ctx *ctx,
 				pbuf = (char *)xbuf[0];
 				memcpy(next_block_iv, pbuf + size - TEGRA_NVVSE_AES_IV_LEN, TEGRA_NVVSE_AES_IV_LEN);
 			}  else if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR) {
-				p_next_block_iv = &next_block_iv[0];
-				update_counter(p_next_block_iv, size);
+				ret = update_counter(&next_block_iv[0], size >> 4U);
+				if (ret) {
+					pr_err("%s(): Failed to update counter: %d\n",
+						__func__, ret);
+					goto free_xbuf;
+				}
 			}
 		}
 		first_loop = false;
 		aes_ctx->b_is_first = 0U;
-		if (aes_enc_dec_ctl->is_encryption && aes_enc_dec_ctl->user_nonce == 1U) {
-			if (aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR) {
-				p_next_block_iv = &next_block_iv[0];
-				update_counter(p_next_block_iv, size);
+		total -= size;
+
+		if (aes_enc_dec_ctl->user_nonce == 1U) {
+			if (aes_enc_dec_ctl->is_encryption != 0U &&
+					aes_enc_dec_ctl->aes_mode == TEGRA_NVVSE_AES_MODE_CTR) {
+				ret = update_counter(&next_block_iv[0], size >> 4U);
+				if (ret) {
+					pr_err("%s(): Failed to update counter: %d\n",
+						__func__, ret);
+					goto free_xbuf;
+				}
+				if (total == 0) {
+					memcpy(ctx->intermediate_counter, &next_block_iv[0],
+						TEGRA_NVVSE_AES_CTR_LEN);
+				}
 			}
 		}
 
-		total -= size;
 		aes_enc_dec_ctl->dest_buffer += size;
 		aes_enc_dec_ctl->src_buffer += size;
 	}
