@@ -21,16 +21,41 @@
 #endif
 #include "ether_linux.h"
 
+/**
+ * @brief ether_get_free_timestamp_node - get free node for timestmap info for SKB
+ *
+ * Algorithm:
+ *  - Find index of statically allocated free memory for timestamp SKB
+ *
+ * @param[in] pdata: OSD private data structure.
+ *
+ * @retval index number
+ */
+static inline unsigned int ether_get_free_timestamp_node(struct ether_priv_data *pdata)
+{
+	unsigned int i;
+
+	for (i = 0; i < ETHER_MAX_PENDING_SKB_CNT; i++) {
+		if (pdata->timestamp_skb[i].in_use == OSI_NONE)
+			break;
+	}
+
+	return i;
+}
+
 int ether_get_tx_ts(struct ether_priv_data *pdata)
 {
 	struct list_head *head_node, *temp_head_node;
+	struct list_head *tstamp_head, *temp_tstamp_head;
 	struct skb_shared_hwtstamps shhwtstamp;
 	struct osi_ioctl ioctl_data = {};
 	unsigned long long nsec = 0x0;
 	struct ether_tx_ts_skb_list *pnode;
+	struct ether_timestamp_skb_list *tnode;
 	int ret = -1;
 	unsigned long flags;
 	bool pending = false;
+	unsigned int idx = 0U;
 
 	if (!atomic_inc_and_test(&pdata->tx_ts_ref_cnt)) {
 		/* Tx time stamp consumption already going on either from workq or func */
@@ -42,13 +67,12 @@ int ether_get_tx_ts(struct ether_priv_data *pdata)
 		return 0;
 	}
 
+	raw_spin_lock_irqsave(&pdata->txts_lock, flags);
 	list_for_each_safe(head_node, temp_head_node,
 			   &pdata->tx_ts_skb_head) {
 		pnode = list_entry(head_node,
 				   struct ether_tx_ts_skb_list,
 				   list_head);
-		memset(&shhwtstamp, 0,
-		       sizeof(struct skb_shared_hwtstamps));
 
 		ioctl_data.cmd = OSI_CMD_GET_TX_TS;
 		ioctl_data.tx_ts.pkt_id = pnode->pktid;
@@ -62,32 +86,60 @@ int ether_get_tx_ts(struct ether_priv_data *pdata)
 			    OSI_MAC_TCR_TXTSSMIS) {
 				dev_warn(pdata->dev,
 					 "No valid time for skb, removed\n");
+				if (pnode->skb != NULL) {
+					 dev_consume_skb_any(pnode->skb);
+				}
+
 				goto update_skb;
 			}
 
 			nsec = ioctl_data.tx_ts.sec * ETHER_ONESEC_NENOSEC +
 			       ioctl_data.tx_ts.nsec;
 
-			/* pass tstamp to stack */
-			shhwtstamp.hwtstamp = ns_to_ktime(nsec);
 			if (pnode->skb != NULL) {
-				skb_tstamp_tx(pnode->skb, &shhwtstamp);
+				idx = ether_get_free_timestamp_node(pdata);
+				if (idx < ETHER_MAX_PENDING_SKB_CNT) {
+					pdata->timestamp_skb[idx].in_use = OSI_ENABLE;
+					tnode = &pdata->timestamp_skb[idx];
+					tnode->skb = pnode->skb;
+					tnode->nsec = nsec;
+					dev_dbg(pdata->dev, "%s() SKB %p added for timestamp ns = %llu\n",
+						__func__, pnode->skb, nsec);
+					list_add_tail(&tnode->list_h,
+						      &pdata->timestamp_skb_head);
+				} else {
+					dev_err(pdata->dev, "No free node to store timestamp for SKB\n");
+					dev_consume_skb_any(pnode->skb);
+				}
 			}
 
 update_skb:
-			if (pnode->skb != NULL) {
-				dev_consume_skb_any(pnode->skb);
-			}
-
-			raw_spin_lock_irqsave(&pdata->txts_lock, flags);
 			list_del(head_node);
 			pnode->in_use = OSI_DISABLE;
-			raw_spin_unlock_irqrestore(&pdata->txts_lock, flags);
 
 		} else {
 			dev_dbg(pdata->dev, "Unable to retrieve TS from OSI\n");
 			pending = true;
 		}
+	}
+
+	raw_spin_unlock_irqrestore(&pdata->txts_lock, flags);
+
+	list_for_each_safe(tstamp_head, temp_tstamp_head,
+			   &pdata->timestamp_skb_head) {
+		tnode = list_entry(tstamp_head,
+				   struct ether_timestamp_skb_list,
+				   list_h);
+		if (tnode->in_use == OSI_ENABLE) {
+			memset(&shhwtstamp, 0,
+			       sizeof(struct skb_shared_hwtstamps));
+			/* pass tstamp to stack */
+			shhwtstamp.hwtstamp = ns_to_ktime(tnode->nsec);
+			skb_tstamp_tx(tnode->skb, &shhwtstamp);
+			list_del(tstamp_head);
+			tnode->in_use = OSI_NONE;
+		}
+		dev_consume_skb_any(tnode->skb);
 	}
 
 	if (pending)
@@ -6574,6 +6626,7 @@ static int ether_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&pdata->set_speed_work, set_speed_work_func);
 	osi_core->hw_feature = &pdata->hw_feat;
 	INIT_LIST_HEAD(&pdata->tx_ts_skb_head);
+	INIT_LIST_HEAD(&pdata->timestamp_skb_head);
 	INIT_DELAYED_WORK(&pdata->tx_ts_work, ether_get_tx_ts_work);
 	pdata->rx_m_enabled = false;
 	pdata->rx_pcs_m_enabled = false;

@@ -396,6 +396,20 @@ struct ether_tx_ts_skb_list {
 };
 
 /**
+ * @brief skb list with timestamp node structure
+ */
+struct ether_timestamp_skb_list {
+	/** Link list node head */
+	struct list_head list_h;
+	/** skb pointer */
+	struct sk_buff *skb;
+	/* Nano sec tx timestamp for skbinfo*/
+	unsigned long long nsec;
+	/** if node is in use */
+	unsigned int in_use;
+};
+
+/**
  * @brief ether_xtra_stat_counters - OSI core extra stat counters
  */
 struct ether_xtra_stat_counters {
@@ -588,8 +602,12 @@ struct ether_priv_data {
 	struct delayed_work tx_ts_work;
 	/** local skb list head */
 	struct list_head tx_ts_skb_head;
+	/** local skb list head with timestamp*/
+	struct list_head timestamp_skb_head;
 	/** pre allocated memory for ether_tx_ts_skb_list list */
 	struct ether_tx_ts_skb_list tx_ts_skb[ETHER_MAX_PENDING_SKB_CNT];
+	/** pre allocated memory for ether_timestamp_skb_list list */
+	struct ether_timestamp_skb_list timestamp_skb[ETHER_MAX_PENDING_SKB_CNT];
 	/** Atomic variable to hold the current pad calibration status */
 	atomic_t padcal_in_progress;
 	/** eqos dev pinctrl handle */
