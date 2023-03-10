@@ -531,7 +531,7 @@ int capture_common_setup_progress_status_notifier(
 {
 	struct dma_buf *dmabuf;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-	struct dma_buf_map map;
+	struct dma_buf_map map = {0};
 	int err;
 #endif
 	void *va;
@@ -636,7 +636,7 @@ int capture_common_pin_memory(
 	struct dma_buf *buf;
 	struct dma_buf_attachment *attach;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-	struct dma_buf_map map;
+	struct dma_buf_map map = {0};
 #endif
 	struct sg_table *sgt;
 	int err = 0;
