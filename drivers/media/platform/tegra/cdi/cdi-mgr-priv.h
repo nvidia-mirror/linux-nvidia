@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,7 @@
 
 #include <linux/cdev.h>
 #include <linux/version.h>
+#include <linux/hrtimer.h>
 #include <media/cdi-mgr.h>
 #include "cdi-tca-priv.h"
 
@@ -23,17 +24,37 @@
 #define CDI_MGR_TCA9539_REGISTER_COUNT      (8)
 #define CDI_MGR_TCA9539_BASE_REG_ADDR       (0x00)
 
+#define CDI_MGR_GPIO_EVENT_QUEUE_SIZE		(8)
+#define CDI_MGR_GPIO_TIMER_QUEUE_SIZE		(4)
+
 enum cam_gpio_direction {
-	CAM_DEVBLK_GPIO_UNSUSED = 0,
-	CAM_DEVBLK_GPIO_INPUT_INTERRUPT,
+	CAM_DEVBLK_GPIO_UNUSED = 0,
+	CAM_DEVBLK_GPIO_INPUT_INTR,
 	CAM_DEVBLK_GPIO_OUTPUT
 };
 
+struct cam_gpio_timer_queue {
+	struct hrtimer timer;
+	ktime_t expires[CDI_MGR_GPIO_TIMER_QUEUE_SIZE];
+	u32 head;
+	u32 count;
+};
+
 struct cam_gpio_config {
-	int index;
+	struct cdi_mgr_priv *mgr;
+	u32 idx;
 	enum cam_gpio_direction gpio_dir;
 	struct gpio_desc *desc;
-	int gpio_intr_irq;
+	int intr_irq;
+	struct cam_gpio_timer_queue timers;
+	ktime_t timeout;
+};
+
+struct cam_gpio_event_queue {
+	wait_queue_head_t wait;
+	struct cdi_mgr_gpio_intr events[CDI_MGR_GPIO_EVENT_QUEUE_SIZE];
+	u32 head;
+	u32 count;
 };
 
 struct cdi_mgr_priv {
@@ -61,14 +82,13 @@ struct cdi_mgr_priv {
 	u32 pwr_state;
 	atomic_t irq_in_use;
 	struct pwm_device *pwm;
-	wait_queue_head_t err_queue;
-	bool err_irq_reported;
 	u8 des_pwr_method;
 	u8 des_pwr_i2c_addr;
 	struct tca9539_priv tca9539;
-	struct cam_gpio_config gpio_arr[MAX_CDI_GPIOS];
-	uint32_t gpio_count;
-	uint32_t err_irq_recvd_status_mask;
+	struct cam_gpio_config gpios[MAX_CDI_GPIOS];
+	uint32_t num_gpios;
+	bool intrs_enable;
+	struct cam_gpio_event_queue gpio_events;
 	bool stop_err_irq_wait;
 	u8 cim_ver; /* 1 - P3714 A01, 2 - P3714 A02/A03 */
 	u32 cim_frsync[3]; /* FRSYNC source selection for each muxer */
