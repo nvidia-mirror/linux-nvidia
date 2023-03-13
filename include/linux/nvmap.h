@@ -3,7 +3,7 @@
  *
  * structure declarations for nvmem and nvmap user-space ioctls
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,6 +31,7 @@
 #define NVMAP_HEAP_CARVEOUT_VPR     (1ul<<28)
 #define NVMAP_HEAP_CARVEOUT_TSEC    (1ul<<27)
 #define NVMAP_HEAP_CARVEOUT_VIDMEM  (1ul<<26)
+#define NVMAP_HEAP_CARVEOUT_CBC (1ul << 3)
 #define NVMAP_HEAP_CARVEOUT_FSI   (1ul<<2)
 #define NVMAP_HEAP_CARVEOUT_IVM     (1ul<<1)
 #define NVMAP_HEAP_CARVEOUT_GENERIC (1ul<<0)
@@ -103,6 +104,7 @@ struct nvmap_platform_carveout {
 	bool no_cpu_access; /* carveout can't be accessed from cpu at all */
 	bool init_done;	/* FIXME: remove once all caveouts use reserved-memory */
 	struct nvmap_pm_ops pm_ops;
+	bool is_cbc; /* cbc carveout is treated differently */
 };
 
 struct nvmap_platform_data {

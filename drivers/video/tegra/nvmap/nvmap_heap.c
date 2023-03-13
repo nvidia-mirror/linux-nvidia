@@ -128,7 +128,7 @@ void nvmap_heap_debugfs_init(struct dentry *heap_root, struct nvmap_heap *heap)
 }
 
 static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
-				   phys_addr_t *start)
+				   phys_addr_t *start, struct nvmap_handle *handle)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 	phys_addr_t pa = DMA_ERROR_CODE;
@@ -136,6 +136,9 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 	phys_addr_t pa = DMA_MAPPING_ERROR;
 #endif
 	struct device *dev = h->dma_dev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+	void *err = NULL;
+#endif
 
 	if (len > UINT_MAX) {
 		dev_err(dev, "%s: %d alloc size is out of range\n",
@@ -165,8 +168,26 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 		(void)dma_alloc_attrs(dev, len, &pa,
 				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE);
 #else
-		(void)nvmap_dma_alloc_attrs(dev, len, &pa,
+		err = nvmap_dma_alloc_attrs(dev, len, &pa,
 				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE);
+		/*
+		 * In case of CBC carveout, try to allocate the entire chunk in physically
+		 * contiguous manner. If it returns error, then try to allocate the memory in
+		 * 2MB chunks.
+		 */
+		if (h->is_cbc && IS_ERR(err)) {
+			err = nvmap_dma_alloc_attrs(dev, len, &pa,
+				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE |
+				DMA_ATTR_ALLOC_SINGLE_PAGES);
+
+			if (!IS_ERR_OR_NULL(err)) {
+				/*
+				 * Need to keep track of pages, so that only those pages
+				 * can be freed while freeing the buffer.
+				 */
+				handle->pgalloc.pages = (struct page **)err;
+			}
+		}
 #endif
 		if (!dma_mapping_error(dev, pa)) {
 #ifdef NVMAP_CONFIG_VPR_RESIZE
@@ -194,7 +215,7 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 }
 
 static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
-				size_t len)
+			   size_t len, struct nvmap_handle *handle)
 {
 	struct device *dev = h->dma_dev;
 
@@ -222,10 +243,18 @@ static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
 			        (void *)(uintptr_t)base,
 			        (dma_addr_t)base, DMA_ATTR_ALLOC_EXACT_SIZE);
 #else
-		nvmap_dma_free_attrs(dev, len,
+		if (h->is_cbc && handle->pgalloc.pages) {
+			/* In case of pages, we need to pass pointer to array of pages */
+			nvmap_dma_free_attrs(dev, len,
+				     (void *)handle->pgalloc.pages,
+				     (dma_addr_t)base,
+				     DMA_ATTR_ALLOC_EXACT_SIZE | DMA_ATTR_ALLOC_SINGLE_PAGES);
+		} else {
+			nvmap_dma_free_attrs(dev, len,
 				     (void *)(uintptr_t)base,
 				     (dma_addr_t)base,
 				     DMA_ATTR_ALLOC_EXACT_SIZE);
+		}
 #endif
 	}
 }
@@ -238,7 +267,8 @@ static struct nvmap_heap_block *do_heap_alloc(struct nvmap_heap *heap,
 					      size_t len, size_t align,
 					      unsigned int mem_prot,
 					      phys_addr_t base_max,
-					      phys_addr_t *start)
+					      phys_addr_t *start,
+					      struct nvmap_handle *handle)
 {
 	struct list_block *heap_block = NULL;
 	dma_addr_t dev_base;
@@ -265,7 +295,7 @@ static struct nvmap_heap_block *do_heap_alloc(struct nvmap_heap *heap,
 		goto fail_heap_block_alloc;
 	}
 
-	dev_base = nvmap_alloc_mem(heap, len, start);
+	dev_base = nvmap_alloc_mem(heap, len, start, handle);
 	if (dma_mapping_error(dev, dev_base)) {
 		dev_err(dev, "failed to alloc mem of size (%zu)\n",
 			len);
@@ -305,8 +335,8 @@ static void do_heap_free(struct nvmap_heap_block *block)
 
 	list_del(&b->all_list);
 
+	nvmap_free_mem(heap, block->base, b->size, block->handle);
 	heap->free_size += b->size;
-	nvmap_free_mem(heap, block->base, b->size);
 	kmem_cache_free(heap_block_cache, b);
 }
 
@@ -359,7 +389,7 @@ struct nvmap_heap_block *nvmap_heap_alloc(struct nvmap_heap *h,
 	}
 
 	align = max_t(size_t, align, L1_CACHE_BYTES);
-	b = do_heap_alloc(h, len, align, prot, 0, start);
+	b = do_heap_alloc(h, len, align, prot, 0, start, handle);
 	if (b) {
 		b->handle = handle;
 		handle->carveout = b;
@@ -473,7 +503,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 				DMA_MEMORY_NOMAP);
 #else
 		err = nvmap_dma_declare_coherent_memory(h->dma_dev, 0, base, len,
-				DMA_MEMORY_NOMAP);
+				DMA_MEMORY_NOMAP, co->is_cbc);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -496,6 +526,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 	h->base = base;
 	h->can_alloc = !!co->can_alloc;
 	h->is_ivm = co->is_ivm;
+	h->is_cbc = co->is_cbc;
 	h->len = len;
 	h->free_size = len;
 	h->peer = co->peer;
@@ -616,12 +647,32 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 	phys_addr_t phys = block->base;
 	phys_addr_t end = block->base + len;
 	int ret = 0;
+	struct nvmap_handle *h;
 
 	if (prot == NVMAP_HANDLE_UNCACHEABLE || prot == NVMAP_HANDLE_WRITE_COMBINE)
 		goto out;
 
-	ret = nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV, phys, end,
+	h = block->handle;
+	if (h->pgalloc.pages) {
+		unsigned long page_count, i;
+
+		/*
+		 * For CBC carveout with physically discontiguous 2MB chunks,
+		 * iterate over 2MB chunks and do cache maint for it.
+		 */
+		page_count = h->size >> PAGE_SHIFT;
+		for (i = 0; i < page_count; i += PAGES_PER_2MB) {
+			phys = page_to_phys(h->pgalloc.pages[i]);
+			end = phys + SIZE_2MB;
+			ret = nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV, phys, end,
+					true, prot != NVMAP_HANDLE_INNER_CACHEABLE);
+			if (ret)
+				goto out;
+		}
+	} else
+		ret = nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV, phys, end,
 				true, prot != NVMAP_HANDLE_INNER_CACHEABLE);
+
 	if (ret)
 		goto out;
 out:

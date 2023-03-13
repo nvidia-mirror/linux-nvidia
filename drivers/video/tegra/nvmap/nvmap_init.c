@@ -141,11 +141,13 @@ static struct nvmap_platform_carveout nvmap_carveouts[] = {
 		.base		= 0,
 		.size		= 0,
 	},
-	/* Need uninitialized entries for IVM carveouts */
 	[4] = {
-		.name		= NULL,
-		.usage_mask	= NVMAP_HEAP_CARVEOUT_IVM,
+		.name		= "cbc",
+		.usage_mask	= NVMAP_HEAP_CARVEOUT_CBC,
+		.base		= 0,
+		.size		= 0,
 	},
+	/* Need uninitialized entries for IVM carveouts */
 	[5] = {
 		.name		= NULL,
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_IVM,
@@ -158,11 +160,15 @@ static struct nvmap_platform_carveout nvmap_carveouts[] = {
 		.name		= NULL,
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_IVM,
 	},
+	[8] = {
+		.name		= NULL,
+		.usage_mask	= NVMAP_HEAP_CARVEOUT_IVM,
+	},
 };
 
 static struct nvmap_platform_data nvmap_data = {
 	.carveouts	= nvmap_carveouts,
-	.nr_carveouts	= 4,
+	.nr_carveouts	= 5,
 };
 
 static struct nvmap_platform_carveout *nvmap_get_carveout_pdata(const char *name)
@@ -359,24 +365,39 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 {
 	int order = get_order(size);
 	unsigned long flags;
-	unsigned int count, i = 0, j = 0;
+	unsigned int count = 0, i = 0, j = 0, k = 0;
 	unsigned int alloc_size;
-	unsigned long align, pageno, page_count;
+	unsigned long align, pageno, page_count, first_pageno;
 	void *addr = NULL;
 	struct page **pages = NULL;
 	int do_memset = 0;
 	int *bitmap_nos = NULL;
+	const char *device_name;
+	bool is_cbc = false;
 
-	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
-		page_count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-		if (page_count > UINT_MAX) {
-			dev_err(dev, "Page count more than max value\n");
-			return NULL;
-		}
-		count = (unsigned int)page_count;
+	device_name = dev_name(dev);
+	if (!device_name) {
+		pr_err("Could not get device_name\n");
+		return NULL;
 	}
-	else
-		count = 1 << order;
+
+	if (!strncmp(device_name, "cbc", 3))
+		is_cbc = true;
+
+	if (is_cbc) {
+		/* Calculation for CBC should consider 2MB chunks */
+		count = size >> PAGE_SHIFT_2MB;
+	} else {
+		if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
+			page_count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+			if (page_count > UINT_MAX) {
+				dev_err(dev, "Page count more than max value\n");
+				return NULL;
+			}
+			count = (unsigned int)page_count;
+		} else
+			count = 1 << order;
+	}
 
 	if (!count)
 		return NULL;
@@ -389,20 +410,30 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	if ((mem->flags & DMA_MEMORY_NOMAP) &&
 	    dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) {
 		alloc_size = 1;
-		pages = nvmap_kvzalloc_pages(count);
-		if (!pages)
+		/* pages contain the array of pages of kernel PAGE_SIZE */
+		if (!is_cbc)
+			pages = nvmap_kvzalloc_pages(count);
+		else
+			pages = nvmap_kvzalloc_pages(count * PAGES_PER_2MB);
+
+		if (!pages) {
+			kvfree(bitmap_nos);
 			return NULL;
+		}
 	} else {
 		alloc_size = count;
 	}
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 
-	if (unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
+	if (!is_cbc && unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
+		goto err;
+	else if (is_cbc && unlikely(size > ((u64)mem->size << PAGE_SHIFT_2MB)))
 		goto err;
 
-	if ((mem->flags & DMA_MEMORY_NOMAP) &&
-	    dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) {
+	if (((mem->flags & DMA_MEMORY_NOMAP) &&
+	    dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) ||
+	    is_cbc) {
 		align = 0;
 	} else  {
 		if (order > DMA_BUF_ALIGNMENT)
@@ -418,9 +449,21 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 		if (pageno >= mem->size)
 			goto err;
 
+		if (!i)
+			first_pageno = pageno;
+
 		count -= alloc_size;
-		if (pages)
-			pages[i++] = pfn_to_page(mem->pfn_base + pageno);
+		if (pages) {
+			if (!is_cbc)
+				pages[i++] = pfn_to_page(mem->pfn_base + pageno);
+			else {
+				/* Handle 2MB chunks */
+				for (k = 0; k < (alloc_size * PAGES_PER_2MB); k++)
+					pages[i++] = pfn_to_page(mem->pfn_base +
+								 pageno * PAGES_PER_2MB + k);
+			}
+		}
+
 		bitmap_set(mem->bitmap, pageno, alloc_size);
 		bitmap_nos[j++] = pageno;
 	}
@@ -428,9 +471,13 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	/*
 	 * Memory was found in the coherent area.
 	 */
-	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+	if (!is_cbc)
+		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT);
+	else
+		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT_2MB);
+
 	if (!(mem->flags & DMA_MEMORY_NOMAP)) {
-		addr = mem->virt_base + (pageno << PAGE_SHIFT);
+		addr = mem->virt_base + (first_pageno << PAGE_SHIFT);
 		do_memset = 1;
 	} else if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) {
 		addr = pages;
@@ -450,7 +497,7 @@ err:
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 	kvfree(pages);
 	kvfree(bitmap_nos);
-	return NULL;
+	return ERR_PTR(-ENOMEM);
 }
 
 void *nvmap_dma_alloc_attrs(struct device *dev, size_t size,
@@ -476,11 +523,22 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 {
 	void *mem_addr;
 	unsigned long flags;
-	unsigned int pageno;
+	unsigned int pageno, page_shift_val;
 	struct dma_coherent_mem_replica *mem;
+	bool is_cbc = false;
+	const char *device_name;
 
 	if (!dev || !dev->dma_mem)
 		return;
+
+	device_name = dev_name(dev);
+	if (!device_name) {
+		pr_err("Could not get device_name\n");
+		return;
+	}
+
+	if (!strncmp(device_name, "cbc", 3))
+		is_cbc = true;
 
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 	if ((mem->flags & DMA_MEMORY_NOMAP) &&
@@ -489,12 +547,22 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		int i;
 
 		spin_lock_irqsave(&mem->spinlock, flags);
-		for (i = 0; i < (size >> PAGE_SHIFT); i++) {
-			pageno = page_to_pfn(pages[i]) - mem->pfn_base;
-			if (WARN_ONCE(pageno > mem->size,
+		if (!is_cbc) {
+			for (i = 0; i < (size >> PAGE_SHIFT); i++) {
+				pageno = page_to_pfn(pages[i]) - mem->pfn_base;
+				if (WARN_ONCE(pageno > mem->size,
 				      "invalid pageno:%d\n", pageno))
-				continue;
-			bitmap_clear(mem->bitmap, pageno, 1);
+					continue;
+				bitmap_clear(mem->bitmap, pageno, 1);
+			}
+		} else {
+			for (i = 0; i < (size >> PAGE_SHIFT); i += PAGES_PER_2MB) {
+				pageno = (page_to_pfn(pages[i]) - mem->pfn_base) / PAGES_PER_2MB;
+				if (WARN_ONCE(pageno > mem->size,
+				      "invalid pageno:%d\n", pageno))
+					continue;
+				bitmap_clear(mem->bitmap, pageno, 1);
+			}
 		}
 		spin_unlock_irqrestore(&mem->spinlock, flags);
 		kvfree(pages);
@@ -506,14 +574,19 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 	else
 		mem_addr =  mem->virt_base;
 
+	page_shift_val = is_cbc ? PAGE_SHIFT_2MB : PAGE_SHIFT;
 	if (mem && cpu_addr >= mem_addr &&
-	    cpu_addr - mem_addr < (u64)mem->size << PAGE_SHIFT) {
-		unsigned int page = (cpu_addr - mem_addr) >> PAGE_SHIFT;
+	    cpu_addr - mem_addr < (u64)mem->size << page_shift_val) {
+		unsigned int page = (cpu_addr - mem_addr) >> page_shift_val;
 		unsigned long flags;
 		unsigned int count;
 
-		if (DMA_ATTR_ALLOC_EXACT_SIZE & attrs)
-			count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+		if (DMA_ATTR_ALLOC_EXACT_SIZE & attrs) {
+			if (is_cbc)
+				count = ALIGN_2MB(size) >> page_shift_val;
+			else
+				count = PAGE_ALIGN(size) >> page_shift_val;
+		}
 		else
 			count = 1 << get_order(size);
 
@@ -601,16 +674,23 @@ static int nvmap_dma_assign_coherent_memory(struct device *dev,
 
 static int nvmap_dma_init_coherent_memory(
 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-	struct dma_coherent_mem_replica **mem)
+	struct dma_coherent_mem_replica **mem, bool is_cbc)
 {
 	struct dma_coherent_mem_replica *dma_mem = NULL;
 	void *mem_base = NULL;
-	int pages = size >> PAGE_SHIFT;
-	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+	int pages;
+	int bitmap_size;
 	int ret;
 
 	if (!size)
 		return -EINVAL;
+
+	if (is_cbc)
+		pages = size >> PAGE_SHIFT_2MB;
+	else
+		pages = size >> PAGE_SHIFT;
+
+	bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
 
 	if (!(flags & DMA_MEMORY_NOMAP)) {
 		mem_base = memremap(phys_addr, size, MEMREMAP_WC);
@@ -632,7 +712,7 @@ static int nvmap_dma_init_coherent_memory(
 
 	dma_mem->virt_base = mem_base;
 	dma_mem->device_base = device_addr;
-	dma_mem->pfn_base = PFN_DOWN(phys_addr);
+	dma_mem->pfn_base = PFN_DOWN(device_addr);
 	dma_mem->size = pages;
 	dma_mem->flags = flags;
 	spin_lock_init(&dma_mem->spinlock);
@@ -649,12 +729,12 @@ err_memunmap:
 }
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-                        dma_addr_t device_addr, size_t size, int flags)
+			dma_addr_t device_addr, size_t size, int flags, bool is_cbc)
 {
 	struct dma_coherent_mem_replica *mem;
 	int ret;
 
-	ret = nvmap_dma_init_coherent_memory(phys_addr, device_addr, size, flags, &mem);
+	ret = nvmap_dma_init_coherent_memory(phys_addr, device_addr, size, flags, &mem, is_cbc);
 	if (ret)
 		return ret;
 
@@ -686,7 +766,7 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 #else
 		err = nvmap_dma_declare_coherent_memory(co->dma_dev, 0,
 				co->base, co->size,
-				DMA_MEMORY_NOMAP);
+				DMA_MEMORY_NOMAP, co->is_cbc);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -816,6 +896,9 @@ int __init nvmap_co_setup(struct reserved_mem *rmem)
 	co->base = rmem->base;
 	co->size = rmem->size;
 	co->cma_dev = NULL;
+	if (!strncmp(co->name, "cbc", 3))
+		co->is_cbc = true;
+
 	nvmap_init_time += sched_clock() - start;
 	return ret;
 }

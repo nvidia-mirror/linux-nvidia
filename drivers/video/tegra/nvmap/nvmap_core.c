@@ -3,7 +3,7 @@
  *
  * Memory manager for Tegra GPU
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -170,7 +170,7 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 	nvmap_kmaps_inc(h);
 	prot = nvmap_pgprot(h, PG_PROT_KERNEL);
 
-	if (h->heap_pgalloc) {
+	if (h->pgalloc.pages) {
 		pages = nvmap_pages(h->pgalloc.pages, h->size >> PAGE_SHIFT);
 		if (!pages)
 			goto out;
@@ -327,7 +327,7 @@ struct sg_table *__nvmap_sg_table(struct nvmap_client *client,
 		goto err;
 	}
 
-	if (!h->heap_pgalloc) {
+	if (!h->pgalloc.pages) {
 		phys_addr_t paddr = handle_phys(h);
 		struct page *page = phys_to_page(paddr);
 

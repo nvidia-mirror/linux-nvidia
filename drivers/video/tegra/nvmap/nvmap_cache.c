@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/nvmap/nvmap_cache.c
  *
- * Copyright (c) 2011-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -197,7 +197,7 @@ static int do_cache_maint(struct cache_maint_op *cache_work)
 		goto out;
 	}
 
-	if (h->heap_pgalloc) {
+	if (h->pgalloc.pages) {
 		heap_page_cache_maint(h, pstart, pend, op, true,
 			(h->flags == NVMAP_HANDLE_INNER_CACHEABLE) ?
 			false : true, cache_work->clean_only_dirty);

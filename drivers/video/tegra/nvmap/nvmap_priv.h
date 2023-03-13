@@ -51,6 +51,11 @@
 
 #include <linux/fdtable.h>
 
+#define SIZE_2MB (2*1024*1024)
+#define ALIGN_2MB(size) ((size + SIZE_2MB - 1) & ~(SIZE_2MB - 1))
+#define PAGE_SHIFT_2MB 21
+#define PAGES_PER_2MB (SIZE_2MB / PAGE_SIZE)
+
 #define DMA_ERROR_CODE	(~(dma_addr_t)0)
 
 #define __DMA_ATTR(attrs) attrs
@@ -188,8 +193,7 @@ struct nvmap_carveout_node {
 	size_t			size;
 };
 
-/* handles allocated using shared system memory (either IOVMM- or high-order
- * page allocations */
+/* handles allocated as collection of pages */
 struct nvmap_pgalloc {
 	struct page **pages;
 	bool contig;			/* contiguous system memory */
@@ -238,10 +242,8 @@ struct nvmap_handle {
 	struct nvmap_client *owner;
 	struct dma_buf *dmabuf;
 	struct dma_buf *dmabuf_ro;
-	union {
-		struct nvmap_pgalloc pgalloc;
-		struct nvmap_heap_block *carveout;
-	};
+	struct nvmap_pgalloc pgalloc;
+	struct nvmap_heap_block *carveout;
 	bool heap_pgalloc;	/* handle is page allocated (sysmem / iovmm) */
 	bool alloc;		/* handle has memory allocated */
 	bool from_va;		/* handle memory is from VA */
@@ -494,7 +496,7 @@ struct dma_coherent_mem_replica {
 };
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-			dma_addr_t device_addr, size_t size, int flags);
+			dma_addr_t device_addr, size_t size, int flags, bool is_cbc);
 #endif
 int nvmap_probe(struct platform_device *pdev);
 int nvmap_remove(struct platform_device *pdev);

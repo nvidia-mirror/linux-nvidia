@@ -3,7 +3,7 @@
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2011-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -718,16 +718,42 @@ static void alloc_handle(struct nvmap_client *client,
 				if (nvmap_cpu_map_is_allowed(h)) {
 					void *cpu_addr;
 
-					cpu_addr = memremap(b->base, h->size,
-							MEMREMAP_WB);
-					if (cpu_addr != NULL) {
-						memset(cpu_addr, 0, h->size);
+					if (h->pgalloc.pages &&
+					    h->heap_type == NVMAP_HEAP_CARVEOUT_CBC) {
+						unsigned long page_count;
+						int i;
+
+						page_count = h->size >> PAGE_SHIFT;
+						/* Iterate over 2MB chunks */
+						for (i = 0; i < page_count; i += PAGES_PER_2MB) {
+							cpu_addr = memremap(page_to_phys(
+									    h->pgalloc.pages[i]),
+									    SIZE_2MB, MEMREMAP_WB);
+							if (cpu_addr != NULL) {
+								memset(cpu_addr, 0, SIZE_2MB);
 #ifdef NVMAP_UPSTREAM_KERNEL
-						arch_invalidate_pmem(cpu_addr, h->size);
+								arch_invalidate_pmem(cpu_addr,
+										     SIZE_2MB);
 #else
-						__dma_flush_area(cpu_addr, h->size);
+								__dma_flush_area(cpu_addr,
+										 SIZE_2MB);
 #endif
-						memunmap(cpu_addr);
+								memunmap(cpu_addr);
+							}
+
+						}
+					} else {
+						cpu_addr = memremap(b->base, h->size,
+								MEMREMAP_WB);
+						if (cpu_addr != NULL) {
+							memset(cpu_addr, 0, h->size);
+#ifdef NVMAP_UPSTREAM_KERNEL
+							arch_invalidate_pmem(cpu_addr, h->size);
+#else
+							__dma_flush_area(cpu_addr, h->size);
+#endif
+							memunmap(cpu_addr);
+						}
 					}
 				}
 			}
@@ -1006,14 +1032,19 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 		if (h->vaddr) {
 			void *addr = h->vaddr;
 
-			addr -= (h->carveout->base & ~PAGE_MASK);
-			iounmap((void __iomem *)addr);
+			if (h->pgalloc.pages) {
+				vunmap(h->vaddr);
+			} else {
+				addr -= (h->carveout->base & ~PAGE_MASK);
+				iounmap((void __iomem *)addr);
+			}
 		}
 
 		nvmap_heap_free(h->carveout);
 		nvmap_kmaps_dec(h);
 		h->carveout = NULL;
 		h->vaddr = NULL;
+		h->pgalloc.pages = NULL;
 		goto out;
 	} else {
 		int ret = nvmap_heap_pgfree(h);

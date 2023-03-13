@@ -192,6 +192,7 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 	struct dma_buf *dmabuf = NULL;
 	bool is_ro;
 	int err;
+	unsigned int page_sz = PAGE_SIZE;
 
 	if (copy_from_user(&op, arg, sizeof(op)))
 		return -EFAULT;
@@ -206,6 +207,14 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 	if (IS_ERR_OR_NULL(handle))
 		return -EINVAL;
 
+	/*
+	 * In case of CBC carveout, the handle size needs to be aligned to 2MB.
+	 */
+	if (op.heap_mask & NVMAP_HEAP_CARVEOUT_CBC) {
+		handle->size = ALIGN_2MB(handle->size);
+		page_sz = SIZE_2MB;
+	}
+
 	if (!is_nvmap_memory_available(handle->size, op.heap_mask)) {
 		nvmap_handle_put(handle);
 		return -ENOMEM;
@@ -213,7 +222,7 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 
 	/* user-space handles are aligned to page boundaries, to prevent
 	 * data leakage. */
-	op.align = max_t(size_t, op.align, PAGE_SIZE);
+	op.align = max_t(size_t, op.align, page_sz);
 
 	err = nvmap_alloc_handle(client, handle, op.heap_mask, op.align,
 				  0, /* no kind */
@@ -1134,13 +1143,15 @@ int nvmap_ioctl_get_handle_parameters(struct file *filp, void __user *arg)
 	/*
 	 * Check handle is allocated or not while setting contig.
 	 * If heap type is IOVMM, check if it has flag set for contiguous memory
-	 * allocation request. Otherwise, if handle belongs to any carveout then
-	 * all allocations are contiguous, hence set contig flag to true.
+	 * allocation request. Otherwise, if handle belongs to any carveout except cbc
+	 * then all allocations are contiguous, hence set contig flag to true.
+	 * In case of cbc, if allocation is page based then set contig flag to false
+	 * otherwise true.
 	 */
 	if (handle->alloc &&
-	    ((handle->heap_type == NVMAP_HEAP_IOVMM &&
-	    handle->userflags & NVMAP_HANDLE_PHYS_CONTIG) ||
-	    handle->heap_type != NVMAP_HEAP_IOVMM)) {
+	   ((handle->heap_type == NVMAP_HEAP_IOVMM &&
+		    handle->userflags & NVMAP_HANDLE_PHYS_CONTIG) ||
+	   (handle->heap_type != NVMAP_HEAP_IOVMM && !handle->pgalloc.pages))) {
 		op.contig = 1U;
 	} else {
 		op.contig = 0U;
