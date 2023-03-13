@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2018-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -219,6 +219,7 @@ struct vs_config_info {
 
 struct vs_request {
 	uint32_t req_id;
+	uint32_t client_priv;
 	enum vs_req_type type;
 	union {
 		struct vs_blkdev_request blkdev_req;
