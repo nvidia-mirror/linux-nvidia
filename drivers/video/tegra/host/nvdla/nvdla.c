@@ -823,6 +823,7 @@ static uint32_t nvdla_read_soft_sku_scratch_register(void)
 	return dla_soft_sku_opt_disable;
 }
 
+#if KERNEL_VERSION(5, 11, 0) >= LINUX_VERSION_CODE
 static int nvhost_nvdla_read_chip_option_register(struct platform_device *pdev)
 {
 	/* Read floor sweeping info using nvmem api
@@ -892,6 +893,7 @@ out:
 
 	return ret;
 }
+#endif
 
 /* driver probe and init */
 static struct of_device_id tegra_nvdla_of_match[] = {
@@ -921,7 +923,6 @@ static int nvdla_probe(struct platform_device *pdev)
 	struct nvhost_device_data *pdata = NULL;
 	struct nvdla_device *nvdla_dev = NULL;
 	struct device *dev = &pdev->dev;
-	int fuse_ret = 0;
 	uint32_t soft_fuse_ret = 0U;
 #ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
@@ -978,23 +979,25 @@ static int nvdla_probe(struct platform_device *pdev)
 				goto err_no_ip;
 			}
 
+#if KERNEL_VERSION(5, 11, 0) >= LINUX_VERSION_CODE
 		} else {
 
-			fuse_ret = nvhost_nvdla_read_chip_option_register(pdev);
+			err = nvhost_nvdla_read_chip_option_register(pdev);
 
-			if ((fuse_ret & FUSE_OPT_DLA_0_DISABLED)
+			if ((err & FUSE_OPT_DLA_0_DISABLED)
 					&& (pdata->class == NV_DLA0_CLASS_ID)) {
 				dev_err(dev, "NVDLA0 IP is disabled in Fuse\n");
 				err = -ENODEV;
 				goto err_no_ip;
 			}
 
-			if ((fuse_ret & FUSE_OPT_DLA_1_DISABLED)
+			if ((err & FUSE_OPT_DLA_1_DISABLED)
 					&& (pdata->class == NV_DLA1_CLASS_ID)) {
 				dev_err(dev, "NVDLA1 IP is disabled in Fuse\n");
 				err = -ENODEV;
 				goto err_no_ip;
 			}
+#endif
 		}
 	}
 
