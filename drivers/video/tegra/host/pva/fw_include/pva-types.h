@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -50,10 +50,10 @@ enum pva_queue_id_e {
 typedef uint8_t pva_ccq_fifo_id_t;
 
 /*
- * VPU IDs
+ * PVE IDs
  */
-typedef uint8_t pva_vpu_id_t;
-#define PVA_VPU_ID_NONE 0xffU
+typedef uint8_t pva_pve_id_t;
+#define PVA_PVE_ID_NONE 0xffU
 
 /*
  * VMEM IDs

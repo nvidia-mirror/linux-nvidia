@@ -354,10 +354,10 @@ struct pva_status_pva_uptime_s {
 };
 
 static inline uint32_t pva_cmd_pva_uptime(struct pva_cmd_s *const cmd,
-					  const pva_vpu_id_t vpu,
+					  const pva_pve_id_t pve,
 					  const uint32_t flags)
 {
-	(void) vpu; /*For Future use*/
+	(void)pve; /*For Future use*/
 	cmd->cmd_field[0] = pva_cmd_get_status(PVA_UPTIME, flags);
 	return 1U;
 }
