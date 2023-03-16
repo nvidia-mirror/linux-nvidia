@@ -198,6 +198,7 @@ struct SYS_MAP_MEMORY {
 
 	phys_addr_t   phys_addr;
 	unsigned long virtual_addr;
+	unsigned long mapping_offs;   /* mapped offset from the beginning of the allocation */
 	unsigned long mapping_length; /* how many bytes were mapped */
 };
 
@@ -326,9 +327,6 @@ struct mods_priv {
 
 	/* Client structures */
 	struct mods_client clients[MODS_MAX_CLIENTS];
-
-	/* Mutex for guarding interrupt logic and PCI device enablement */
-	struct mutex       mtx;
 };
 
 #ifdef MODS_HAS_POLL_T
@@ -382,13 +380,14 @@ struct mods_priv {
 /* ** MODULE WIDE FUNCTIONS						     */
 /* ************************************************************************* */
 
+/* client */
+struct mods_client *mods_client_from_id(u8 client_id);
+int mods_is_client_enabled(u8 client_id);
+
 /* irq */
 void mods_init_irq(void);
-void mods_cleanup_irq(void);
 struct mutex *mods_get_irq_mutex(void);
-struct mods_client *mods_alloc_client(void);
 void mods_free_client_interrupts(struct mods_client *client);
-void mods_free_client(u8 client_id);
 POLL_TYPE mods_irq_event_check(u8 client_id);
 
 /* mem */

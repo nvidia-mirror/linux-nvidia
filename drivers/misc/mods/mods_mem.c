@@ -22,6 +22,7 @@
 
 #include <linux/bitops.h>
 #include <linux/pagemap.h>
+#include <linux/sched.h>
 
 #if defined(MODS_HAS_SET_DMA_MASK)
 #include <linux/dma-mapping.h>
@@ -412,7 +413,6 @@ static int dma_map_to_default_dev(struct mods_client   *client,
 #ifdef CONFIG_ARM64
 static void clear_contiguous_cache(struct mods_client *client,
 				   u64                 virt_start,
-				   u64                 phys_start,
 				   u32                 size);
 #endif
 
@@ -438,7 +438,6 @@ static int setup_cache_attr(struct mods_client   *client,
 #ifdef CONFIG_ARM64
 			clear_contiguous_cache(client,
 					       (u64)(size_t)ptr,
-					       sg_phys(sg) + offs,
 					       PAGE_SIZE);
 #else
 			if (p_mem_info->cache_type == MODS_ALLOC_WRITECOMBINE)
@@ -458,6 +457,9 @@ static int setup_cache_attr(struct mods_client   *client,
 			 * even for chunks where we haven't change them.
 			 */
 			mark_chunk_wc(p_mem_info, ichunk);
+
+			/* Avoid superficial lockups */
+			cond_resched();
 		}
 	}
 
@@ -2077,7 +2079,6 @@ int esc_mods_virtual_to_phys(struct mods_client              *client,
 	list_for_each(iter, head) {
 		struct SYS_MAP_MEMORY *p_map_mem;
 		u64                    begin, end;
-		u64                    phys_offs;
 
 		p_map_mem = list_entry(iter, struct SYS_MAP_MEMORY, list);
 
@@ -2104,14 +2105,9 @@ int esc_mods_virtual_to_phys(struct mods_client              *client,
 				return OK;
 			}
 
-			if (get_alloc_offset(p_map_mem->p_mem_info,
-					     p_map_mem->phys_addr,
-					     &phys_offs) != OK)
-				break;
-
 			range.memory_handle =
 				(u64)(size_t)p_map_mem->p_mem_info;
-			range.offset = virt_offs + phys_offs;
+			range.offset = virt_offs + p_map_mem->mapping_offs;
 
 			mutex_unlock(&client->mtx);
 
@@ -2194,10 +2190,7 @@ int esc_mods_phys_to_virtual(struct mods_client              *client,
 			continue;
 
 		/* offset from the beginning of the mapping */
-		if (get_alloc_offset(p_map_mem->p_mem_info,
-				     p_map_mem->phys_addr,
-				     &map_offset))
-			continue;
+		map_offset = p_map_mem->mapping_offs;
 
 		if ((offset >= map_offset) &&
 		    (offset <  map_offset + p_map_mem->mapping_length)) {
@@ -2474,7 +2467,6 @@ failed:
 #ifdef CONFIG_ARM64
 static void clear_contiguous_cache(struct mods_client *client,
 				   u64                 virt_start,
-				   u64                 phys_start,
 				   u32                 size)
 {
 	u64 end = virt_start + size;
@@ -2483,16 +2475,16 @@ static void clear_contiguous_cache(struct mods_client *client,
 	static u32 d_line_shift;
 
 	if (!d_line_shift) {
-#if KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
-		const u64 ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
 #if KERNEL_VERSION(6, 0, 0) <= MODS_KERNEL_VERSION
-		const int field = CTR_EL0_DminLine_SHIFT;
-#else
-		const int field = CTR_DMINLINE_SHIFT;
-#endif
+		const u64 ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
 
 		d_line_shift =
-			cpuid_feature_extract_unsigned_field(ctr_el0, field);
+			cpuid_feature_extract_unsigned_field(ctr_el0, CTR_EL0_DminLine_SHIFT);
+#elif KERNEL_VERSION(5, 10, 0) <= MODS_KERNEL_VERSION
+		const u64 ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
+
+		d_line_shift =
+			cpuid_feature_extract_unsigned_field(ctr_el0, CTR_DMINLINE_SHIFT);
 #else
 		d_line_shift = 4; /* Fallback for kernel 5.9 or older */
 #endif
@@ -2502,91 +2494,15 @@ static void clear_contiguous_cache(struct mods_client *client,
 	cur = virt_start & ~(d_size - 1);
 	do {
 		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
+
+		/* Avoid superficial lockups */
+		cond_resched();
 	} while (cur += d_size, cur < end);
+	asm volatile("dsb sy" : : : "memory");
 
 	cl_debug(DEBUG_MEM_DETAILED,
-		 "clear cache virt 0x%llx phys 0x%llx size 0x%x\n",
-		 virt_start, phys_start, size);
-}
-
-static void clear_entry_cache_mappings(struct mods_client    *client,
-				       struct SYS_MAP_MEMORY *p_map_mem,
-				       u64                    virt_offs,
-				       u64                    virt_offs_end)
-{
-	struct MODS_MEM_INFO *p_mem_info = p_map_mem->p_mem_info;
-	struct scatterlist   *sg;
-	u64	              cur_vo = p_map_mem->virtual_addr;
-	u32                   num_chunks;
-	u32                   i;
-
-	if (!p_mem_info)
-		return;
-
-	if (p_mem_info->cache_type != MODS_ALLOC_CACHED)
-		return;
-
-	num_chunks = get_num_chunks(p_mem_info);
-
-	for_each_sg(p_mem_info->sg, sg, num_chunks, i) {
-		u32 chunk_offs     = 0;
-		u32 chunk_offs_end = sg->length;
-		u64 cur_vo_end     = cur_vo + chunk_offs_end;
-
-		if (virt_offs_end <= cur_vo)
-			break;
-
-		if (virt_offs >= cur_vo_end) {
-			cur_vo = cur_vo_end;
-			continue;
-		}
-
-		if (cur_vo < virt_offs)
-			chunk_offs = (u32)(virt_offs - cur_vo);
-
-		if (virt_offs_end < cur_vo_end)
-			chunk_offs_end -= (u32)(cur_vo_end - virt_offs_end);
-
-		cl_debug(DEBUG_MEM_DETAILED,
-			 "clear cache %p [%u]\n",
-			 p_mem_info,
-			 i);
-
-		while (chunk_offs < chunk_offs_end) {
-			u32 i_page     = chunk_offs >> PAGE_SHIFT;
-			u32 page_offs  = chunk_offs - (i_page << PAGE_SHIFT);
-			u64 page_va    =
-			    (u64)(size_t)MODS_KMAP(sg_page(sg) + i_page);
-			u64 clear_va   = page_va + page_offs;
-			u64 clear_pa   = sg_phys(sg) + chunk_offs;
-			u32 clear_size = PAGE_SIZE - page_offs;
-			u64 remaining  = chunk_offs_end - chunk_offs;
-
-			if (likely(page_va)) {
-				if ((u64)clear_size > remaining)
-					clear_size = (u32)remaining;
-
-				cl_debug(DEBUG_MEM_DETAILED,
-					 "clear page %u, chunk offs 0x%x, page va 0x%llx\n",
-					 i_page,
-					 chunk_offs,
-					 page_va);
-
-				clear_contiguous_cache(client,
-						       clear_va,
-						       clear_pa,
-						       clear_size);
-
-				kunmap((void *)(size_t)page_va);
-			} else {
-				cl_error("kmap failed\n");
-			}
-
-			chunk_offs += clear_size;
-		}
-
-		cur_vo = cur_vo_end;
-	}
+		 "flush cache virt 0x%llx size 0x%x\n",
+		 virt_start, size);
 }
 
 int esc_mods_flush_cpu_cache_range(struct mods_client                *client,
@@ -2619,45 +2535,34 @@ int esc_mods_flush_cpu_cache_range(struct mods_client                *client,
 	}
 
 	head = &client->mem_map_list;
+	err  = -EINVAL;
 
 	list_for_each(iter, head) {
 		struct SYS_MAP_MEMORY *p_map_mem
 			= list_entry(iter, struct SYS_MAP_MEMORY, list);
 
-		u64 mapped_va = p_map_mem->virtual_addr;
+		const u64 mapped_va   = p_map_mem->virtual_addr;
+		const u64 mapped_end  = mapped_va + p_map_mem->mapping_length;
+		const u64 flush_start = p->virt_addr_start < mapped_va ? mapped_va
+								       : p->virt_addr_start;
+		const u64 flush_end   = p->virt_addr_end > mapped_end ? mapped_end
+								      : p->virt_addr_end;
 
-		/* Note: mapping end points to the first address of next range*/
-		u64 mapping_end = mapped_va + p_map_mem->mapping_length;
+		if (flush_start >= flush_end)
+			continue;
 
-		int start_on_page = p->virt_addr_start >= mapped_va
-				    && p->virt_addr_start < mapping_end;
-		int start_before_page = p->virt_addr_start < mapped_va;
-		int end_on_page = p->virt_addr_end >= mapped_va
-				  && p->virt_addr_end < mapping_end;
-		int end_after_page = p->virt_addr_end >= mapping_end;
-		u64 virt_start = p->virt_addr_start;
-
-		/* Kernel expects end to point to the first address of next
-		 * range
-		 */
-		u64 virt_end = p->virt_addr_end + 1;
-
-		if ((start_on_page || start_before_page)
-			&& (end_on_page || end_after_page)) {
-
-			if (!start_on_page)
-				virt_start = p_map_mem->virtual_addr;
-			if (!end_on_page)
-				virt_end = mapping_end;
-			clear_entry_cache_mappings(client,
-						   p_map_mem,
-						   virt_start,
-						   virt_end);
-		}
+		clear_contiguous_cache(client, flush_start, flush_end - flush_start);
+		err = OK;
 	}
+
 	mutex_unlock(&client->mtx);
 
+	if (err)
+		cl_error("va range 0x%lx..0x%lx not flushed\n",
+			 (unsigned long)p->virt_addr_start,
+			 (unsigned long)p->virt_addr_end);
+
 	LOG_EXT();
-	return OK;
+	return err;
 }
 #endif /* CONFIG_ARM64 */

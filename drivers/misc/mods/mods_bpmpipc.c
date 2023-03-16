@@ -26,9 +26,8 @@
 
 #include <soc/tegra/ivc.h>
 #include <soc/tegra/bpmp.h>
-#include <linux/version.h>
 
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION)
 #include <linux/iosys-map.h>
 #endif
 
@@ -86,7 +85,7 @@ static int bpmp_ipc_send(struct mods_client *client,
 			 const void *data,
 			 size_t sz)
 {
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION)
 	int err;
 	struct iosys_map ob;
 
@@ -119,7 +118,7 @@ static int bpmp_ipc_recv(struct mods_client *client,
 			 u32 timeout_ms)
 {
 	int err;
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION)
 	struct iosys_map ib;
 #else
 	const void *frame;
@@ -128,7 +127,7 @@ static int bpmp_ipc_recv(struct mods_client *client,
 
 	end = ktime_add_ms(ktime_get(), timeout_ms);
 
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+#if (KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION)
 	do {
 		err = tegra_ivc_read_get_next_frame(ivc, &ib);
 		if (!err)

@@ -3,9 +3,6 @@
 ccflags-y += -I$(srctree.nvidia)/include
 ccflags-y += -DMODS_HAS_TEGRA
 
-LINUX_VERSION := $(shell expr $(VERSION) \* 256 + $(PATCHLEVEL))
-LINUX_VERSION_6_2 := $(shell expr 6 \* 256 + 2)
-
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
 CONFIG_MODS := m
 endif

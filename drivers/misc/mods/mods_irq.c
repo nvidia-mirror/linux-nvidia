@@ -50,11 +50,13 @@
 /*********************
  * PRIVATE FUNCTIONS *
  *********************/
-static struct mods_priv mp;
+
+/* Mutex for guarding interrupt logic and PCI device enablement */
+static struct mutex irq_mtx;
 
 struct mutex *mods_get_irq_mutex(void)
 {
-	return &mp.mtx;
+	return &irq_mtx;
 }
 
 #ifdef CONFIG_PCI
@@ -65,7 +67,7 @@ int mods_enable_device(struct mods_client   *client,
 	int                  err   = OK;
 	struct en_dev_entry *dpriv = client->enabled_devices;
 
-	WARN_ON(!mutex_is_locked(&mp.mtx));
+	WARN_ON(!mutex_is_locked(&irq_mtx));
 
 	dpriv = pci_get_drvdata(dev);
 	if (dpriv) {
@@ -124,7 +126,7 @@ void mods_disable_device(struct mods_client *client,
 {
 	struct en_dev_entry *dpriv = pci_get_drvdata(dev);
 
-	WARN_ON(!mutex_is_locked(&mp.mtx));
+	WARN_ON(!mutex_is_locked(&irq_mtx));
 
 #ifdef MODS_HAS_SRIOV
 	if (dpriv && dpriv->num_vfs)
@@ -259,14 +261,9 @@ static const char *mods_irq_type_name(u8 irq_type)
 }
 #endif
 
-static struct mods_client *client_from_id(u8 client_id)
-{
-	return &mp.clients[client_id - 1];
-}
-
 static void wake_up_client(struct dev_irq_map *t)
 {
-	struct mods_client *client = client_from_id(t->client_id);
+	struct mods_client *client = mods_client_from_id(t->client_id);
 
 	if (client)
 		wake_up_interruptible(&client->interrupt_event);
@@ -347,7 +344,7 @@ static irqreturn_t mods_irq_handle(int irq, void *data)
 		unsigned long       flags    = 0;
 		int                 recorded = false;
 		unsigned int        irq_time = get_cur_time();
-		struct mods_client *client   = client_from_id(t->client_id);
+		struct mods_client *client   = mods_client_from_id(t->client_id);
 
 		spin_lock_irqsave(&client->irq_lock, flags);
 
@@ -385,12 +382,12 @@ static int mods_lookup_cpu_irq(u8 client_id, unsigned int irq)
 		struct dev_irq_map *t    = NULL;
 		struct dev_irq_map *next = NULL;
 
-		if (!test_bit(client_idx - 1, &mp.client_flags))
+		if (!mods_is_client_enabled(client_idx))
 			continue;
 
 		list_for_each_entry_safe(t,
 					 next,
-					 &client_from_id(client_idx)->irq_list,
+					 &mods_client_from_id(client_idx)->irq_list,
 					 list) {
 
 			if (t->apic_irq == irq) {
@@ -657,82 +654,24 @@ void mods_init_irq(void)
 {
 	LOG_ENT();
 
-	memset(&mp, 0, sizeof(mp));
+	mutex_init(&irq_mtx);
 
-	mutex_init(&mp.mtx);
-
-	LOG_EXT();
-}
-
-void mods_cleanup_irq(void)
-{
-	int i;
-
-	LOG_ENT();
-	for (i = 0; i < MODS_MAX_CLIENTS; i++) {
-		if (mp.client_flags & (1U << i))
-			mods_free_client(i + 1);
-	}
 	LOG_EXT();
 }
 
 POLL_TYPE mods_irq_event_check(u8 client_id)
 {
-	struct irq_q_info *q = &client_from_id(client_id)->irq_queue;
-	unsigned int pos = (1U << (client_id - 1));
+	struct irq_q_info *q;
 
-	if (!(mp.client_flags & pos))
-		return POLLERR; /* irq has quit */
+	if (!mods_is_client_enabled(client_id))
+		return POLLERR; /* client has quit */
+
+	q = &mods_client_from_id(client_id)->irq_queue;
 
 	if (q->head != q->tail)
 		return POLLIN; /* irq generated */
 
 	return 0;
-}
-
-struct mods_client *mods_alloc_client(void)
-{
-	unsigned int idx;
-	unsigned int max_clients = 1;
-
-	LOG_ENT();
-
-	if (mods_get_multi_instance() ||
-	    (mods_get_access_token() != MODS_ACCESS_TOKEN_NONE))
-		max_clients = MODS_MAX_CLIENTS;
-
-	for (idx = 1; idx <= max_clients; idx++) {
-		if (!test_and_set_bit(idx - 1U, &mp.client_flags)) {
-			struct mods_client *client = client_from_id(idx);
-
-			memset(client, 0, sizeof(*client));
-			client->client_id    = idx;
-			client->access_token = MODS_ACCESS_TOKEN_NONE;
-			atomic_set(&client->last_bad_dbdf, -1);
-
-			cl_debug(DEBUG_IOCTL,
-				 "open client (bit mask 0x%lx)\n",
-				 mp.client_flags);
-
-			mutex_init(&client->mtx);
-			spin_lock_init(&client->irq_lock);
-			init_waitqueue_head(&client->interrupt_event);
-			INIT_LIST_HEAD(&client->irq_list);
-			INIT_LIST_HEAD(&client->mem_alloc_list);
-			INIT_LIST_HEAD(&client->mem_map_list);
-			INIT_LIST_HEAD(&client->free_mem_list);
-#if defined(CONFIG_PPC64)
-			INIT_LIST_HEAD(&client->ppc_tce_bypass_list);
-			INIT_LIST_HEAD(&client->nvlink_sysmem_trained_list);
-#endif
-
-			LOG_EXT();
-			return client;
-		}
-	}
-
-	LOG_EXT();
-	return NULL;
 }
 
 static int mods_free_irqs(struct mods_client *client,
@@ -746,7 +685,7 @@ static int mods_free_irqs(struct mods_client *client,
 
 	LOG_ENT();
 
-	if (unlikely(mutex_lock_interruptible(&mp.mtx))) {
+	if (unlikely(mutex_lock_interruptible(&irq_mtx))) {
 		LOG_EXT();
 		return -EINTR;
 	}
@@ -754,7 +693,7 @@ static int mods_free_irqs(struct mods_client *client,
 	dpriv = pci_get_drvdata(dev);
 
 	if (!dpriv) {
-		mutex_unlock(&mp.mtx);
+		mutex_unlock(&irq_mtx);
 		LOG_EXT();
 		return OK;
 	}
@@ -767,7 +706,7 @@ static int mods_free_irqs(struct mods_client *client,
 			PCI_SLOT(dev->devfn),
 			PCI_FUNC(dev->devfn),
 			dpriv->client_id);
-		mutex_unlock(&mp.mtx);
+		mutex_unlock(&irq_mtx);
 		LOG_EXT();
 		return -EINVAL;
 	}
@@ -823,7 +762,7 @@ static int mods_free_irqs(struct mods_client *client,
 	cl_debug(DEBUG_ISR_DETAILED, "irqs freed\n");
 #endif
 
-	mutex_unlock(&mp.mtx);
+	mutex_unlock(&irq_mtx);
 	LOG_EXT();
 	return 0;
 }
@@ -840,21 +779,6 @@ void mods_free_client_interrupts(struct mods_client *client)
 		dpriv = dpriv->next;
 	}
 
-	LOG_EXT();
-}
-
-void mods_free_client(u8 client_id)
-{
-	struct mods_client *client = client_from_id(client_id);
-
-	LOG_ENT();
-
-	memset(client, 0, sizeof(*client));
-
-	/* Indicate the client_id is free */
-	clear_bit((unsigned int)client_id - 1U, &mp.client_flags);
-
-	cl_debug(DEBUG_IOCTL, "closed client\n");
 	LOG_EXT();
 }
 
@@ -1072,7 +996,7 @@ static int mods_register_pci_irq(struct mods_client         *client,
 		return err;
 	}
 
-	if (unlikely(mutex_lock_interruptible(&mp.mtx))) {
+	if (unlikely(mutex_lock_interruptible(&irq_mtx))) {
 		pci_dev_put(dev);
 		LOG_EXT();
 		return -EINTR;
@@ -1088,7 +1012,7 @@ static int mods_register_pci_irq(struct mods_client         *client,
 				p->dev.device,
 				p->dev.function,
 				dpriv->client_id);
-			mutex_unlock(&mp.mtx);
+			mutex_unlock(&irq_mtx);
 			pci_dev_put(dev);
 			LOG_EXT();
 			return -EBUSY;
@@ -1100,7 +1024,7 @@ static int mods_register_pci_irq(struct mods_client         *client,
 				p->dev.bus,
 				p->dev.device,
 				p->dev.function);
-			mutex_unlock(&mp.mtx);
+			mutex_unlock(&irq_mtx);
 			pci_dev_put(dev);
 			LOG_EXT();
 			return -EINVAL;
@@ -1112,7 +1036,7 @@ static int mods_register_pci_irq(struct mods_client         *client,
 	if (err) {
 		cl_error("could not allocate irqs for irq_type %d\n",
 			 irq_type);
-		mutex_unlock(&mp.mtx);
+		mutex_unlock(&irq_mtx);
 		pci_dev_put(dev);
 		LOG_EXT();
 		return err;
@@ -1137,7 +1061,7 @@ static int mods_register_pci_irq(struct mods_client         *client,
 		}
 	}
 
-	mutex_unlock(&mp.mtx);
+	mutex_unlock(&irq_mtx);
 	pci_dev_put(dev);
 	LOG_EXT();
 	return err;
@@ -1152,7 +1076,7 @@ static int mods_register_cpu_irq(struct mods_client         *client,
 
 	LOG_ENT();
 
-	if (unlikely(mutex_lock_interruptible(&mp.mtx))) {
+	if (unlikely(mutex_lock_interruptible(&irq_mtx))) {
 		LOG_EXT();
 		return -EINTR;
 	}
@@ -1160,7 +1084,7 @@ static int mods_register_cpu_irq(struct mods_client         *client,
 	/* Determine if the interrupt is already hooked */
 	if (mods_lookup_cpu_irq(0, irq) == IRQ_FOUND) {
 		cl_error("CPU IRQ 0x%x has already been registered\n", irq);
-		mutex_unlock(&mp.mtx);
+		mutex_unlock(&irq_mtx);
 		LOG_EXT();
 		return -EINVAL;
 	}
@@ -1168,7 +1092,7 @@ static int mods_register_cpu_irq(struct mods_client         *client,
 	/* Register interrupt */
 	err = add_irq_map(client, NULL, p, irq, 0);
 
-	mutex_unlock(&mp.mtx);
+	mutex_unlock(&irq_mtx);
 	LOG_EXT();
 	return err;
 }
@@ -1208,7 +1132,7 @@ static int mods_unregister_cpu_irq(struct mods_client *client,
 
 	irq = p->dev.bus;
 
-	if (unlikely(mutex_lock_interruptible(&mp.mtx))) {
+	if (unlikely(mutex_lock_interruptible(&irq_mtx))) {
 		LOG_EXT();
 		return -EINTR;
 	}
@@ -1216,7 +1140,7 @@ static int mods_unregister_cpu_irq(struct mods_client *client,
 	/* Determine if the interrupt is already hooked by this client */
 	if (mods_lookup_cpu_irq(client->client_id, irq) == IRQ_NOT_FOUND) {
 		cl_error("IRQ 0x%x not hooked, can't unhook\n", irq);
-		mutex_unlock(&mp.mtx);
+		mutex_unlock(&irq_mtx);
 		LOG_EXT();
 		return -EINVAL;
 	}
@@ -1226,7 +1150,7 @@ static int mods_unregister_cpu_irq(struct mods_client *client,
 		if ((irq == del->apic_irq) && (del->dev == NULL)) {
 			if (del->type != p->type) {
 				cl_error("wrong IRQ type passed\n");
-				mutex_unlock(&mp.mtx);
+				mutex_unlock(&irq_mtx);
 				LOG_EXT();
 				return -EINVAL;
 			}
@@ -1239,7 +1163,7 @@ static int mods_unregister_cpu_irq(struct mods_client *client,
 		}
 	}
 
-	mutex_unlock(&mp.mtx);
+	mutex_unlock(&irq_mtx);
 	LOG_EXT();
 	return OK;
 }

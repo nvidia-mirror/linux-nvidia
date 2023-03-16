@@ -29,7 +29,6 @@
 #include <linux/random.h>
 #include <linux/sched.h>
 #include <linux/uaccess.h>
-#include <linux/version.h>
 #ifdef MODS_HAS_CONSOLE_LOCK
 #   include <linux/console.h>
 #   include <linux/kd.h>
@@ -40,6 +39,10 @@
 #ifdef CONFIG_X86
 #   include <linux/screen_info.h>
 #   include <asm/msr.h>
+#endif
+
+#ifndef IS_BUILTIN
+#   define IS_BUILTIN(c) 0
 #endif
 
 /***********************************************************************
@@ -392,6 +395,81 @@ int mods_get_multi_instance(void)
 	return multi_instance > 0;
 }
 
+/*********************
+ * CLIENT MANAGEMENT *
+ *********************/
+static struct mods_priv mp;
+
+static struct mods_client *alloc_client(void)
+{
+	unsigned int idx;
+	unsigned int max_clients = 1;
+
+	LOG_ENT();
+
+	if (mods_get_multi_instance() ||
+	    (mods_get_access_token() != MODS_ACCESS_TOKEN_NONE))
+		max_clients = MODS_MAX_CLIENTS;
+
+	for (idx = 1; idx <= max_clients; idx++) {
+		if (!test_and_set_bit(idx - 1U, &mp.client_flags)) {
+			struct mods_client *client = mods_client_from_id(idx);
+
+			memset(client, 0, sizeof(*client));
+			client->client_id    = idx;
+			client->access_token = MODS_ACCESS_TOKEN_NONE;
+			atomic_set(&client->last_bad_dbdf, -1);
+
+			cl_debug(DEBUG_IOCTL,
+				 "open client (bit mask 0x%lx)\n",
+				 mp.client_flags);
+
+			mutex_init(&client->mtx);
+			spin_lock_init(&client->irq_lock);
+			init_waitqueue_head(&client->interrupt_event);
+			INIT_LIST_HEAD(&client->irq_list);
+			INIT_LIST_HEAD(&client->mem_alloc_list);
+			INIT_LIST_HEAD(&client->mem_map_list);
+			INIT_LIST_HEAD(&client->free_mem_list);
+#if defined(CONFIG_PPC64)
+			INIT_LIST_HEAD(&client->ppc_tce_bypass_list);
+			INIT_LIST_HEAD(&client->nvlink_sysmem_trained_list);
+#endif
+
+			LOG_EXT();
+			return client;
+		}
+	}
+
+	LOG_EXT();
+	return NULL;
+}
+
+static void free_client(u8 client_id)
+{
+	struct mods_client *client = mods_client_from_id(client_id);
+
+	LOG_ENT();
+
+	memset(client, 0, sizeof(*client));
+
+	/* Indicate the client_id is free */
+	clear_bit((unsigned int)client_id - 1U, &mp.client_flags);
+
+	cl_debug(DEBUG_IOCTL, "closed client\n");
+	LOG_EXT();
+}
+
+struct mods_client *mods_client_from_id(u8 client_id)
+{
+	return &mp.clients[client_id - 1];
+}
+
+int mods_is_client_enabled(u8 client_id)
+{
+	return test_bit(client_id - 1, &mp.client_flags);
+}
+
 u32 mods_get_access_token(void)
 {
 	return access_token;
@@ -404,7 +482,9 @@ static int validate_client(struct mods_client *client)
 		return false;
 	}
 
-	if (client->client_id < 1 || client->client_id > MODS_MAX_CLIENTS) {
+	if (client->client_id < 1 ||
+	    client->client_id > MODS_MAX_CLIENTS ||
+	    !mods_is_client_enabled(client->client_id)) {
 		cl_error("invalid client id\n");
 		return false;
 	}
@@ -445,6 +525,8 @@ static int __init mods_init_module(void)
 	int rc;
 
 	LOG_ENT();
+
+	memset(&mp, 0, sizeof(mp));
 
 	mods_init_irq();
 
@@ -488,12 +570,10 @@ static int __init mods_init_module(void)
 #endif
 #endif
 
-#if defined(CONFIG_ARM_FFA_TRANSPORT)
-#if (KERNEL_VERSION(6, 2, 0) > LINUX_VERSION_CODE)
+#if IS_BUILTIN(CONFIG_ARM_FFA_TRANSPORT)
 	rc = mods_ffa_abi_register();
 	if (rc < 0)
 		mods_warning_printk("error on mods_ffa_abi_register returned %d\n", rc);
-#endif
 #endif
 
 	mods_info_printk("*** WARNING: DIAGNOSTIC DRIVER LOADED ***\n");
@@ -510,13 +590,18 @@ static int __init mods_init_module(void)
 
 static void __exit mods_exit_module(void)
 {
+	int i;
+
 	LOG_ENT();
 
 	mods_exit_dmabuf();
 
 	mods_remove_debugfs();
 
-	mods_cleanup_irq();
+	for (i = 0; i < MODS_MAX_CLIENTS; i++) {
+		if (mp.client_flags & (1U << i))
+			free_client(i + 1);
+	}
 
 #if defined(MODS_HAS_TEGRA)
 #if defined(CONFIG_DMA_ENGINE)
@@ -536,12 +621,9 @@ static void __exit mods_exit_module(void)
 	mods_shutdown_clock_api();
 #endif
 
-#if defined(CONFIG_ARM_FFA_TRANSPORT)
-#if (KERNEL_VERSION(6, 2, 0) > LINUX_VERSION_CODE)
+#if IS_BUILTIN(CONFIG_ARM_FFA_TRANSPORT)
 	mods_ffa_abi_unregister();
 #endif
-#endif
-
 	mods_info_printk("driver unloaded\n");
 	LOG_EXT();
 }
@@ -615,6 +697,7 @@ static int register_mapping(struct mods_client   *client,
 			    struct MODS_MEM_INFO *p_mem_info,
 			    phys_addr_t           phys_addr,
 			    unsigned long         virtual_address,
+			    unsigned long         mapping_offs,
 			    unsigned long         mapping_length)
 {
 	struct SYS_MAP_MEMORY *p_map_mem;
@@ -630,6 +713,7 @@ static int register_mapping(struct mods_client   *client,
 
 	p_map_mem->phys_addr      = phys_addr;
 	p_map_mem->virtual_addr   = virtual_address;
+	p_map_mem->mapping_offs   = mapping_offs;
 	p_map_mem->mapping_length = mapping_length;
 	p_map_mem->p_mem_info     = p_mem_info;
 
@@ -697,9 +781,9 @@ static void unregister_all_mappings(struct mods_client *client)
 	LOG_EXT();
 }
 
-static pgprot_t mods_get_prot(struct mods_client *client,
-			      u8                  mem_type,
-			      pgprot_t            prot)
+static pgprot_t get_prot(struct mods_client *client,
+			 u8                  mem_type,
+			 pgprot_t            prot)
 {
 	switch (mem_type) {
 	case MODS_ALLOC_CACHED:
@@ -717,17 +801,33 @@ static pgprot_t mods_get_prot(struct mods_client *client,
 	}
 }
 
-static pgprot_t get_prot_for_range(struct mods_client *client,
-				   phys_addr_t         phys_addr,
-				   unsigned long       size,
-				   pgprot_t            prot)
+static int get_prot_for_range(struct mods_client *client,
+			      phys_addr_t         phys_addr,
+			      unsigned long       size,
+			      pgprot_t           *prot)
 {
-	if ((phys_addr == client->mem_type.phys_addr) &&
-		(size == client->mem_type.size)) {
+	const phys_addr_t req_end     = phys_addr + size;
+	const phys_addr_t range_begin = client->mem_type.phys_addr;
+	const phys_addr_t range_end   = range_begin + client->mem_type.size;
 
-		return mods_get_prot(client, client->mem_type.type, prot);
+	/* Check overlap with set memory type range */
+	if (phys_addr < range_end && req_end > range_begin) {
+
+		/* Check if requested range is completely inside */
+		if (likely(phys_addr >= range_begin && req_end <= range_end)) {
+			*prot = get_prot(client, client->mem_type.type, *prot);
+			return 0;
+		}
+
+		cl_error("mmap range [0x%llx, 0x%llx] does not match set memory type range [0x%llx, 0x%llx]\n",
+			 (unsigned long long)phys_addr,
+			 (unsigned long long)req_end,
+			 (unsigned long long)range_begin,
+			 (unsigned long long)range_end);
+		return -EINVAL;
 	}
-	return prot;
+
+	return 0;
 }
 
 const char *mods_get_prot_str(u8 mem_type)
@@ -751,13 +851,17 @@ static const char *get_prot_str_for_range(struct mods_client *client,
 					  phys_addr_t         phys_addr,
 					  unsigned long       size)
 {
-	if ((phys_addr == client->mem_type.phys_addr) &&
-		(size == client->mem_type.size)) {
+	const phys_addr_t req_end     = phys_addr + size;
+	const phys_addr_t range_begin = client->mem_type.phys_addr;
+	const phys_addr_t range_end   = range_begin + client->mem_type.size;
 
+	/* Check overlap with set memory type range */
+	if (phys_addr < range_end && req_end > range_begin)
 		return mods_get_prot_str(client->mem_type.type);
-	}
+
 	return "default";
 }
+
 /********************
  * PCI ERROR FUNCTIONS *
  ********************/
@@ -807,8 +911,9 @@ static void mods_krnl_vma_open(struct vm_area_struct *vma)
 
 	LOG_ENT();
 	mods_debug_printk(DEBUG_MEM_DETAILED,
-			  "open vma, virt 0x%lx, phys 0x%llx\n",
+			  "open vma, virt 0x%lx, size 0x%lx, phys 0x%llx\n",
 			  vma->vm_start,
+			  vma->vm_end - vma->vm_start,
 			  (unsigned long long)vma->vm_pgoff << PAGE_SHIFT);
 
 	priv = vma->vm_private_data;
@@ -829,15 +934,14 @@ static void mods_krnl_vma_close(struct vm_area_struct *vma)
 		struct mods_client    *client = priv->client;
 		struct SYS_MAP_MEMORY *p_map_mem;
 
-		if (unlikely(mutex_lock_interruptible(&client->mtx))) {
-			LOG_EXT();
-			return;
-		}
+		mutex_lock(&client->mtx);
 
 		/* we need to unregister the mapping */
 		p_map_mem = find_mapping(client, vma->vm_start);
 		if (p_map_mem)
 			unregister_mapping(client, p_map_mem);
+
+		mutex_unlock(&client->mtx);
 
 		mods_debug_printk(DEBUG_MEM_DETAILED,
 				  "closed vma, virt 0x%lx\n",
@@ -847,8 +951,6 @@ static void mods_krnl_vma_close(struct vm_area_struct *vma)
 
 		kfree(priv);
 		atomic_dec(&client->num_allocs);
-
-		mutex_unlock(&client->mtx);
 	}
 
 	LOG_EXT();
@@ -877,9 +979,12 @@ static int mods_krnl_vma_access(struct vm_area_struct *vma,
 	client = priv->client;
 
 	cl_debug(DEBUG_MEM_DETAILED,
-		 "access vma, virt 0x%lx, phys 0x%llx\n",
+		 "access vma [virt 0x%lx, size 0x%lx, phys 0x%llx] at virt 0x%lx, len 0x%x\n",
 		 vma->vm_start,
-		 (unsigned long long)vma->vm_pgoff << PAGE_SHIFT);
+		 vma->vm_end - vma->vm_start,
+		 (unsigned long long)vma->vm_pgoff << PAGE_SHIFT,
+		 addr,
+		 len);
 
 	if (unlikely(mutex_lock_interruptible(&client->mtx))) {
 		LOG_EXT();
@@ -891,12 +996,14 @@ static int mods_krnl_vma_access(struct vm_area_struct *vma,
 	if (unlikely(!p_map_mem || addr < p_map_mem->virtual_addr ||
 		     addr + len > p_map_mem->virtual_addr +
 				  p_map_mem->mapping_length)) {
+		cl_error("mapped range [virt 0x%lx, size 0x%x] does not match vma [virt 0x%lx, size 0x%lx]\n",
+			 addr, len, vma->vm_start, vma->vm_end - vma->vm_start);
 		mutex_unlock(&client->mtx);
 		LOG_EXT();
 		return -ENOMEM;
 	}
 
-	map_offs = addr - vma->vm_start;
+	map_offs = addr - vma->vm_start + p_map_mem->mapping_offs;
 
 	if (p_map_mem->p_mem_info) {
 		struct MODS_MEM_INFO *p_mem_info = p_map_mem->p_mem_info;
@@ -985,7 +1092,7 @@ static int mods_krnl_open(struct inode *ip, struct file *fp)
 
 	LOG_ENT();
 
-	client = mods_alloc_client();
+	client = alloc_client();
 	if (client == NULL) {
 		mods_error_printk("too many clients\n");
 		LOG_EXT();
@@ -1063,7 +1170,7 @@ static int mods_krnl_close(struct inode *ip, struct file *fp)
 		client->work_queue = NULL;
 	}
 
-	mods_free_client(client_id);
+	free_client(client_id);
 
 	pr_info("mods [%d]: driver closed\n", client_id);
 
@@ -1136,12 +1243,14 @@ static int mods_krnl_mmap(struct file *fp, struct vm_area_struct *vma)
 
 	mods_krnl_vma_open(vma);
 
-	if (unlikely(mutex_lock_interruptible(&client->mtx)))
-		err = -EINTR;
-	else {
+	err = mutex_lock_interruptible(&client->mtx);
+	if (likely(!err)) {
 		err = mods_krnl_map_inner(client, vma);
 		mutex_unlock(&client->mtx);
 	}
+
+	if (unlikely(err))
+		mods_krnl_vma_close(vma);
 
 	LOG_EXT();
 	return err;
@@ -1152,6 +1261,7 @@ static int map_system_mem(struct mods_client    *client,
 			  struct MODS_MEM_INFO  *p_mem_info)
 {
 	struct scatterlist *sg          = NULL;
+	const char         *cache_str   = mods_get_prot_str(p_mem_info->cache_type);
 	const phys_addr_t   req_pa = (phys_addr_t)vma->vm_pgoff << PAGE_SHIFT;
 	phys_addr_t         reg_pa      = 0;
 	const unsigned long vma_size    = vma->vm_end - vma->vm_start;
@@ -1161,9 +1271,9 @@ static int map_system_mem(struct mods_client    *client,
 	const u32           num_chunks  = get_num_chunks(p_mem_info);
 	u32                 map_chunks;
 	u32                 i           = 0;
-	const pgprot_t      prot        = mods_get_prot(client,
-							p_mem_info->cache_type,
-							vma->vm_page_prot);
+	const pgprot_t      prot        = get_prot(client,
+						   p_mem_info->cache_type,
+						   vma->vm_page_prot);
 
 	/* Find the beginning of the requested range */
 	for_each_sg(p_mem_info->sg, sg, num_chunks, i) {
@@ -1200,20 +1310,22 @@ static int map_system_mem(struct mods_client    *client,
 		if (i == 0) {
 			const phys_addr_t aoffs = req_pa - chunk_pa;
 
-			map_pa   += aoffs;
-			map_size -= aoffs;
-			reg_pa   =  chunk_pa;
+			map_pa    += aoffs;
+			map_size  -= aoffs;
+			skip_size += aoffs;
+			reg_pa     = chunk_pa;
 		}
 
 		if (map_size > size_to_map)
 			map_size = (unsigned int)size_to_map;
 
 		cl_debug(DEBUG_MEM_DETAILED,
-			 "remap va 0x%lx pfn 0x%lx size 0x%x pages %u\n",
+			 "remap va 0x%lx pfn 0x%lx size 0x%x pages %u %s\n",
 			 map_va,
 			 (unsigned long)(map_pa >> PAGE_SHIFT),
 			 map_size,
-			 map_size >> PAGE_SHIFT);
+			 map_size >> PAGE_SHIFT,
+			 cache_str);
 
 		if (remap_pfn_range(vma,
 				    map_va,
@@ -1234,6 +1346,7 @@ static int map_system_mem(struct mods_client    *client,
 			 p_mem_info,
 			 reg_pa,
 			 vma->vm_start,
+			 skip_size,
 			 vma_size);
 
 	return OK;
@@ -1245,6 +1358,8 @@ static int map_device_mem(struct mods_client    *client,
 	/* device memory */
 	const phys_addr_t   req_pa   = (phys_addr_t)vma->vm_pgoff << PAGE_SHIFT;
 	const unsigned long vma_size = vma->vm_end - vma->vm_start;
+	pgprot_t            prot     = vma->vm_page_prot;
+	int                 err;
 
 	cl_debug(DEBUG_MEM,
 		 "map dev: phys 0x%llx, virt 0x%lx, size 0x%lx, %s\n",
@@ -1253,13 +1368,15 @@ static int map_device_mem(struct mods_client    *client,
 		 vma_size,
 		 get_prot_str_for_range(client, req_pa, vma_size));
 
-	if (io_remap_pfn_range(
-			vma,
-			vma->vm_start,
-			vma->vm_pgoff,
-			vma_size,
-			get_prot_for_range(client, req_pa, vma_size,
-					   vma->vm_page_prot))) {
+	err = get_prot_for_range(client, req_pa, vma_size, &prot);
+	if (unlikely(err))
+		return err;
+
+	if (unlikely(io_remap_pfn_range(vma,
+					vma->vm_start,
+					vma->vm_pgoff,
+					vma_size,
+					prot))) {
 		cl_error("failed to map device memory\n");
 		return -EAGAIN;
 	}
@@ -1268,6 +1385,7 @@ static int map_device_mem(struct mods_client    *client,
 			 NULL,
 			 req_pa,
 			 vma->vm_start,
+			 0,
 			 vma_size);
 
 	return OK;
@@ -2664,12 +2782,10 @@ static long mods_krnl_ioctl(struct file  *fp,
 
 #endif
 
-#if defined(CONFIG_ARM_FFA_TRANSPORT)
-#if (KERNEL_VERSION(6, 2, 0) > LINUX_VERSION_CODE)
+#if IS_BUILTIN(CONFIG_ARM_FFA_TRANSPORT)
 	case MODS_ESC_FFA_CMD:
 		MODS_IOCTL(MODS_ESC_FFA_CMD, esc_mods_arm_ffa_cmd, MODS_FFA_PARAMS);
 		break;
-#endif
 #endif
 
 	case MODS_ESC_ACQUIRE_ACCESS_TOKEN:
