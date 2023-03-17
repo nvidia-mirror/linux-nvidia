@@ -2635,6 +2635,7 @@ int tegra_hv_vse_safety_tsec_get_keyload_status(uint32_t node_id, uint32_t *err_
 		return -ENODEV;
 
 	se_dev = g_virtual_se_dev[g_crypto_to_ivc_map[node_id].se_engine];
+	pivck = g_crypto_to_ivc_map[node_id].ivck;
 
 	ivc_req_msg = devm_kzalloc(se_dev->dev, sizeof(*ivc_req_msg),
 					GFP_KERNEL);

@@ -384,7 +384,7 @@ struct tegra_nvvse_tsec_get_keyload_status {
 	/* NVVSE Error code  */
 	uint32_t err_code;
 };
-#define NVVSE_IOCTL_CMDID_TSEC_GET_KEYLOAD_STATUS _IOW(TEGRA_NVVSE_IOC_MAGIC, \
+#define NVVSE_IOCTL_CMDID_TSEC_GET_KEYLOAD_STATUS _IOWR(TEGRA_NVVSE_IOC_MAGIC, \
 						TEGRA_NVVSE_CMDID_TSEC_GET_KEYLOAD_STATUS, \
 						struct tegra_nvvse_tsec_get_keyload_status)
 
