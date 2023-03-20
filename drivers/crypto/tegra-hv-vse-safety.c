@@ -341,7 +341,7 @@ struct tegra_virtual_tsec_args {
 	/**
 	 * Keyslot index for keyslot containing TSEC key
 	 */
-	uint8_t keyslot[KEYSLOT_SIZE_BYTES];
+	uint32_t keyslot;
 
 	/**
 	 * Size of input buffer in bytes.
@@ -2138,7 +2138,7 @@ static int tegra_hv_vse_safety_tsec_sv_op(struct ahash_request *req)
 
 	ivc_tx->tsec.src_addr = src_buf_addr;
 	ivc_tx->tsec.src_buf_size = req->nbytes;
-	memcpy(ivc_tx->tsec.keyslot, cmac_ctx->aes_keyslot, KEYSLOT_SIZE_BYTES);
+	ivc_tx->tsec.keyslot = *((uint32_t *)cmac_ctx->aes_keyslot);
 
 	if (cmac_req_data->request_type == CMAC_SIGN) {
 		ivc_tx->cmd = TEGRA_VIRTUAL_SE_CMD_TSEC_SIGN;
