@@ -267,7 +267,7 @@ static const struct of_device_id tsec_of_match[] = {
 	{ .compatible = "nvidia,tegra234-tsec",
 		.data = (struct tsec_device_data *)&t23x_tsec_data },
 	{ .compatible = "nvidia,tegra239-tsec",
-		.data = (struct nvhost_device_data *)&t239_tsec_data },
+		.data = (struct tsec_device_data *)&t239_tsec_data },
 	{ },
 };
 
