@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -908,26 +908,152 @@ static const struct file_operations actmon_k_fops = {
 	.release	= single_release,
 };
 
+static int actmon_consec_upper_num_show(struct seq_file *s, void *unused)
+{
+	struct host1x_actmon *actmon = s->private;
+	long num = actmon_op().get_consec_upper_num(actmon);
+
+	seq_printf(s, "%ld\n", num);
+	return 0;
+}
+
+static int actmon_consec_upper_num_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, actmon_consec_upper_num_show, inode->i_private);
+}
+
+static ssize_t actmon_consec_upper_num_write(struct file *file,
+				const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct host1x_actmon *actmon = s->private;
+	char buffer[40];
+	unsigned int buf_size;
+	unsigned long num;
+
+	if (count >= sizeof(buffer))
+		nvhost_warn(NULL,
+			"%s: value too big! only first %ld characters will be written",
+			__func__, sizeof(buffer) - 1);
+
+	buf_size = min(count, (sizeof(buffer)-1));
+
+	if (copy_from_user(buffer, user_buf, buf_size)) {
+		nvhost_err(NULL,
+			   "failed to copy from user user_buf=%p", user_buf);
+		return -EFAULT;
+	}
+	buffer[buf_size] = '\0';
+
+	if (strlen(buffer) > buf_size) {
+		nvhost_err(NULL, "buffer too large (>%d)", buf_size);
+		return -EFAULT;
+	}
+
+	if (kstrtoul(buffer, 10, &num)) {
+		nvhost_err(NULL, "failed to convert %s to ul", buffer);
+		return -EINVAL;
+	}
+
+	actmon_op().set_consec_upper_num(actmon, num);
+
+	return buf_size;
+}
+
+static const struct file_operations actmon_consec_upper_num_fops = {
+	.open	= actmon_consec_upper_num_open,
+	.read	= seq_read,
+	.write	= actmon_consec_upper_num_write,
+	.llseek	= seq_lseek,
+	.release	= single_release,
+};
+
+static int actmon_consec_lower_num_show(struct seq_file *s, void *unused)
+{
+	struct host1x_actmon *actmon = s->private;
+	long num = actmon_op().get_consec_lower_num(actmon);
+
+	seq_printf(s, "%ld\n", num);
+	return 0;
+}
+
+static int actmon_consec_lower_num_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, actmon_consec_lower_num_show, inode->i_private);
+}
+
+static ssize_t actmon_consec_lower_num_write(struct file *file,
+				const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct host1x_actmon *actmon = s->private;
+	char buffer[40];
+	unsigned int buf_size;
+	unsigned long num;
+
+	if (count >= sizeof(buffer))
+		nvhost_warn(NULL,
+			"%s: value too big! only first %ld characters will be written",
+			__func__, sizeof(buffer) - 1);
+
+	buf_size = min(count, (sizeof(buffer)-1));
+
+	if (copy_from_user(buffer, user_buf, buf_size)) {
+		nvhost_err(NULL,
+			   "failed to copy from user user_buf=%p", user_buf);
+		return -EFAULT;
+	}
+	buffer[buf_size] = '\0';
+
+	if (strlen(buffer) > buf_size) {
+		nvhost_err(NULL, "buffer too large (>%d)", buf_size);
+		return -EFAULT;
+	}
+
+	if (kstrtoul(buffer, 10, &num)) {
+		nvhost_err(NULL, "failed to convert %s to ul", buffer);
+		return -EINVAL;
+	}
+
+	actmon_op().set_consec_lower_num(actmon, num);
+
+	return buf_size;
+}
+
+static const struct file_operations actmon_consec_lower_num_fops = {
+	.open	= actmon_consec_lower_num_open,
+	.read	= seq_read,
+	.write	= actmon_consec_lower_num_write,
+	.llseek	= seq_lseek,
+	.release	= single_release,
+};
+
 void nvhost_actmon_debug_init(struct host1x_actmon *actmon,
 				     struct dentry *de)
 {
 	if (!actmon)
 		return;
 
-	debugfs_create_file("actmon_k", S_IRUGO | S_IWUSR, de,
+	debugfs_create_file("actmon_k", 0644, de,
 			actmon, &actmon_k_fops);
-	debugfs_create_file("actmon_sample_period", S_IRUGO, de,
+	debugfs_create_file("actmon_sample_period", 0444, de,
 			actmon, &actmon_sample_period_fops);
-	debugfs_create_file("actmon_sample_period_norm", S_IRUGO | S_IWUSR, de,
+	debugfs_create_file("actmon_sample_period_norm", 0644, de,
 			actmon, &actmon_sample_period_norm_fops);
-	debugfs_create_file("actmon_avg_norm", S_IRUGO, de,
+	debugfs_create_file("actmon_avg_norm", 0444, de,
 			actmon, &actmon_avg_norm_fops);
-	debugfs_create_file("actmon_avg", S_IRUGO, de,
+	debugfs_create_file("actmon_avg", 0444, de,
 			actmon, &actmon_avg_fops);
-	debugfs_create_file("actmon_count", S_IRUGO, de,
+	debugfs_create_file("actmon_count", 0444, de,
 			actmon, &actmon_count_fops);
-	debugfs_create_file("actmon_count_norm", S_IRUGO, de,
+	debugfs_create_file("actmon_count_norm", 0444, de,
 			actmon, &actmon_count_norm_fops);
+	debugfs_create_file("actmon_consec_upper_num", 0644, de,
+			actmon, &actmon_consec_upper_num_fops);
+	debugfs_create_file("actmon_consec_lower_num", 0644, de,
+			actmon, &actmon_consec_lower_num_fops);
 	/* additional hardware specific debugfs nodes */
 	if (actmon_op().debug_init)
 		actmon_op().debug_init(actmon, de);

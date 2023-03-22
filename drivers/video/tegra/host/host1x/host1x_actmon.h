@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Actmon
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -35,7 +35,9 @@ enum type_e {
 
 enum wmark_type_e {
 	ACTMON_INTR_ABOVE_WMARK = 1,
-	ACTMON_INTR_BELOW_WMARK = 2
+	ACTMON_INTR_BELOW_WMARK = 2,
+	ACTMON_INTR_CONSEC_ABOVE_WMARK = 3,
+	ACTMON_INTR_CONSEC_BELOW_WMARK = 4
 };
 
 struct host1x_actmon {
@@ -54,6 +56,8 @@ struct host1x_actmon {
 
 	int k;
 	int divider;
+	int consec_upper_num;
+	int consec_lower_num;
 	struct platform_device *pdev;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -106,13 +106,37 @@ static inline u32 actmon_local_ctrl_k_val_f(u32 v)
 {
 	return (v & 0x7) << 10;
 }
+static inline u32 actmon_local_ctrl_consec_upper_num_f(u32 v)
+{
+	return (v & 0x7) << 26;
+}
+static inline u32 actmon_local_ctrl_consec_lower_num_f(u32 v)
+{
+	return (v & 0x7) << 21;
+}
 static inline u32 actmon_local_ctrl_k_val_m(void)
 {
 	return 0x7 << 10;
 }
+static inline u32 actmon_local_ctrl_consec_upper_num_m(void)
+{
+	return 0x7 << 26;
+}
+static inline u32 actmon_local_ctrl_consec_lower_num_m(void)
+{
+	return 0x7 << 21;
+}
 static inline u32 actmon_local_intr_en_r(void)
 {
 	return 0x84;
+}
+static inline u32 actmon_local_intr_en_consecutive_above_wmark_en_f(u32 v)
+{
+	return (v & 0x1) << 31;
+}
+static inline u32 actmon_local_intr_en_consecutive_below_wmark_en_f(u32 v)
+{
+	return (v & 0x1) << 30;
 }
 static inline u32 actmon_local_intr_en_avg_above_wmark_en_f(u32 v)
 {
@@ -126,6 +150,14 @@ static inline u32 actmon_local_intr_status_r(void)
 {
 	return 0x88;
 }
+static inline u32 actmon_local_intr_status_consec_above_wmark_v(u32 r)
+{
+	return (r >> 31) & 0x1;
+}
+static inline u32 actmon_local_intr_status_consec_below_wmark_v(u32 r)
+{
+	return (r >> 30) & 0x1;
+}
 static inline u32 actmon_local_intr_status_avg_above_wmark_v(u32 r)
 {
 	return (r >> 29) & 0x1;
@@ -133,6 +165,14 @@ static inline u32 actmon_local_intr_status_avg_above_wmark_v(u32 r)
 static inline u32 actmon_local_intr_status_avg_below_wmark_v(u32 r)
 {
 	return (r >> 28) & 0x1;
+}
+static inline u32 actmon_local_upper_wmark_r(void)
+{
+	return 0x8c;
+}
+static inline u32 actmon_local_lower_wmark_r(void)
+{
+	return 0x90;
 }
 static inline u32 actmon_local_avg_upper_wmark_r(void)
 {

@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Actmon support for T194
  *
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -111,20 +111,27 @@ static void host1x_actmon_process_isr(u32 hintstat, void *priv)
 		platform_get_drvdata(actmon->pdev);
 	long val;
 
-	/* first, disable the interrupt */
+	/* Disable the actmon interrupt related to the monitored engine */
 	nvhost_intr_disable_host_irq(&nvhost_get_host(host_pdev)->intr,
 				     engine_pdata->actmon_irq);
 
-	/* get the event type */
+	/* Clear global interrupt status register */
 	val = actmon_readl(actmon, actmon_glb_intr_status_r());
 	actmon_writel(actmon, val, actmon_glb_intr_status_r());
+
+	/* Clear local interrupt status register */
 	val = actmon_readl(actmon, actmon_local_intr_status_r());
 	actmon_writel(actmon, val, actmon_local_intr_status_r());
 
+	/* Determine watermark event type for the interrupt */
 	if (actmon_local_intr_status_avg_above_wmark_v(val))
 		host1x_actmon_event_fn(actmon, ACTMON_INTR_ABOVE_WMARK);
 	else if (actmon_local_intr_status_avg_below_wmark_v(val))
 		host1x_actmon_event_fn(actmon, ACTMON_INTR_BELOW_WMARK);
+	else if (actmon_local_intr_status_consec_above_wmark_v(val))
+		host1x_actmon_event_fn(actmon, ACTMON_INTR_CONSEC_ABOVE_WMARK);
+	else if (actmon_local_intr_status_consec_below_wmark_v(val))
+		host1x_actmon_event_fn(actmon, ACTMON_INTR_CONSEC_BELOW_WMARK);
 }
 
 /*
@@ -140,12 +147,16 @@ static void actmon_update_sample_period_safe(struct host1x_actmon *actmon)
 	long freq_mhz, clks_per_sample;
 	u32 val = actmon_readl(actmon, actmon_glb_ctrl_r());
 
+	/*
+	 * We use (MHz and usec) instead of (Hz and sec)
+	 * due to numerical limitations
+	 */
+	freq_mhz = clk_get_rate(actmon->clk) / 1000000;
+
 	/* Set SOURCE as TICK */
 	val |= actmon_glb_ctrl_source_f(2);
 
-	/* We use MHz and us instead of Hz and s due to numerical limitations */
-	freq_mhz = clk_get_rate(actmon->clk) / 1000000;
-
+	/* Determine the SAMPLE_TICK and divider based on the usec_per_sample */
 	if ((freq_mhz * actmon->usecs_per_sample) / 256 > 255) {
 		val |= actmon_glb_ctrl_sample_tick_f(1);
 		actmon->divider = 65536;
@@ -154,10 +165,12 @@ static void actmon_update_sample_period_safe(struct host1x_actmon *actmon)
 		actmon->divider = 256;
 	}
 
+	/* Number of clock cycles for each sample */
 	clks_per_sample = (freq_mhz * actmon->usecs_per_sample) /
 		actmon->divider;
 	actmon->clks_per_sample = clks_per_sample + 1;
 
+	/* Update the SAMPLE_PERIOD in the control register */
 	val &= ~actmon_glb_ctrl_sample_period_m();
 	val |= actmon_glb_ctrl_sample_period_f(clks_per_sample);
 	actmon_writel(actmon, val, actmon_glb_ctrl_r());
@@ -196,6 +209,62 @@ static unsigned long get_module_freq(struct host1x_actmon *actmon)
 	return freq;
 }
 
+static void host1x_actmon_reset(struct host1x_actmon *actmon)
+{
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_GLB_CTRL_0
+	 * Reset actmon sampling configuration.
+	 */
+	actmon_writel(actmon, 0, actmon_glb_ctrl_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_GLB_INT_EN_0
+	 * Disable interrupt for all unit actmon instances [0:7].
+	 * It acts as a filter for local interrupt signals.
+	 */
+	actmon_writel(actmon, 0, actmon_glb_intr_en_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_CTRL_0
+	 * Disable actmon for monitoring the engine activity
+	 */
+	actmon_writel(actmon, 0, actmon_local_ctrl_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_INTR_ENABLE_0
+	 * Disable local actmon interrupts. (e.g. consecutive and average)
+	 */
+	actmon_writel(actmon, 0, actmon_local_intr_en_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_INIT_AVG_0
+	 * Clear initial value of moving average acitvity counter
+	 */
+	actmon_writel(actmon, 0, actmon_local_init_avg_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_AVG_UPPER_WMARK_0
+	 * Reg: HOST1X_THOST_ACTMON_XXX_AVG_LOWER_WMARK_0
+	 * Clear average watermark thresholds
+	 */
+	actmon_writel(actmon, 0, actmon_local_avg_lower_wmark_r());
+	actmon_writel(actmon, 0, actmon_local_avg_upper_wmark_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_UPPER_WMARK_0
+	 * Reg: HOST1X_THOST_ACTMON_XXX_LOWER_WMARK_0
+	 * Clear consecutive watermark thresholds
+	 */
+	actmon_writel(actmon, 0, actmon_local_lower_wmark_r());
+	actmon_writel(actmon, 0, actmon_local_upper_wmark_r());
+
+	/*
+	 * Reg: HOST1X_THOST_ACTMON_XXX_INTR_STATUS_0
+	 * Clear local interrupt status register (e.g. consecutive and average)
+	 */
+	actmon_writel(actmon, 0xffffffff, actmon_local_intr_status_r());
+}
+
 static int host1x_actmon_init(struct host1x_actmon *actmon)
 {
 	struct platform_device *host_pdev = actmon->host->dev;
@@ -203,57 +272,56 @@ static int host1x_actmon_init(struct host1x_actmon *actmon)
 		platform_get_drvdata(host_pdev);
 	struct nvhost_device_data *engine_pdata =
 		platform_get_drvdata(actmon->pdev);
-
 	u32 val;
 
+	/* Avoid to perform actmon initialization repeatedly */
 	if (actmon->init == ACTMON_READY)
 		return 0;
 
+	/* Actmon default settings */
 	if (actmon->init == ACTMON_OFF) {
-		actmon->usecs_per_sample = 80;
+		actmon->consec_upper_num = 7;
+		actmon->consec_lower_num = 7;
+		actmon->usecs_per_sample = 1500;
 		actmon->k = 4;
 	}
 
+	/* Check the existence of actmon reference clock */
 	actmon->clk = host_pdata->clk[1];
 	if (!actmon->clk)
 		return -ENODEV;
 
-	/* Clear average and control registers */
-	actmon_writel(actmon, 0, actmon_local_init_avg_r());
-	actmon_writel(actmon, 0, actmon_glb_ctrl_r());
-	actmon_writel(actmon, 0, actmon_glb_intr_en_r());
-	actmon_writel(actmon, 0, actmon_local_intr_en_r());
-	actmon_writel(actmon, 0, actmon_local_ctrl_r());
-	actmon_writel(actmon, 0, actmon_local_avg_lower_wmark_r());
-	actmon_writel(actmon, 0, actmon_local_avg_upper_wmark_r());
+	/* Reset actmon-related registers to default settings */
+	host1x_actmon_reset(actmon);
 
 	/* Write (normalised) sample period. */
 	actmon_update_sample_period_safe(actmon);
 
-	/* Clear interrupt status */
-	actmon_writel(actmon, 0xffffffff, actmon_glb_intr_status_r());
-	actmon_writel(actmon, 0xffffffff, actmon_local_intr_status_r());
-
+	/* Configure local actmon control register */
 	val = actmon_readl(actmon, actmon_local_ctrl_r());
-	val |= actmon_local_ctrl_enb_periodic_f(1);
-	val |= actmon_local_ctrl_k_val_f(actmon->k);
 	val |= actmon_local_ctrl_actmon_enable_f(1);
+	val |= actmon_local_ctrl_enb_periodic_f(1);
 	val |= actmon_local_ctrl_enb_cumulative_f(1);
+	val |= actmon_local_ctrl_k_val_f(actmon->k);
+	val |= actmon_local_ctrl_consec_upper_num_f(actmon->consec_upper_num);
+	val |= actmon_local_ctrl_consec_lower_num_f(actmon->consec_lower_num);
 	actmon_writel(actmon, val, actmon_local_ctrl_r());
 
-	/* Set COUNT_WEIGHT @actmon */
+	/* Configure COUNT_WEIGHT based on associated engine max freq */
 	actmon_writel(actmon, engine_pdata->actmon_weight_count,
 					actmon_local_count_weight_r());
 
-	/* Enable global interrupt */
+	/* Enable actmon global interrupt to */
 	if (engine_pdata->actmon_irq)
 		actmon_writel(actmon, 0x1, actmon_glb_intr_en_r());
 
+	/* Let host1x recognize the interrupt from this actmon instance */
 	nvhost_intr_enable_host_irq(&nvhost_get_host(host_pdev)->intr,
 				    engine_pdata->actmon_irq,
 				    host1x_actmon_process_isr,
 				    actmon);
 
+	/* Actmon is ready to serve */
 	actmon->init = ACTMON_READY;
 
 	host1x_actmon_dump_regs(actmon);
@@ -389,31 +457,50 @@ static int host1x_actmon_count_norm(struct host1x_actmon *actmon, u32 *avg)
 	return 0;
 }
 
-static int host1x_set_high_wmark(struct host1x_actmon *actmon, u32 val_scaled)
+static int host1x_set_high_wmark(struct host1x_actmon *actmon, u32 scale)
 {
-	u32 freq_khz = 0;
-	u32 dev_cycle_per_sample = 0;
-	u32 val = 0;
+	struct platform_device *pdev = actmon->host->dev;
+	u32 freq_khz, dev_cycle_per_sample, val, avg_wmark, consec_wmark;
+	int err;
 
+	/* Check whether actmon has been initialized or not */
 	if (actmon->init != ACTMON_READY)
 		return 0;
 
+	/* Power on the host1x first before writing to the actmon register */
+	err = nvhost_module_busy(actmon->host->dev);
+	if (err) {
+		nvhost_warn(&pdev->dev, "failed to power on host1x. update high watermark failed");
+		return err;
+	}
+
+	/* Determine number of clock cycles for each sampling in actmon */
 	freq_khz = get_module_freq(actmon) / 1000;
 	dev_cycle_per_sample = (actmon->usecs_per_sample * freq_khz) / 1000;
 
-	val = (val_scaled < 1000) ?
-		((val_scaled * dev_cycle_per_sample) / 1000) :
+	/* Determine average watermark threshold */
+	avg_wmark = (scale < 1000) ?
+		((scale * dev_cycle_per_sample) / 1000) :
 		dev_cycle_per_sample;
 
-	/* write new watermark */
-	actmon_writel(actmon, val, actmon_local_avg_upper_wmark_r());
+	/* Determine consecutive watermark threshold */
+	consec_wmark = (scale < 900) ?
+		(((scale + 100) * avg_wmark) / scale) :
+		avg_wmark;
 
-	/* enable or disable watermark depending on the values */
+	/* Program new watermark thresholds to the actmon register */
+	actmon_writel(actmon, avg_wmark, actmon_local_avg_upper_wmark_r());
+	actmon_writel(actmon, consec_wmark, actmon_local_upper_wmark_r());
+
+	/* Enable or disable watermark interrupt depending on the scale value */
 	val = actmon_readl(actmon, actmon_local_intr_en_r());
-	if (val_scaled < 1000)
+	if (scale < 1000) {
 		val |= actmon_local_intr_en_avg_above_wmark_en_f(1);
-	else
+		val |= actmon_local_intr_en_consecutive_above_wmark_en_f(1);
+	} else {
 		val &= ~actmon_local_intr_en_avg_above_wmark_en_f(1);
+		val &= ~actmon_local_intr_en_consecutive_above_wmark_en_f(1);
+	}
 	actmon_writel(actmon, val, actmon_local_intr_en_r());
 
 	host1x_actmon_dump_regs(actmon);
@@ -421,34 +508,54 @@ static int host1x_set_high_wmark(struct host1x_actmon *actmon, u32 val_scaled)
 	return 0;
 }
 
-static int host1x_set_low_wmark(struct host1x_actmon *actmon, u32 val_scaled)
+static int host1x_set_low_wmark(struct host1x_actmon *actmon, u32 scale)
 {
-	u32 freq_khz = 0;
-	u32 dev_cycle_per_sample = 0;
-	u32 val = 0;
+	struct platform_device *pdev = actmon->host->dev;
+	u32 freq_khz, dev_cycle_per_sample, val, avg_wmark, consec_wmark;
+	int err;
 
+	/* Check whether actmon has been initialized or not */
 	if (actmon->init != ACTMON_READY)
 		return 0;
 
+	/* Power on the host1x first before writing to the actmon register */
+	err = nvhost_module_busy(actmon->host->dev);
+	if (err) {
+		nvhost_warn(&pdev->dev, "failed to power on host1x. update low watermark failed");
+		return err;
+	}
+
+	/* Determine number of clock cycles for each sampling in actmon */
 	freq_khz = get_module_freq(actmon) / 1000;
 	dev_cycle_per_sample = (actmon->usecs_per_sample * freq_khz) / 1000;
 
-	val = (val_scaled < 1000) ?
-		((val_scaled * dev_cycle_per_sample) / 1000) :
+	/* Determine average watermark threshold */
+	avg_wmark = (scale < 1000) ?
+		((scale * dev_cycle_per_sample) / 1000) :
 		dev_cycle_per_sample;
 
-	/* write new watermark */
-	actmon_writel(actmon, val, actmon_local_avg_lower_wmark_r());
+	/* Determine consecutive watermark threshold */
+	consec_wmark = (scale > 100) ?
+		(((scale - 100) * avg_wmark) / scale) :
+		avg_wmark;
 
-	/* enable or disable watermark depending on the values */
+	/* Program new watermark thresholds to the actmon register */
+	actmon_writel(actmon, avg_wmark, actmon_local_avg_lower_wmark_r());
+	actmon_writel(actmon, consec_wmark, actmon_local_lower_wmark_r());
+
+	/* Enable or disable watermark interrupt depending on the scale value */
 	val = actmon_readl(actmon, actmon_local_intr_en_r());
-	if (val_scaled)
+	if (scale) {
 		val |= actmon_local_intr_en_avg_below_wmark_en_f(1);
-	else
+		val |= actmon_local_intr_en_consecutive_below_wmark_en_f(1);
+	} else {
 		val &= ~actmon_local_intr_en_avg_below_wmark_en_f(1);
+		val &= ~actmon_local_intr_en_consecutive_below_wmark_en_f(1);
+	}
 	actmon_writel(actmon, val, actmon_local_intr_en_r());
 
 	host1x_actmon_dump_regs(actmon);
+
 	return 0;
 }
 
@@ -488,7 +595,7 @@ static void host1x_actmon_set_k(struct host1x_actmon *actmon, u32 k)
 
 	err = nvhost_module_busy(actmon->host->dev);
 	if (err) {
-		nvhost_warn(&pdev->dev, "failed to power on host1x. sample period update failed");
+		nvhost_warn(&pdev->dev, "failed to power on host1x. actmon k value update failed");
 		return;
 	}
 
@@ -502,6 +609,74 @@ static void host1x_actmon_set_k(struct host1x_actmon *actmon, u32 k)
 static u32 host1x_actmon_get_k(struct host1x_actmon *actmon)
 {
 	return actmon->k;
+}
+
+static void host1x_actmon_set_consec_upper_num(struct host1x_actmon *actmon, u32 num)
+{
+	struct platform_device *pdev = actmon->host->dev;
+	long val;
+	int err;
+
+	/* The consecutive number (N) should within 1 to 8 */
+	if (num < 1 || num > 8)
+		return;
+
+	/* Power on the host1x first before writing to the actmon register */
+	err = nvhost_module_busy(actmon->host->dev);
+	if (err) {
+		nvhost_warn(&pdev->dev, "failed to power on host1x. consec_upper_num update failed");
+		return;
+	}
+
+	/* Actmon will consider the number as N + 1 */
+	actmon->consec_upper_num = num-1;
+
+	/* Write the value to the register */
+	val = actmon_readl(actmon, actmon_local_ctrl_r());
+	val &= ~(actmon_local_ctrl_consec_upper_num_m());
+	val |= actmon_local_ctrl_consec_upper_num_f(actmon->consec_upper_num);
+	actmon_writel(actmon, val, actmon_local_ctrl_r());
+
+	nvhost_module_idle(actmon->host->dev);
+}
+
+static u32 host1x_actmon_get_consec_upper_num(struct host1x_actmon *actmon)
+{
+	return actmon->consec_upper_num+1;
+}
+
+static void host1x_actmon_set_consec_lower_num(struct host1x_actmon *actmon, u32 num)
+{
+	struct platform_device *pdev = actmon->host->dev;
+	long val;
+	int err;
+
+	/* The consecutive number (N) should within 1 to 8 */
+	if (num < 1 || num > 8)
+		return;
+
+	/* Power on the actmon first before writing to the register */
+	err = nvhost_module_busy(actmon->host->dev);
+	if (err) {
+		nvhost_warn(&pdev->dev, "failed to power on host1x. consec_lower_num update failed");
+		return;
+	}
+
+	/* Actmon will consider the number as N + 1 */
+	actmon->consec_lower_num = num-1;
+
+	/* Write the value to the register */
+	val = actmon_readl(actmon, actmon_local_ctrl_r());
+	val &= ~(actmon_local_ctrl_consec_lower_num_m());
+	val |= actmon_local_ctrl_consec_lower_num_f(actmon->consec_lower_num);
+	actmon_writel(actmon, val, actmon_local_ctrl_r());
+
+	nvhost_module_idle(actmon->host->dev);
+}
+
+static u32 host1x_actmon_get_consec_lower_num(struct host1x_actmon *actmon)
+{
+	return actmon->consec_lower_num+1;
 }
 
 static long host1x_actmon_get_sample_period(struct host1x_actmon *actmon)
@@ -583,6 +758,10 @@ static const struct nvhost_actmon_ops host1x_actmon_ops = {
 	.get_sample_period = host1x_actmon_get_sample_period,
 	.get_k = host1x_actmon_get_k,
 	.set_k = host1x_actmon_set_k,
+	.get_consec_upper_num = host1x_actmon_get_consec_upper_num,
+	.set_consec_upper_num = host1x_actmon_set_consec_upper_num,
+	.get_consec_lower_num = host1x_actmon_get_consec_lower_num,
+	.set_consec_lower_num = host1x_actmon_set_consec_lower_num,
 	.debug_init = t18x_actmon_debug_init,
 	.set_high_wmark = host1x_set_high_wmark,
 	.set_low_wmark = host1x_set_low_wmark,

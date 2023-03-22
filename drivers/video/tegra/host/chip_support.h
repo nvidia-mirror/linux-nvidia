@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Chip Support
  *
- * Copyright (c) 2011-2022, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2011-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -155,6 +155,10 @@ struct nvhost_actmon_ops {
 	long (*get_sample_period)(struct host1x_actmon *actmon);
 	void (*set_k)(struct host1x_actmon *actmon, u32 k);
 	u32 (*get_k)(struct host1x_actmon *actmon);
+	void (*set_consec_upper_num)(struct host1x_actmon *actmon, u32 num);
+	u32 (*get_consec_upper_num)(struct host1x_actmon *actmon);
+	void (*set_consec_lower_num)(struct host1x_actmon *actmon, u32 num);
+	u32 (*get_consec_lower_num)(struct host1x_actmon *actmon);
 	void (*debug_init)(struct host1x_actmon *actmon, struct dentry *de);
 	int (*set_high_wmark)(struct host1x_actmon *actmon, u32 val);
 	int (*set_low_wmark)(struct host1x_actmon *actmon, u32 val);
