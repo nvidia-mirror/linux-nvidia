@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License version 2
@@ -261,7 +261,7 @@ static const struct tegra_gte_ev_mapped tegra234_aon_gpio_map[] = {
 	[27] = {27, 2, NV_AON_GTE_SLICE2_IRQ_GPIO_27},
 	[28] = {26, 2, NV_AON_GTE_SLICE2_IRQ_GPIO_28},
 	[29] = {25, 2, NV_AON_GTE_SLICE2_IRQ_GPIO_29},
-	[30] = {24, 2, NV_AON_GTE_SLICE1_IRQ_GPIO_30},
+	[30] = {24, 2, NV_AON_GTE_SLICE2_IRQ_GPIO_30},
 	[31] = {23, 2, NV_AON_GTE_SLICE2_IRQ_GPIO_31},
 };
 
