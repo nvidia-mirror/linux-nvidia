@@ -3,7 +3,7 @@
  *
  * structure declarations for nvmem and nvmap user-space ioctls
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -103,6 +103,7 @@ struct nvmap_alloc_handle {
 	__u32 heap_mask;	/* heaps to allocate from */
 	__u32 flags;		/* wb/wc/uc/iwb etc. */
 	__u32 align;		/* min alignment necessary */
+	__s32 numa_nid;		/* NUMA node id */
 };
 
 struct nvmap_alloc_ivm_handle {

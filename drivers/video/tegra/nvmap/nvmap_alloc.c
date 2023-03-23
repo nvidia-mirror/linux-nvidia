@@ -71,13 +71,16 @@ void nvmap_altfree(void *ptr, size_t len)
 		kfree(ptr);
 }
 
-static struct page *nvmap_alloc_pages_exact(gfp_t gfp, size_t size)
+static struct page *nvmap_alloc_pages_exact(gfp_t gfp, size_t size, bool use_numa, int numa_id)
 {
 	struct page *page, *p, *e;
 	unsigned int order;
 
 	order = get_order(size);
-	page = alloc_pages(gfp, order);
+	if (!use_numa)
+		page = alloc_pages(gfp, order);
+	else
+		page = alloc_pages_node(numa_id, gfp, order);
 
 	if (!page)
 		return NULL;
@@ -243,11 +246,12 @@ static struct color_list *init_color_list(struct nvmap_alloc_state *state,
 
 #ifdef NVMAP_CONFIG_PAGE_POOLS
 	/* Allocated page from nvmap page pool if possible */
-	page_index = nvmap_page_pool_alloc_lots(&nvmap_dev->pool, list->pages, nr_pages);
+	page_index = nvmap_page_pool_alloc_lots(&nvmap_dev->pool, list->pages, nr_pages,
+				false, 0);
 #endif
 	/* Fall back to general page allocator */
 	for (i = page_index; i < nr_pages; i++) {
-		list->pages[i] = nvmap_alloc_pages_exact(gfp, PAGE_SIZE);
+		list->pages[i] = nvmap_alloc_pages_exact(gfp, PAGE_SIZE, false, 0);
 		if (!list->pages[i])
 			goto fail;
 	}
@@ -519,7 +523,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 
 	if (contiguous) {
 		struct page *page;
-		page = nvmap_alloc_pages_exact(gfp, size);
+		page = nvmap_alloc_pages_exact(gfp, size, true, h->numa_id);
 		if (!page)
 			goto fail;
 
@@ -531,7 +535,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 #ifdef NVMAP_CONFIG_PAGE_POOLS
 		/* Get as many big pages from the pool as possible. */
 		page_index = nvmap_page_pool_alloc_lots_bp(&nvmap_dev->pool, pages,
-								 nr_page);
+							nr_page, true, h->numa_id);
 		pages_per_big_pg = nvmap_dev->pool.pages_per_big_pg;
 #endif
 		/* Try to allocate big pages from page allocator */
@@ -547,7 +551,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 			gfp_t gfp_no_reclaim = (gfp | __GFP_NOMEMALLOC) & ~__GFP_RECLAIM;
 
 			page = nvmap_alloc_pages_exact(gfp_no_reclaim,
-					pages_per_big_pg << PAGE_SHIFT);
+					pages_per_big_pg << PAGE_SHIFT, true, h->numa_id);
 			if (!page)
 				break;
 
@@ -562,17 +566,21 @@ static int handle_page_alloc(struct nvmap_client *client,
 			/* Get as many pages from the pool as possible. */
 			page_index += nvmap_page_pool_alloc_lots(
 				      &nvmap_dev->pool, &pages[page_index],
-				      nr_page - page_index);
+				      nr_page - page_index, true, h->numa_id);
 #endif
 			allocated = page_index;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
-			if (page_index < nr_page)
-				allocated = __alloc_pages_bulk(gfp, numa_mem_id(), NULL,
+			if (page_index < nr_page) {
+				int nid = h->numa_id == NUMA_NO_NODE ? numa_mem_id() : h->numa_id;
+
+				allocated = __alloc_pages_bulk(gfp, nid, NULL,
 						nr_page, NULL, pages);
+			}
 #endif
 			for (i = allocated; i < nr_page; i++) {
-				pages[i] = nvmap_alloc_pages_exact(gfp,
-								   PAGE_SIZE);
+				pages[i] = nvmap_alloc_pages_exact(gfp, PAGE_SIZE,
+								   true, h->numa_id);
+
 				if (!pages[i])
 					goto fail;
 			}

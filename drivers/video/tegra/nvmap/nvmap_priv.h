@@ -278,6 +278,7 @@ struct nvmap_handle {
 	 * waitq to wait on RO dmabuf release completion, if release is already in progress.
 	 */
 	wait_queue_head_t waitq;
+	int numa_id;
 };
 
 struct nvmap_handle_info {
@@ -345,10 +346,10 @@ int nvmap_page_pool_init(struct nvmap_device *dev);
 int nvmap_page_pool_fini(struct nvmap_device *dev);
 struct page *nvmap_page_pool_alloc(struct nvmap_page_pool *pool);
 int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
-					struct page **pages, u32 nr);
+		struct page **pages, u32 nr, bool use_numa, int numa_id);
 #ifdef CONFIG_ARM64_4K_PAGES
 int nvmap_page_pool_alloc_lots_bp(struct nvmap_page_pool *pool,
-					struct page **pages, u32 nr);
+		struct page **pages, u32 nr, bool use_numa, int numa_id);
 #endif /* CONFIG_ARM64_4K_PAGES */
 u32 nvmap_page_pool_fill_lots(struct nvmap_page_pool *pool,
 				       struct page **pages, u32 nr);

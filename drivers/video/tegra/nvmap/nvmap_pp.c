@@ -3,7 +3,7 @@
  *
  * Manage page pools to speed up page allocation.
  *
- * Copyright (c) 2009-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -63,56 +63,86 @@ static inline void __pp_dbg_var_add(u64 *dbg_var, u32 nr)
 static int __nvmap_page_pool_fill_lots_locked(struct nvmap_page_pool *pool,
 				       struct page **pages, u32 nr);
 
-static inline struct page *get_zero_list_page(struct nvmap_page_pool *pool)
+static inline struct page *get_zero_list_page(struct nvmap_page_pool *pool, bool use_numa,
+					int numa_id)
 {
-	struct page *page;
+	struct page *page, *tmp;
+	int nid = numa_id == NUMA_NO_NODE ? numa_mem_id() : numa_id;
 
 	trace_get_zero_list_page(pool->to_zero);
 
 	if (list_empty(&pool->zero_list))
 		return NULL;
 
-	page = list_first_entry(&pool->zero_list, struct page, lru);
+	if (!use_numa) {
+		page = list_first_entry(&pool->zero_list, struct page, lru);
+		goto exit;
+	} else {
+		list_for_each_entry_safe(page, tmp, &pool->zero_list, lru)
+			if (page_to_nid(page) == nid)
+				goto exit;
+	}
+	return NULL;
+
+exit:
 	list_del(&page->lru);
-
 	pool->to_zero--;
-
 	return page;
 }
 
-static inline struct page *get_page_list_page(struct nvmap_page_pool *pool)
+static inline struct page *get_page_list_page(struct nvmap_page_pool *pool, bool use_numa,
+					int numa_id)
 {
-	struct page *page;
+	struct page *page, *tmp;
+	int nid = numa_id == NUMA_NO_NODE ? numa_mem_id() : numa_id;
 
 	trace_get_page_list_page(pool->count);
 
 	if (list_empty(&pool->page_list))
 		return NULL;
 
-	page = list_first_entry(&pool->page_list, struct page, lru);
+	if (!use_numa) {
+		page = list_first_entry(&pool->page_list, struct page, lru);
+		goto exit;
+	} else {
+		list_for_each_entry_safe(page, tmp, &pool->page_list, lru)
+			if (page_to_nid(page) == nid)
+				goto exit;
+	}
+	return NULL;
+
+exit:
 	list_del(&page->lru);
-
 	pool->count--;
-
 	return page;
 }
 
 #ifdef CONFIG_ARM64_4K_PAGES
-static inline struct page *get_page_list_page_bp(struct nvmap_page_pool *pool)
+static inline struct page *get_page_list_page_bp(struct nvmap_page_pool *pool, bool use_numa,
+					int numa_id)
 {
-	struct page *page;
+	struct page *page, *tmp;
+	int nid = numa_id == NUMA_NO_NODE ? numa_mem_id() : numa_id;
 
 	trace_get_page_list_page_bp(pool->big_page_count);
 
 	if (list_empty(&pool->page_list_bp))
 		return NULL;
 
-	page = list_first_entry(&pool->page_list_bp, struct page, lru);
-	list_del(&page->lru);
+	if (!use_numa) {
+		page = list_first_entry(&pool->page_list_bp, struct page, lru);
+		goto exit;
+	} else {
+		list_for_each_entry_safe(page, tmp, &pool->page_list_bp, lru)
+			if (page_to_nid(page) == nid)
+				goto exit;
+	}
+	return NULL;
 
+exit:
+	list_del(&page->lru);
 	pool->count -= pool->pages_per_big_pg;
 	pool->big_page_count -= pool->pages_per_big_pg;
-
 	return page;
 }
 #endif /* CONFIG_ARM64_4K_PAGES */
@@ -147,7 +177,7 @@ static void nvmap_pp_do_background_zero_pages(struct nvmap_page_pool *pool)
 
 	rt_mutex_lock(&pool->lock);
 	for (i = 0; i < PENDING_PAGES_SIZE; i++) {
-		page = get_zero_list_page(pool);
+		page = get_zero_list_page(pool, false, 0);
 		if (page == NULL)
 			break;
 		pending_zero_pages[i] = page;
@@ -234,14 +264,14 @@ static ulong nvmap_page_pool_free_pages_locked(struct nvmap_page_pool *pool,
 
 #ifdef CONFIG_ARM64_4K_PAGES
 		if (use_page_list_bp)
-			page = get_page_list_page_bp(pool);
+			page = get_page_list_page_bp(pool, false, 0);
 		else if (use_page_list)
 #else
 		if (use_page_list)
 #endif /* CONFIG_ARM64_4K_PAGES */
-			page = get_page_list_page(pool);
+			page = get_page_list_page(pool, false, 0);
 		else
-			page = get_zero_list_page(pool);
+			page = get_zero_list_page(pool, false, 0);
 
 		if (!page) {
 			if (!use_page_list) {
@@ -286,7 +316,8 @@ static ulong nvmap_page_pool_free_pages_locked(struct nvmap_page_pool *pool,
  * array in a linear fashion starting from index 0.
  */
 int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
-				struct page **pages, u32 nr)
+				struct page **pages, u32 nr,
+				bool use_numa, int numa_id)
 {
 	u32 ind = 0;
 	u32 non_zero_idx;
@@ -301,10 +332,10 @@ int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
 		struct page *page = NULL;
 
 		if (!non_zero_cnt)
-			page = get_page_list_page(pool);
+			page = get_page_list_page(pool, use_numa, numa_id);
 
 		if (!page) {
-			page = get_zero_list_page(pool);
+			page = get_zero_list_page(pool, use_numa, numa_id);
 			if (!page)
 				break;
 			if (!non_zero_cnt)
@@ -336,7 +367,8 @@ int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
 
 #ifdef CONFIG_ARM64_4K_PAGES
 int nvmap_page_pool_alloc_lots_bp(struct nvmap_page_pool *pool,
-				struct page **pages, u32 nr)
+				struct page **pages, u32 nr,
+				bool use_numa, int numa_id)
 {
 	u32 ind = 0, nr_pages = nr;
 	struct page *page;
@@ -350,7 +382,7 @@ int nvmap_page_pool_alloc_lots_bp(struct nvmap_page_pool *pool,
 	while (nr_pages - ind >= pool->pages_per_big_pg) {
 		int i;
 
-		page = get_page_list_page_bp(pool);
+		page = get_page_list_page_bp(pool, use_numa, numa_id);
 		if (!page)
 			break;
 

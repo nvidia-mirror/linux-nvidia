@@ -203,6 +203,11 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 	if (!op.handle)
 		return -EINVAL;
 
+	if (op.numa_nid > MAX_NUMNODES || (op.numa_nid != NUMA_NO_NODE && op.numa_nid < 0)) {
+		pr_err("numa id:%d is invalid\n", op.numa_nid);
+		return -EINVAL;
+	}
+
 	handle = nvmap_handle_get_from_id(client, op.handle);
 	if (IS_ERR_OR_NULL(handle))
 		return -EINVAL;
@@ -220,6 +225,7 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 		return -ENOMEM;
 	}
 
+	handle->numa_id = op.numa_nid;
 	/* user-space handles are aligned to page boundaries, to prevent
 	 * data leakage. */
 	op.align = max_t(size_t, op.align, page_sz);
