@@ -6821,17 +6821,6 @@ static int ether_resume(struct ether_priv_data *pdata)
 	schedule_delayed_work(&pdata->ether_hsi_work,
 			      msecs_to_jiffies(osi_core->hsi.err_time_threshold));
 #endif
-	/* Keep MACSEC also to Resume if MACSEC is supported on this platform */
-#ifdef MACSEC_SUPPORT
-	if ((osi_core->mac == OSI_MAC_HW_EQOS && osi_core->mac_ver == OSI_EQOS_MAC_5_30) ||
-	    (osi_core->mac == OSI_MAC_HW_MGBE && osi_core->mac_ver == OSI_MGBE_MAC_3_10)) {
-		if (pdata->macsec_pdata->next_supp_idx != OSI_DISABLE) {
-			ret = macsec_resume(pdata->macsec_pdata);
-			if (ret < 0)
-				dev_err(pdata->dev, "Failed to resume MACSEC ");
-		}
-	}
-#endif /* MACSEC_SUPPORT */
 
 	return 0;
 
@@ -6864,22 +6853,9 @@ static int ether_suspend_noirq(struct device *dev)
 	struct osi_dma_priv_data *osi_dma = pdata->osi_dma;
 	struct osi_ioctl ioctl_data = {};
 	unsigned int i = 0, chan = 0;
-	int ret;
 
 	if (!netif_running(ndev))
 		return 0;
-
-	/* Keep MACSEC to suspend if MACSEC is supported on this platform */
-#ifdef MACSEC_SUPPORT
-	if ((osi_core->mac == OSI_MAC_HW_EQOS && osi_core->mac_ver == OSI_EQOS_MAC_5_30) ||
-	    (osi_core->mac == OSI_MAC_HW_MGBE && osi_core->mac_ver == OSI_MGBE_MAC_3_10)) {
-		if (pdata->macsec_pdata->next_supp_idx != OSI_DISABLE) {
-			ret = macsec_suspend(pdata->macsec_pdata);
-			if (ret < 0)
-				dev_err(pdata->dev, "Failed to suspend macsec");
-		}
-	}
-#endif /* MACSEC_SUPPORT */
 
 	tasklet_kill(&pdata->lane_restart_task);
 

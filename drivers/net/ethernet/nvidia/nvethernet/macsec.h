@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -121,11 +121,9 @@ enum nv_macsec_attrs {
 	NV_MACSEC_ATTR_UNSPEC,
 	NV_MACSEC_ATTR_IFNAME,
 	NV_MACSEC_ATTR_TXSC_PORT,
-	NV_MACSEC_ATTR_PROT_FRAMES_EN,
 	NV_MACSEC_ATTR_REPLAY_PROT_EN,
 	NV_MACSEC_ATTR_REPLAY_WINDOW,
 	NV_MACSEC_ATTR_CIPHER_SUITE,
-	NV_MACSEC_ATTR_CTRL_PORT_EN,
 	NV_MACSEC_ATTR_SA_CONFIG, /* Nested SA config */
 	NV_MACSEC_ATTR_TZ_CONFIG, /* Nested TZ config */
 	NV_MACSEC_ATTR_TZ_KT_RESET, /* Nested TZ KT config */
@@ -183,10 +181,8 @@ static const struct nla_policy nv_macsec_genl_policy[NUM_NV_MACSEC_ATTR] = {
 enum nv_macsec_nl_commands {
 	NV_MACSEC_CMD_INIT,
 	NV_MACSEC_CMD_GET_TX_NEXT_PN,
-	NV_MACSEC_CMD_SET_PROT_FRAMES,
 	NV_MACSEC_CMD_SET_REPLAY_PROT,
 	NV_MACSEC_CMD_SET_CIPHER,
-	NV_MACSEC_CMD_SET_CONTROLLED_PORT,
 	NV_MACSEC_CMD_CREATE_TX_SA,
 	NV_MACSEC_CMD_EN_TX_SA,
 	NV_MACSEC_CMD_DIS_TX_SA,

@@ -240,11 +240,7 @@ static ssize_t macsec_enable_show(struct device *dev,
 	struct macsec_priv_data *macsec_pdata = pdata->macsec_pdata;
 	unsigned int enabled = macsec_pdata->enabled;
 	return scnprintf(buf, PAGE_SIZE, "%s\n",
-			 (enabled == (OSI_MACSEC_TX_EN | OSI_MACSEC_RX_EN))
-				      ? "txrx" :
-			 (enabled == OSI_MACSEC_TX_EN) ? "tx" :
-			 (enabled == OSI_MACSEC_RX_EN) ? "rx" :
-			 "None");
+			 (enabled == OSI_ENABLE) ? "txrx" : "None");
 }
 
 extern int macsec_open(struct macsec_priv_data *macsec_pdata,
