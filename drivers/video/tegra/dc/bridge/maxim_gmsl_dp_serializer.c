@@ -137,11 +137,75 @@
 #define MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_DET		0x4
 #define MAX_GMSL_DP_SER_INTERNAL_CRC_ERR_INJ		0x10
 
+/* XY Dual View Configuration Registers */
+#define MAX_GMSL_DP_SER_ASYM_14_X		0X04CE
+#define MAX_GMSL_DP_SER_ASYM_14_Y		0X05CE
+#define MAX_GMSL_DP_SER_ASYM_15_X		0X04CF
+#define MAX_GMSL_DP_SER_ASYM_15_Y		0X05CF
+#define MAX_GMSL_DP_SER_ASYM_17_X		0X04D1
+#define MAX_GMSL_DP_SER_ASYM_17_Y		0X05D1
+
+/* Pipe X Superframe Registers, each next PIPE register at 0x100 offset */
+#define MAX_GMSL_DP_SER_X_M_L			0X04C0
+#define MAX_GMSL_DP_SER_X_M_M			0X04C1
+#define MAX_GMSL_DP_SER_X_M_H			0X04C2
+#define MAX_GMSL_DP_SER_X_N_L			0X04C3
+#define MAX_GMSL_DP_SER_X_N_M			0X04C4
+#define MAX_GMSL_DP_SER_X_N_H			0X04C5
+#define MAX_GMSL_DP_SER_X_X_OFFSET_L		0X04C6
+#define MAX_GMSL_DP_SER_X_X_OFFSET_H		0X04C7
+#define MAX_GMSL_DP_SER_X_X_MAX_L		0X04C8
+#define MAX_GMSL_DP_SER_X_X_MAX_H		0X04C9
+#define MAX_GMSL_DP_SER_X_Y_MAX_L		0X04CA
+#define MAX_GMSL_DP_SER_X_Y_MAX_H		0X04CB
+#define MAX_GMSL_DP_SER_X_VS_DLY_L		0X04D8
+#define MAX_GMSL_DP_SER_X_VS_DLY_M		0X04D9
+#define MAX_GMSL_DP_SER_X_VS_DLY_H		0X04DA
+#define MAX_GMSL_DP_SER_X_VS_HIGH_L		0X04DB
+#define MAX_GMSL_DP_SER_X_VS_HIGH_M		0X04DC
+#define MAX_GMSL_DP_SER_X_VS_HIGH_H		0X04DD
+#define MAX_GMSL_DP_SER_X_VS_LOW_L		0X04DE
+#define MAX_GMSL_DP_SER_X_VS_LOW_M		0X04DF
+#define MAX_GMSL_DP_SER_X_VS_LOW_H		0X04E0
+#define MAX_GMSL_DP_SER_X_HS_DLY_L		0X04E1
+#define MAX_GMSL_DP_SER_X_HS_DLY_M		0X04E2
+#define MAX_GMSL_DP_SER_X_HS_DLY_H		0X04E3
+#define MAX_GMSL_DP_SER_X_HS_HIGH_L		0X04E4
+#define MAX_GMSL_DP_SER_X_HS_HIGH_H		0X04E5
+#define MAX_GMSL_DP_SER_X_HS_LOW_L		0X04E6
+#define MAX_GMSL_DP_SER_X_HS_LOW_H		0X04E7
+#define MAX_GMSL_DP_SER_X_HS_CNT_L		0X04E8
+#define MAX_GMSL_DP_SER_X_HS_CNT_H		0X04E9
+#define MAX_GMSL_DP_SER_X_HS_LLOW_L		0X04EA
+#define MAX_GMSL_DP_SER_X_HS_LLOW_M		0X04EB
+#define MAX_GMSL_DP_SER_X_HS_LLOW_H		0X04EC
+#define MAX_GMSL_DP_SER_X_DE_DLY_L		0X04ED
+#define MAX_GMSL_DP_SER_X_DE_DLY_M		0X04EE
+#define MAX_GMSL_DP_SER_X_DE_DLY_H		0X04EF
+#define MAX_GMSL_DP_SER_X_DE_HIGH_L		0X04F0
+#define MAX_GMSL_DP_SER_X_DE_HIGH_H		0X04F1
+#define MAX_GMSL_DP_SER_X_DE_LOW_L		0X04F2
+#define MAX_GMSL_DP_SER_X_DE_LOW_H		0X04F3
+#define MAX_GMSL_DP_SER_X_DE_CNT_L		0X04F4
+#define MAX_GMSL_DP_SER_X_DE_CNT_H		0X04F5
+#define MAX_GMSL_DP_SER_X_DE_LLOW_L		0X04F6
+#define MAX_GMSL_DP_SER_X_DE_LLOW_M		0X04F7
+#define MAX_GMSL_DP_SER_X_DE_LLOW_H		0X04F8
+#define MAX_GMSL_DP_SER_X_LUT_TEMPLATE		0x04CD
+
 #define MAX_GMSL_ARRAY_SIZE		4
 
 #define MAX_GMSL_LINKS			2
 #define MAX_GMSL_LINK_A			0
 #define MAX_GMSL_LINK_B			1
+
+#define MAX_GMSL_PIPE_X			0
+#define MAX_GMSL_PIPE_Y			1
+#define MAX_GMSL_PIPE_Z			2
+#define MAX_GMSL_PIPE_U			3
+
+#define MAX_GMSL_DP_SER_DUAL_VIEW_ZY_OFFSET	0x200
+#define MAX_GMSL_DP_SER_PIPE_SUBIMAGE_OFFSET	0x100
 
 struct max_gmsl_dp_ser_source {
 	struct fwnode_handle *fwnode;
@@ -150,6 +214,36 @@ struct max_gmsl_dp_ser_source {
 static const struct regmap_config max_gmsl_dp_ser_i2c_regmap = {
 	.reg_bits = 16,
 	.val_bits = 8,
+};
+
+struct max_gmsl_subimage_timing {
+	bool enable;
+	u32 superframe_group;
+	u32 x_start;
+	u32 h_active;
+	u32 h_front_porch;
+	u32 h_back_porch;
+	u32 h_sync_len;
+	u32 h_total;
+	u32 y_start;
+	u32 v_active;
+	u32 v_front_porch;
+	u32 v_back_porch;
+	u32 v_sync_len;
+	u32 v_total;
+};
+
+struct max_gmsl_subimage_attr {
+	u32 m, n, x_offset, x_max, y_max;
+	u32 vs_dly, vs_high, vs_low;
+	u32 hs_dly, hs_high, hs_low, hs_cnt, hs_llow;
+	u32 de_dly, de_high, de_low, de_cnt, de_llow;
+	u8 lut_template;
+};
+
+struct superframe_info {
+	struct max_gmsl_subimage_timing subimage_timing[MAX_GMSL_ARRAY_SIZE];
+	struct max_gmsl_subimage_attr subimage_attr[MAX_GMSL_ARRAY_SIZE];
 };
 
 struct max_gmsl_dp_ser_priv {
@@ -168,6 +262,7 @@ struct max_gmsl_dp_ser_priv {
 	bool link_is_enabled[MAX_GMSL_LINKS];
 	u32 enable_gmsl3[MAX_GMSL_LINKS];
 	u32 enable_gmsl_fec[MAX_GMSL_LINKS];
+	struct superframe_info superframe;
 };
 
 static int max_gmsl_dp_ser_read(struct max_gmsl_dp_ser_priv *priv, int reg)
@@ -191,6 +286,7 @@ static int max_gmsl_dp_ser_write(struct max_gmsl_dp_ser_priv *priv, u32 reg, u8 
 		dev_err(&priv->client->dev,
 			"%s: register 0x%02x write failed (%d)\n",
 			__func__, reg, ret);
+
 	return ret;
 }
 
@@ -417,6 +513,159 @@ static irqreturn_t max_gsml_dp_ser_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void max_gmsl_dp_ser_program_dual_view_for_superframe_group(struct device *dev, u32 pipe_id)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct max_gmsl_dp_ser_priv *priv = i2c_get_clientdata(client);
+	u32 offset = 0;
+
+	/* Z-U registers offset shifted by 0x200 */
+	if (pipe_id == MAX_GMSL_PIPE_Z)
+		offset = MAX_GMSL_DP_SER_DUAL_VIEW_ZY_OFFSET;
+
+	/*
+	 * TODO: Get formula and sequence to calculate these regiters.
+	 * As of now, just hard code these settings for symmetric dual view.
+	 * These needs to be program in exact sequence and same register
+	 * is modified with different values. As of now, data sheet does not
+	 * have details for all fields of these registers.
+	 */
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_14_Y + offset, 0x37);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_17_X + offset, 0xF8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_17_Y + offset, 0xF8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_15_X + offset, 0xBF);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_15_Y + offset, 0xBF);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_17_X + offset, 0xFC);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_17_Y + offset, 0xFC);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_14_X + offset, 0x2F);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_14_X + offset, 0x0F);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_14_Y + offset, 0x27);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_ASYM_14_Y + offset, 0x07);
+}
+
+static void max_gmsl_dp_ser_program_subimage_timings(struct device *dev, u32 pipe_id)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct max_gmsl_dp_ser_priv *priv = i2c_get_clientdata(client);
+	u32 offset = pipe_id * MAX_GMSL_DP_SER_PIPE_SUBIMAGE_OFFSET;
+
+	// Asymmetric dual-view total pixel count per frame in sub-image
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_M_L + offset, (priv->superframe.subimage_attr[pipe_id].m & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_M_M + offset, (priv->superframe.subimage_attr[pipe_id].m & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_M_H + offset, (priv->superframe.subimage_attr[pipe_id].m & 0xFF0000) >> 16);
+
+	// Asymmetric dual-view total pixel count per frame for superframe
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_N_L + offset, (priv->superframe.subimage_attr[pipe_id].n & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_N_M + offset, (priv->superframe.subimage_attr[pipe_id].n & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_N_H + offset, (priv->superframe.subimage_attr[pipe_id].n & 0xFF0000) >> 16);
+
+	// Number of pixels to skip before writing when receiving a new line
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_X_OFFSET_L + offset, (priv->superframe.subimage_attr[pipe_id].x_offset & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_X_OFFSET_H + offset, (priv->superframe.subimage_attr[pipe_id].x_offset & 0xFF00) >> 8);
+
+	// Index of the last pixel of sub-image in the superframe
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_X_MAX_L + offset, (priv->superframe.subimage_attr[pipe_id].x_max & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_X_MAX_H + offset, (priv->superframe.subimage_attr[pipe_id].x_max & 0xFF00) >> 8);
+
+	// Index of the last line of sub-image in the superframe
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_Y_MAX_L + offset, (priv->superframe.subimage_attr[pipe_id].y_max & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_Y_MAX_H + offset, (priv->superframe.subimage_attr[pipe_id].y_max & 0xFF00) >> 8);
+
+	// VS delay in terms of PCLK cycles. The output VS is delayed by VS_DELAY cycles from the start.
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_DLY_L + offset, (priv->superframe.subimage_attr[pipe_id].vs_dly & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_DLY_M + offset, (priv->superframe.subimage_attr[pipe_id].vs_dly & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_DLY_H + offset, (priv->superframe.subimage_attr[pipe_id].vs_dly & 0xFF0000) >> 16);
+
+	// VS high period in terms of PCLK
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_HIGH_L + offset, (priv->superframe.subimage_attr[pipe_id].vs_high & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_HIGH_M + offset, (priv->superframe.subimage_attr[pipe_id].vs_high & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_HIGH_H + offset, (priv->superframe.subimage_attr[pipe_id].vs_high & 0xFF0000) >> 16);
+
+	// VS low period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_LOW_L + offset, (priv->superframe.subimage_attr[pipe_id].vs_low & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_LOW_M + offset, (priv->superframe.subimage_attr[pipe_id].vs_low & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_VS_LOW_H + offset, (priv->superframe.subimage_attr[pipe_id].vs_low & 0xFF0000) >> 16);
+
+	// HS delay in terms of PCLK cycles The output HS is delayed by HS_DELAY cycles from the start.
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_DLY_L + offset, (priv->superframe.subimage_attr[pipe_id].hs_dly & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_DLY_M + offset, (priv->superframe.subimage_attr[pipe_id].hs_dly & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_DLY_H + offset, (priv->superframe.subimage_attr[pipe_id].hs_dly & 0xFF0000) >> 16);
+
+	// HS high period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_HIGH_L + offset, (priv->superframe.subimage_attr[pipe_id].hs_high & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_HIGH_H + offset, (priv->superframe.subimage_attr[pipe_id].hs_high & 0xFF00) >> 8);
+
+	// HS low period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_LOW_L + offset, (priv->superframe.subimage_attr[pipe_id].hs_low & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_LOW_H + offset, (priv->superframe.subimage_attr[pipe_id].hs_low & 0xFF00) >> 8);
+
+	// HS pulses per frame
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_CNT_L + offset, (priv->superframe.subimage_attr[pipe_id].hs_cnt & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_CNT_H + offset, (priv->superframe.subimage_attr[pipe_id].hs_cnt & 0xFF00) >> 8);
+
+	// HS long low period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_LLOW_L + offset, (priv->superframe.subimage_attr[pipe_id].hs_llow & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_LLOW_M + offset, (priv->superframe.subimage_attr[pipe_id].hs_llow & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_HS_LLOW_H + offset, (priv->superframe.subimage_attr[pipe_id].hs_llow & 0xFF0000) >> 16);
+
+	// DE delay in terms of PCLK cycles The output HS is delayed by HS_DELAY cycles from the start.
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_DLY_L + offset, (priv->superframe.subimage_attr[pipe_id].de_dly & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_DLY_M + offset, (priv->superframe.subimage_attr[pipe_id].de_dly & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_DLY_H + offset, (priv->superframe.subimage_attr[pipe_id].de_dly & 0xFF0000) >> 16);
+
+	// DE high period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_HIGH_L + offset, (priv->superframe.subimage_attr[pipe_id].de_high & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_HIGH_H + offset, (priv->superframe.subimage_attr[pipe_id].de_high & 0xFF00) >> 8);
+
+	// DE low period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_LOW_L + offset, (priv->superframe.subimage_attr[pipe_id].de_low & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_LOW_H + offset, (priv->superframe.subimage_attr[pipe_id].de_low & 0xFF00) >> 8);
+
+	// DE pulses per frame
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_CNT_L + offset, (priv->superframe.subimage_attr[pipe_id].de_cnt & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_CNT_H + offset, (priv->superframe.subimage_attr[pipe_id].de_cnt & 0xFF00) >> 8);
+
+	// DE long low period in terms of PCLK cycles
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_LLOW_L + offset, (priv->superframe.subimage_attr[pipe_id].de_llow & 0xFF));
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_LLOW_M + offset, (priv->superframe.subimage_attr[pipe_id].de_llow & 0xFF00) >> 8);
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_DE_LLOW_H + offset, (priv->superframe.subimage_attr[pipe_id].de_llow & 0xFF0000) >> 16);
+
+	// LUT Template
+	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_X_LUT_TEMPLATE + offset, (priv->superframe.subimage_attr[pipe_id].lut_template));
+}
+
+static int max_gmsl_dp_ser_configure_superframe(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct max_gmsl_dp_ser_priv *priv = i2c_get_clientdata(client);
+
+	/*
+	 * Currently Enforcing X-Y and/or Z-U Dual view.
+	 * TODO: Add support for other combinations of pipe.
+	 */
+	if ((priv->superframe.subimage_timing[MAX_GMSL_PIPE_X].superframe_group != priv->superframe.subimage_timing[MAX_GMSL_PIPE_Y].superframe_group) ||
+		(priv->superframe.subimage_timing[MAX_GMSL_PIPE_Z].superframe_group != priv->superframe.subimage_timing[MAX_GMSL_PIPE_U].superframe_group)) {
+			dev_err(dev, "%s: Invalid superframe-group combination\n", __func__);
+			return -1;
+	}
+
+	if (priv->superframe.subimage_timing[MAX_GMSL_PIPE_X].enable && priv->superframe.subimage_timing[MAX_GMSL_PIPE_Y].enable) {
+		/* X and Y both enabled, program superframe registers */
+		max_gmsl_dp_ser_program_dual_view_for_superframe_group(dev, MAX_GMSL_PIPE_X);
+		max_gmsl_dp_ser_program_subimage_timings(dev, MAX_GMSL_PIPE_X);
+		max_gmsl_dp_ser_program_subimage_timings(dev, MAX_GMSL_PIPE_Y);
+	}
+
+	if (priv->superframe.subimage_timing[MAX_GMSL_PIPE_Z].enable && priv->superframe.subimage_timing[MAX_GMSL_PIPE_U].enable) {
+		/* Z and U both enabled, program superframe registers */
+		max_gmsl_dp_ser_program_dual_view_for_superframe_group(dev, MAX_GMSL_PIPE_Z);
+		max_gmsl_dp_ser_program_subimage_timings(dev, MAX_GMSL_PIPE_Z);
+		max_gmsl_dp_ser_program_subimage_timings(dev, MAX_GMSL_PIPE_U);
+	}
+
+	return 0;
+}
+
 static int max_gmsl_dp_ser_init(struct device *dev)
 {
 	struct max_gmsl_dp_ser_priv *priv;
@@ -518,6 +767,9 @@ static int max_gmsl_dp_ser_init(struct device *dev)
 			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
 	max_gmsl_dp_ser_write(priv, MAX_GMSL_DP_SER_INTERNAL_CRC_U,
 			       MAX_GMSL_DP_SER_INTERNAL_CRC_ENABLE);
+
+	/* configure superframe settings */
+	max_gmsl_dp_ser_configure_superframe(dev);
 
 	/* enable video output */
 	max_gmsl_dp_ser_update(priv, MAX_GMSL_DP_SER_VID_TX_X,
@@ -631,6 +883,226 @@ static int max_gmsl_dp_ser_parse_gmsl_props(struct i2c_client *client,
 	return 0;
 }
 
+static void max_gmsl_dp_ser_calc_superframe_pipe_attr(struct i2c_client *client,
+					   struct max_gmsl_dp_ser_priv *priv,
+					   int pipe_id)
+{
+	//Asymmetric dual-view total pixel count per frame in sub-image
+	priv->superframe.subimage_attr[pipe_id].m = priv->superframe.subimage_timing[pipe_id].h_total * priv->superframe.subimage_timing[pipe_id].v_total;
+
+	//Asymmetric dual-view total pixel count per frame for superframe
+	// TODO: Get formula for this value
+	priv->superframe.subimage_attr[pipe_id].n = 461000;
+
+	//Number of pixels to skip before writing when receiving a new line
+	priv->superframe.subimage_attr[pipe_id].x_offset = priv->superframe.subimage_timing[pipe_id].x_start;
+
+	//Index of the last pixel of sub-image in the superframe
+	priv->superframe.subimage_attr[pipe_id].x_max = priv->superframe.subimage_timing[pipe_id].h_active + priv->superframe.subimage_attr[pipe_id].x_offset;
+
+	//Index of the last line of sub-image in the superframe
+	priv->superframe.subimage_attr[pipe_id].y_max = priv->superframe.subimage_timing[pipe_id].v_active;
+
+	//VS delay in terms of PCLK cycles. The output VS is delayed by VS_DELAY cycles from the start.
+	priv->superframe.subimage_attr[pipe_id].vs_dly = priv->superframe.subimage_timing[pipe_id].h_total * (priv->superframe.subimage_timing[pipe_id].v_active + priv->superframe.subimage_timing[pipe_id].v_front_porch);
+
+	//VS high period in terms of PCLK
+	priv->superframe.subimage_attr[pipe_id].vs_high = priv->superframe.subimage_timing[pipe_id].h_total * priv->superframe.subimage_timing[pipe_id].v_sync_len;
+
+	//VS low period in terms of PCLK cycles
+	//TODO Get formula for this value
+	priv->superframe.subimage_attr[pipe_id].vs_low = 36000;
+
+	//HS delay in terms of PCLK cycles The output HS is delayed by HS_DELAY cycles from the start.
+	priv->superframe.subimage_attr[pipe_id].hs_dly = 0;
+
+	//HS high period in terms of PCLK cycles
+	priv->superframe.subimage_attr[pipe_id].hs_high = priv->superframe.subimage_timing[pipe_id].h_sync_len;
+
+	//HS low period in terms of PCLK cycles
+	priv->superframe.subimage_attr[pipe_id].hs_low = priv->superframe.subimage_timing[pipe_id].h_active + priv->superframe.subimage_timing[pipe_id].h_front_porch + priv->superframe.subimage_timing[pipe_id].h_back_porch;
+
+	//HS pulses per frame
+	priv->superframe.subimage_attr[pipe_id].hs_cnt = priv->superframe.subimage_timing[pipe_id].v_total;
+
+	//HS long low period in terms of PCLK cycles
+	priv->superframe.subimage_attr[pipe_id].hs_llow = 0;
+
+	//DE delay in terms of PCLK cycles The output DE is delayed by DE_DELAY cycles from the start.
+	priv->superframe.subimage_attr[pipe_id].de_dly = priv->superframe.subimage_timing[pipe_id].h_back_porch + priv->superframe.subimage_timing[pipe_id].h_sync_len;
+
+	//DE high period in terms of PCLK cycles
+	priv->superframe.subimage_attr[pipe_id].de_high = priv->superframe.subimage_timing[pipe_id].h_active;
+
+	//DE low period in terms of PCLK cycles
+	priv->superframe.subimage_attr[pipe_id].de_low = priv->superframe.subimage_timing[pipe_id].h_front_porch + priv->superframe.subimage_timing[pipe_id].h_sync_len + priv->superframe.subimage_timing[pipe_id].h_back_porch;
+
+	//Active lines per frame
+	priv->superframe.subimage_attr[pipe_id].de_cnt = priv->superframe.subimage_timing[pipe_id].v_active;
+
+	//DE long low period in terms of PCLK cycles
+	//TODO Get formula for this value
+	priv->superframe.subimage_attr[pipe_id].de_llow = 61944;
+
+	//LUT template
+	//TODO Get formula for this value
+	priv->superframe.subimage_attr[pipe_id].lut_template = 20;
+}
+
+static int max_gmsl_dp_ser_parse_superframe_pipe_props(struct i2c_client *client,
+					   struct max_gmsl_dp_ser_priv *priv,
+					   struct device_node *pipe_node,
+					   int pipe_id)
+{
+	struct device *dev = &priv->client->dev;
+	int err = 0;
+	u32 val = 0;
+	struct device_node *timings_handle;
+
+	err = of_property_read_u32(pipe_node, "superframe-group", &val);
+	if (err) {
+		dev_err(dev, "%s: - superframe-group property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].superframe_group = val;
+
+	err = of_property_read_u32(pipe_node, "timings-phandle", &val);
+	if (err) {
+		dev_err(dev, "%s: - timings-phandle property not found\n",
+			 __func__);
+		return err;
+	}
+
+	timings_handle = of_find_node_by_phandle(val);
+	if (timings_handle == NULL) {
+		dev_err(dev, "%s: - can not get timings node\n",
+			 __func__);
+		return -1;
+	}
+
+	err = of_property_read_u32(timings_handle, "x", &val);
+	if (err) {
+		dev_err(dev, "%s: - x property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].x_start = val;
+
+	err = of_property_read_u32(timings_handle, "width", &val);
+	if (err) {
+		dev_err(dev, "%s: - width property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].h_active = val;
+
+	err = of_property_read_u32(timings_handle, "hfront-porch", &val);
+	if (err) {
+		dev_err(dev, "%s: - hfront-porch property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].h_front_porch = val;
+
+	err = of_property_read_u32(timings_handle, "hback-porch", &val);
+	if (err) {
+		dev_err(dev, "%s: - hback-porch property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].h_back_porch = val;
+
+	err = of_property_read_u32(timings_handle, "hsync-len", &val);
+	if (err) {
+		dev_err(dev, "%s: - hsync-len property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].h_sync_len = val;
+
+	priv->superframe.subimage_timing[pipe_id].h_total = priv->superframe.subimage_timing[pipe_id].h_active + priv->superframe.subimage_timing[pipe_id].h_front_porch + priv->superframe.subimage_timing[pipe_id].h_back_porch + priv->superframe.subimage_timing[pipe_id].h_sync_len;
+
+	err = of_property_read_u32(timings_handle, "y", &val);
+	if (err) {
+		dev_err(dev, "%s: - y property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].y_start = val;
+
+	err = of_property_read_u32(timings_handle, "height", &val);
+	if (err) {
+		dev_err(dev, "%s: - height property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].v_active = val;
+
+	err = of_property_read_u32(timings_handle, "vfront-porch", &val);
+	if (err) {
+		dev_err(dev, "%s: - vfront-porch property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].v_front_porch = val;
+
+	err = of_property_read_u32(timings_handle, "vback-porch", &val);
+	if (err) {
+		dev_err(dev, "%s: - vback-porch property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].v_back_porch = val;
+
+	err = of_property_read_u32(timings_handle, "vsync-len", &val);
+	if (err) {
+		dev_err(dev, "%s: - vsync-len property not found\n",
+			 __func__);
+		return err;
+	}
+	priv->superframe.subimage_timing[pipe_id].v_sync_len = val;
+
+	priv->superframe.subimage_timing[pipe_id].v_total = priv->superframe.subimage_timing[pipe_id].v_active + priv->superframe.subimage_timing[pipe_id].v_front_porch + priv->superframe.subimage_timing[pipe_id].v_back_porch + priv->superframe.subimage_timing[pipe_id].v_sync_len;
+
+	return 0;
+}
+
+static void max_gmsl_dp_ser_parse_superframe_props(struct i2c_client *client,
+					   struct max_gmsl_dp_ser_priv *priv)
+{
+	struct device *dev = &priv->client->dev;
+	struct device_node *ser = dev->of_node;
+	int err, i = 0;
+	struct device_node *superframe_video_timings, *pipe_node;
+	char pipe_name[MAX_GMSL_ARRAY_SIZE][7] = { "pipe-x", "pipe-y", "pipe-z", "pipe-u"};
+
+	/* check if superframe timings present in device tree */
+	superframe_video_timings = of_find_node_by_name(ser, "superframe-video-timings");
+	if (superframe_video_timings == NULL) {
+		dev_info(dev, "%s: - superframe-video-timings property not found\n",
+			 __func__);
+		return;
+	}
+
+	/* get superframe subimage properties for each pipe */
+	for (i = 0; i < MAX_GMSL_ARRAY_SIZE; i++) {
+		pipe_node = of_find_node_by_name(superframe_video_timings, pipe_name[i]);
+		if (pipe_node) {
+			err = max_gmsl_dp_ser_parse_superframe_pipe_props(client, priv, pipe_node, i);
+			if (!err) {
+				/* pipe have valid properties, calculate attributes */
+				priv->superframe.subimage_timing[i].enable = true;
+				max_gmsl_dp_ser_calc_superframe_pipe_attr(client, priv, i);
+			} else {
+				dev_err(dev, "%s: - %s property found but properties are invalid\n", __func__, pipe_name[i]);
+			}
+		} else {
+			dev_info(dev, "%s: - %s property not found\n", __func__, pipe_name[i]);
+		}
+	}
+}
+
 static int max_gmsl_dp_ser_parse_dt_props(struct i2c_client *client,
 					   struct max_gmsl_dp_ser_priv *priv)
 {
@@ -648,6 +1120,8 @@ static int max_gmsl_dp_ser_parse_dt_props(struct i2c_client *client,
 		dev_err(dev, "%s: error parsing GMSL props\n", __func__);
 		return -EFAULT;
 	}
+
+	max_gmsl_dp_ser_parse_superframe_props(client, priv);
 
 	return err;
 }
