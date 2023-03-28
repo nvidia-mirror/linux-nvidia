@@ -417,9 +417,27 @@ static int tnvvse_crypto_sha_final(struct tnvvse_crypto_ctx *ctx,
 {
 	struct crypto_sha_state *sha_state = &ctx->sha_state;
 	struct crypto_ahash *tfm = sha_state->tfm;
+	struct ahash_request *req;
+	struct scatterlist sg[1];
+	unsigned long size = 0;
+	void *hash_buff;
+	char *result_buff;
 	int ret = -ENOMEM;
 
 	if (!sha_state->sha_done_success) {
+		hash_buff = sha_state->xbuf[0];
+		result_buff = sha_state->result_buff;
+		req = sha_state->req;
+		sg_init_one(&sg[0], hash_buff, size);
+
+		ahash_request_set_crypt(req, &sg[0], result_buff, size);
+
+		ret = wait_async_op(&sha_state->sha_complete, crypto_ahash_final(req));
+		if (ret) {
+			pr_err("%s(): Failed to ahash_final for %s: %d\n",
+					__func__, sha_alg_names[sha_state->sha_type], ret);
+		}
+
 		pr_err("%s(): SHA is not completed successfully\n", __func__);
 		ret = -EFAULT;
 		goto stop_sha;
