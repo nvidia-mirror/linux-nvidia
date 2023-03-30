@@ -191,13 +191,18 @@ fail:
 static int t234_hwpm_validate_emc_config(struct tegra_soc_hwpm *hwpm)
 {
 	struct tegra_soc_hwpm_chip *active_chip = hwpm->active_chip;
+# if defined(CONFIG_T234_HWPM_IP_MSS_CHANNEL) || \
+	defined(CONFIG_T234_HWPM_IP_MSS_ISO_NISO_HUBS) || \
+	defined(CONFIG_T234_HWPM_IP_MSS_MCF)
 	struct hwpm_ip *chip_ip = NULL;
 	struct hwpm_ip_inst *ip_inst = NULL;
+	u32 inst_idx = 0U;
+	u32 element_mask_max = 0U;
+#endif
 	u32 emc_disable_fuse_val = 0U;
 	u32 emc_disable_fuse_val_mask = 0xFU;
 	u32 emc_element_floorsweep_mask = 0U;
-	u32 idx = 0U, inst_idx = 0U;
-	u32 element_mask_max = 0U;
+	u32 idx = 0U;
 	int err;
 
 	tegra_hwpm_fn(hwpm, " ");
