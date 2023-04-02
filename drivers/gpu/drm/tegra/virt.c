@@ -252,6 +252,7 @@ static int actmon_debugfs_usage_show(struct seq_file *s, void *unused)
 {
 	struct virt_engine *virt = s->private;
 	unsigned long rate;
+	int cycles_per_actmon_sample;
 	int count;
 
 	rate = clk_get_rate(virt->clk);
@@ -267,7 +268,7 @@ static int actmon_debugfs_usage_show(struct seq_file *s, void *unused)
 	/* Based on configuration in NvHost Server */
 #define ACTMON_SAMPLE_PERIOD_US		100
 	/* Rate in MHz cancels out microseconds */
-	int cycles_per_actmon_sample = (rate / 1000000) * ACTMON_SAMPLE_PERIOD_US;
+	cycles_per_actmon_sample = (rate / 1000000) * ACTMON_SAMPLE_PERIOD_US;
 
 	seq_printf(s, "%d\n", (count * 1000) / cycles_per_actmon_sample);
 
@@ -342,7 +343,7 @@ static int virt_engine_probe(struct platform_device *pdev)
 
 	virt->clk = devm_clk_get_optional(&pdev->dev, NULL);
 	if (IS_ERR(virt->clk)) {
-		dev_err(dev, "could not get clock: %d\n", PTR_ERR(virt->clk));
+		dev_err(dev, "could not get clock: %ld\n", PTR_ERR(virt->clk));
 		return PTR_ERR(virt->clk);
 	}
 
