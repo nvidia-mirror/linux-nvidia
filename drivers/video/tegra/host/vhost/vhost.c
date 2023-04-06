@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Virtualization Host functions for HOST1X
  *
- * Copyright (c) 2014-2022, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,7 +31,8 @@ static inline int vhost_comm_init(struct platform_device *pdev,
 		channel_management_in_guest ?
 		1 : ARRAY_SIZE(queue_sizes);
 
-	return tegra_gr_comm_init(pdev, num_queues, queue_sizes,
+	return tegra_gr_comm_init(&pdev->dev, pdev->dev.of_node,
+			num_queues, queue_sizes,
 			TEGRA_VHOST_QUEUE_CMD, num_queues);
 }
 

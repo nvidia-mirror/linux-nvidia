@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Virtualization Communication Framework
  *
- * Copyright (c) 2013-2018, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2013-2023, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,12 +19,12 @@
 #ifndef __TEGRA_GR_COMM_H
 #define __TEGRA_GR_COMM_H
 
-#include <linux/platform_device.h>
+#include <linux/device.h>
 
 #define TEGRA_GR_COMM_ID_SELF (0xFF)
 
 #ifdef CONFIG_TEGRA_GR_VIRTUALIZATION
-int tegra_gr_comm_init(struct platform_device *pdev, u32 elems,
+int tegra_gr_comm_init(struct device *dev, struct device_node *dn, u32 elems,
 		const size_t *queue_sizes, u32 queue_start, u32 num_queues);
 void tegra_gr_comm_deinit(u32 queue_start, u32 num_queues);
 int tegra_gr_comm_send(u32 peer, u32 index, void *data,
@@ -39,7 +39,7 @@ void *tegra_gr_comm_oob_get_ptr(u32 peer, u32 index,
 				void **ptr, size_t *size);
 void tegra_gr_comm_oob_put_ptr(void *handle);
 #else
-static inline int tegra_gr_comm_init(struct platform_device *pdev,
+static inline int tegra_gr_comm_init(struct device *dev, struct device_node *dn,
 				u32 elems,
 				const size_t *queue_sizes, u32 queue_start,
 				u32 num_queues)
