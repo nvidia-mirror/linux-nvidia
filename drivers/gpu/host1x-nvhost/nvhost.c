@@ -680,7 +680,7 @@ EXPORT_SYMBOL(nvhost_flcn_finalize_poweron);
 struct nvhost_host1x_cb {
 	struct dma_fence_cb cb;
 	struct work_struct work;
-	void (*notifier)(void *data, int unused);
+	void (*notifier)(void *data);
 	void *notifier_data;
 };
 
@@ -698,13 +698,13 @@ static void nvhost_intr_do_work(struct work_struct *work)
 	struct nvhost_host1x_cb *host1x_cb;
 
 	host1x_cb = container_of(work, struct nvhost_host1x_cb, work);
-	host1x_cb->notifier(host1x_cb->notifier_data, 0);
+	host1x_cb->notifier(host1x_cb->notifier_data);
 	kfree_rcu(host1x_cb);
 }
 
 int nvhost_intr_register_notifier(struct platform_device *pdev,
 				  u32 id, u32 thresh,
-				  void (*callback)(void *data, int unused),
+				  void (*callback)(void *data),
 				  void *private_data)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);

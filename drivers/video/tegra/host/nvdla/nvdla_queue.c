@@ -322,7 +322,16 @@ static inline size_t nvdla_profile_status_offset(struct nvdla_task *task)
 	return offset;
 }
 
+
+#if IS_ENABLED(CONFIG_TEGRA_GRHOST)
+/*
+ * This function definition can be removed once support
+ * for the NVIDIA Linux v5.10 kernel is removed.
+ */
 static void nvdla_queue_update(void *priv, int unused)
+#else
+static void nvdla_queue_update(void *priv)
+#endif
 {
 	int task_complete;
 	struct nvdla_task *task, *safe;
