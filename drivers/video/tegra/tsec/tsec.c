@@ -112,6 +112,134 @@ static void tsec_set_cg_regs(struct tsec_device_data *pdata)
 	tsec_writel(pdata, tsec_riscv_cg_r(), 0x3);
 }
 
+#ifdef CONFIG_DEBUG_FS
+
+struct nvriscv_log_buffer {
+	/* read offset updated by client RM */
+	uint32_t read_offset;
+	/* write offset updated by firmware RM */
+	uint32_t write_offset;
+	/* buffer size configured by client RM */
+	uint32_t buffer_size;
+	/* magic number for header validation in nvwatch */
+	uint32_t magic;
+};
+
+#define LOG_BUF_SIZE	((4 * SZ_1K) - sizeof(struct nvriscv_log_buffer))
+#define INFO_BUF_SIZE	(SZ_128)
+static u8 log_buf[LOG_BUF_SIZE]; /* Read from DMEM into local buffer */
+static u8 info_buf[INFO_BUF_SIZE];
+
+static int tsec_debug_show(struct seq_file *s, void *unused)
+{
+	int info_len = 0;
+	struct tsec_device_data *pdata = (struct tsec_device_data *)s->private;
+
+	/* Do not attempt to read DMEM if TSEC is power-down */
+	if (pdata->power_on) {
+#define DMEM_PORT	(0)
+		/* Offset of Log Buffer in DMEM */
+		u32 log_bug_off  = tsec_dmem_logbuf_offset_f();
+		u32 dmemC        = tsec_falcon_dmemc_r(DMEM_PORT);
+		u32 dmemD        = tsec_falcon_dmemd_r(DMEM_PORT);
+		struct nvriscv_log_buffer log_buf_info;
+
+		/* Auto Increment Read */
+		u32 loop_index = 0;
+
+		tsec_writel(pdata, dmemC, log_bug_off | 0x02000000);
+		while (loop_index < LOG_BUF_SIZE) {
+			u32 reg_val;
+
+			reg_val = tsec_readl(pdata, dmemD);
+			log_buf[loop_index++] = (u8)((reg_val >> 0) & 0xFF);
+			log_buf[loop_index++] = (u8)((reg_val >> 8) & 0xFF);
+			log_buf[loop_index++] = (u8)((reg_val >> 16) & 0xFF);
+			log_buf[loop_index++] = (u8)((reg_val >> 24) & 0xFF);
+		}
+		log_buf_info.read_offset  = tsec_readl(pdata, dmemD);
+		log_buf_info.write_offset = tsec_readl(pdata, dmemD);
+		log_buf_info.buffer_size  = tsec_readl(pdata, dmemD);
+		log_buf_info.magic        = tsec_readl(pdata, dmemD);
+
+		/*
+		* Replace any null charecter with new line because tsec ucode
+		* does the reverse before dumping the logs in the buffer
+		*/
+		for (loop_index = 0; loop_index < LOG_BUF_SIZE; loop_index++) {
+			if (log_buf[loop_index] == 0)
+				log_buf[loop_index] = 0xA;
+		}
+
+		/* Insert null charecter at end of log buffer */
+		log_buf[log_buf_info.write_offset] = 0;
+
+		/* Print log_buf */
+		info_len = sprintf(info_buf,
+			"Tsec Logs Start: read_offset=%d write_offset=%d buffer_size=%d magic=0x%x\n",
+			log_buf_info.read_offset, log_buf_info.write_offset,
+			log_buf_info.buffer_size, log_buf_info.magic);
+		if (info_len > 0)
+			seq_write(s, info_buf, info_len);
+
+		seq_write(s, log_buf,
+			(log_buf_info.write_offset - log_buf_info.read_offset));
+
+		info_len = strlen("Tsec Logs End\n");
+		strcpy(info_buf, "Tsec Logs End\n");
+		info_buf[info_len] = '\0';
+		seq_write(s, info_buf, info_len);
+	} else {
+		info_len = strlen("Tsec power-down\n");
+		strcpy(info_buf, "Tsec power-down\n");
+		info_buf[info_len] = '\0';
+		seq_write(s, info_buf, info_len);
+	}
+
+	return 0;
+}
+
+static int tsec_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tsec_debug_show, inode->i_private);
+}
+
+static const struct file_operations tsec_debug_fops = {
+	.open		= tsec_debug_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+/*
+ * TSEC debugfs interface
+ * create: /sys/kernel/debug/tegra_tsec/fw_logs.
+ * cat /sys/kernel/debug/tegra_tsec/fw_logs will read the DMEM reserved for
+ * debug messages and print it on console.
+ */
+
+static int tsec_module_init_debugfs(struct platform_device *dev)
+{
+	struct tsec_device_data *pdata = platform_get_drvdata(dev);
+
+	pdata->debug_root = debugfs_create_dir("tegra_tsec", NULL);
+	if (!pdata->debug_root)
+		return -ENOMEM;
+
+	debugfs_create_file("fw_logs", 0444, pdata->debug_root,
+			pdata, &tsec_debug_fops);
+
+	return 0;
+}
+
+static void tsec_module_deinit_debugfs(struct platform_device *dev)
+{
+	struct tsec_device_data *pdata = platform_get_drvdata(dev);
+
+	debugfs_remove_recursive(pdata->debug_root);
+}
+#endif /* CONFIG_DEBUG_FS */
+
 /*
  * TSEC Power Management Operations
  */
@@ -295,11 +423,25 @@ static int tsec_probe(struct platform_device *dev)
 		return err;
 	}
 
+#ifdef CONFIG_DEBUG_FS
+	if (debugfs_initialized()) {
+		err = tsec_module_init_debugfs(dev);
+		if (err) {
+			dev_err(&dev->dev, "error %d in tsec_module_init_debugfs\n", err);
+			return err;
+		}
+	}
+#endif /* CONFIG_DEBUG_FS */
+
 	return tsec_kickoff_boot(dev);
 }
 
 static int tsec_remove(struct platform_device *dev)
 {
+#ifdef CONFIG_DEBUG_FS
+	tsec_module_deinit_debugfs(dev);
+#endif /* CONFIG_DEBUG_FS */
+
 	return tsec_poweroff(&dev->dev);
 }
 

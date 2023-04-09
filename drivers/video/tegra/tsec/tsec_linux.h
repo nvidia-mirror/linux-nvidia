@@ -3,7 +3,7 @@
  *
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -42,5 +42,9 @@
 #include <linux/platform/tegra/tegra_mc.h> /* for mc_get_carveout_info */
 #include <asm/cacheflush.h>                /* for __flush_dcache_area */
 #endif
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>                 /* for debugfs APIs */
+#endif
+#include <linux/sizes.h>                   /* for SZ_* size macros */
 
 #endif /* TSEC_LINUX_H */

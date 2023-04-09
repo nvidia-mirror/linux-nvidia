@@ -3,7 +3,7 @@
  *
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -60,6 +60,10 @@ struct tsec_device_data {
 	char *riscv_desc_bin;
 	/* name of riscv image binary */
 	char *riscv_image_bin;
+
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debug_root;
+#endif /* CONFIG_DEBUG_FS */
 };
 
 /*

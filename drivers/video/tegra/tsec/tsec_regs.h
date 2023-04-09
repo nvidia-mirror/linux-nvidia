@@ -2,7 +2,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -261,6 +261,23 @@ static inline u32 tsec_riscv_br_retcode_result_v(u32 r)
 static inline u32 tsec_riscv_br_retcode_result_pass_v(void)
 {
 	return 0x00000003;
+}
+
+static inline u32 tsec_falcon_dmemc_r(u32 r)
+{
+	/* NV_PSEC_FALCON_DMEMC_0 */
+	return (0x11c0 + (r) * 8);
+}
+
+static inline u32 tsec_falcon_dmemd_r(u32 r)
+{
+	/* NV_PSEC_FALCON_DMEMD_0 */
+	return (0x11c4 + (r) * 8);
+}
+
+static inline u32 tsec_dmem_logbuf_offset_f(void)
+{
+	return 0x14000;
 }
 
 #endif /* TSEC_REGS_H */
