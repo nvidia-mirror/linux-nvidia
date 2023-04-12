@@ -140,6 +140,9 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 	case MODS_FFA_CMD_C2C_TEST:
 		cl_debug(DEBUG_TEGRADMA, "sending cmd MODS_FFA_CMD_C2C_TEST to SP\n");
 		break;
+	case MODS_FFA_CMD_MISC:
+		cl_debug(DEBUG_TEGRADMA, "sending cmd MODS_FFA_CMD_MISC to SP\n");
+		break;
 	default:
 		cl_error("Unexpected command from SP 0x%llx\n", (unsigned long long)p->cmd);
 		return err;
@@ -165,12 +168,9 @@ int esc_mods_arm_ffa_cmd(struct mods_client *client,
 		p->outdata[0] = data.data1;
 		break;
 	case MODS_FFA_CMD_HSS_TEST:
-		cl_debug(DEBUG_TEGRADMA, "received response from SP for CMD_HSS_TEST: 0x%llx\n",
-					  (unsigned long long)data.data1);
-		p->outdata[0] = data.data1;
-		break;
 	case MODS_FFA_CMD_C2C_TEST:
-		cl_debug(DEBUG_TEGRADMA, "received response from SP for CMD_C2C_TEST: 0x%llx\n",
+	case MODS_FFA_CMD_MISC:
+		cl_debug(DEBUG_TEGRADMA, "received response from SP: 0x%llx\n",
 					  (unsigned long long)data.data1);
 		p->outdata[0] = data.data1;
 		break;
