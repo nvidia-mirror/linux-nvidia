@@ -313,6 +313,17 @@ typedef struct syncpoint_info {
 
 #define ISP_NUM_GOS_TABLES	MK_U32(8)
 
+/**
+ * @defgroup ISPUnitIds
+ * ISP Unit Identifiers
+ */
+/**@{*/
+/** ISP unit 0 */
+#define ISP_UNIT_ISP                              MK_U32(0x0000)
+/** ISP unit 1 */
+#define ISP_UNIT_ISP2                             MK_U32(0x0001)
+/**@}*/
+
 #define VI_NUM_GOS_TABLES	MK_U32(12)
 #define VI_NUM_ATOMP_SURFACES	4
 #define VI_NUM_STATUS_SURFACES	1
@@ -2313,7 +2324,8 @@ struct capture_channel_isp_config {
 	/** Size of the memoryinfo buffer reserved for each program request. */
 	uint32_t program_memoryinfo_size;
 
-	uint32_t reserved;
+	/** ISP unit ID. See @ref ISPUnitIds "ISP Unit Identifiers". */
+	uint32_t isp_unit_id;
 
 #define HAVE_ISP_GOS_TABLES
 	/** Number of active ISP GOS tables in isp_gos_tables[] */
