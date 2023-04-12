@@ -2,7 +2,7 @@
 /*
  * Tegra Virtual Block I/O Driver for OOPS partition
  *
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -773,6 +773,38 @@ static int tegra_hv_vblk_oops_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int tegra_hv_vblk_oops_suspend(struct device *dev)
+{
+	/* Reset the channel */
+	mutex_lock(&vblkdev_oops->ivc_lock);
+	tegra_hv_ivc_channel_reset(vblkdev_oops->ivck);
+	mutex_unlock(&vblkdev_oops->ivc_lock);
+
+	return 0;
+}
+
+static int tegra_hv_vblk_oops_resume(struct device *dev)
+{
+	int i = 0;
+
+	/* This while loop exits as long as the remote endpoint cooperates. */
+	while (tegra_hv_ivc_channel_notified(vblkdev_oops->ivck) != 0) {
+		if (i++ > IVC_RESET_RETRIES) {
+			dev_err(vblkdev_oops->device, "ivc reset timeout\n");
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops tegra_hv_vblk_oops_pm_ops = {
+	.suspend = tegra_hv_vblk_oops_suspend,
+	.resume = tegra_hv_vblk_oops_resume,
+};
+#endif /* CONFIG_PM_SLEEP */
+
 #ifdef CONFIG_OF
 static const struct of_device_id tegra_hv_vblk_oops_match[] = {
 	{ .compatible = "nvidia,tegra-hv-oops-storage", },
@@ -788,6 +820,9 @@ static struct platform_driver tegra_hv_vblk_oops_driver = {
 		.name = OOPS_DRV_NAME,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(tegra_hv_vblk_oops_match),
+#ifdef CONFIG_PM_SLEEP
+		.pm = &tegra_hv_vblk_oops_pm_ops,
+#endif
 	},
 };
 
