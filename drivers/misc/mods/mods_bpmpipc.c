@@ -287,12 +287,24 @@ static int bpmp_ipc_channel_init(struct mods_client *client,
 	int err;
 	ktime_t end;
 
+#if (KERNEL_VERSION(6, 2, 0) <= MODS_KERNEL_VERSION)
+	struct iosys_map rx, tx;
+
+	iosys_map_set_vaddr_iomem(&rx, bpmp_ipc_ch->resp_base);
+	iosys_map_set_vaddr_iomem(&tx, bpmp_ipc_ch->req_base);
+
+	err = tegra_ivc_init(&bpmp_ipc_ch->ivc, NULL,
+			     &rx, bpmp_ipc_ch->resp_phys_addr,
+			     &tx, bpmp_ipc_ch->req_phys_addr,
+			     1, MRQ_MSG_SIZE,
+			     bpmp_ivc_notify, bpmp_ipc_ch);
+#else
 	err = tegra_ivc_init(&bpmp_ipc_ch->ivc, NULL,
 			 bpmp_ipc_ch->resp_base, 0,
 			 bpmp_ipc_ch->req_base, 0,
 			 1, MRQ_MSG_SIZE,
 			 bpmp_ivc_notify, bpmp_ipc_ch);
-
+#endif
 
 	if (err != 0) {
 		cl_error("tegra-ivc init failed: %d\n", err);
