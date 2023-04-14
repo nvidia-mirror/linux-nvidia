@@ -496,7 +496,7 @@ struct dma_coherent_mem_replica {
 };
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-			dma_addr_t device_addr, size_t size, int flags, bool is_cbc);
+			dma_addr_t device_addr, size_t size, int flags, bool is_compression);
 #endif
 int nvmap_probe(struct platform_device *pdev);
 int nvmap_remove(struct platform_device *pdev);

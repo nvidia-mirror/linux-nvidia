@@ -171,11 +171,11 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 		err = nvmap_dma_alloc_attrs(dev, len, &pa,
 				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE);
 		/*
-		 * In case of CBC carveout, try to allocate the entire chunk in physically
+		 * In case of Compression carveout, try to allocate the entire chunk in physically
 		 * contiguous manner. If it returns error, then try to allocate the memory in
 		 * 2MB chunks.
 		 */
-		if (h->is_cbc && IS_ERR(err)) {
+		if (h->is_compression_co && IS_ERR(err)) {
 			err = nvmap_dma_alloc_attrs(dev, len, &pa,
 				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE |
 				DMA_ATTR_ALLOC_SINGLE_PAGES);
@@ -243,7 +243,7 @@ static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
 			        (void *)(uintptr_t)base,
 			        (dma_addr_t)base, DMA_ATTR_ALLOC_EXACT_SIZE);
 #else
-		if (h->is_cbc && handle->pgalloc.pages) {
+		if (h->is_compression_co && handle->pgalloc.pages) {
 			/* In case of pages, we need to pass pointer to array of pages */
 			nvmap_dma_free_attrs(dev, len,
 				     (void *)handle->pgalloc.pages,
@@ -503,7 +503,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 				DMA_MEMORY_NOMAP);
 #else
 		err = nvmap_dma_declare_coherent_memory(h->dma_dev, 0, base, len,
-				DMA_MEMORY_NOMAP, co->is_cbc);
+				DMA_MEMORY_NOMAP, co->is_compression_co);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -526,7 +526,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 	h->base = base;
 	h->can_alloc = !!co->can_alloc;
 	h->is_ivm = co->is_ivm;
-	h->is_cbc = co->is_cbc;
+	h->is_compression_co = co->is_compression_co;
 	h->len = len;
 	h->free_size = len;
 	h->peer = co->peer;
@@ -657,7 +657,7 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 		unsigned long page_count, i;
 
 		/*
-		 * For CBC carveout with physically discontiguous 2MB chunks,
+		 * For Compression carveout with physically discontiguous 2MB chunks,
 		 * iterate over 2MB chunks and do cache maint for it.
 		 */
 		page_count = h->size >> PAGE_SHIFT;

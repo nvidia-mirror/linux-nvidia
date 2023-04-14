@@ -41,7 +41,7 @@ struct nvmap_heap {
 	struct device *cma_dev;
 	struct device *dma_dev;
 	bool is_ivm;
-	bool is_cbc;
+	bool is_compression_co;
 	bool can_alloc; /* Used only if is_ivm == true */
 	unsigned int peer; /* Used only if is_ivm == true */
 	unsigned int vm_id; /* Used only if is_ivm == true */

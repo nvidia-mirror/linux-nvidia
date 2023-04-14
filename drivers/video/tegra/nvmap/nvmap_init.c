@@ -142,8 +142,8 @@ static struct nvmap_platform_carveout nvmap_carveouts[] = {
 		.size		= 0,
 	},
 	[4] = {
-		.name		= "cbc",
-		.usage_mask	= NVMAP_HEAP_CARVEOUT_CBC,
+		.name		= "compression",
+		.usage_mask	= NVMAP_HEAP_CARVEOUT_COMPRESSION,
 		.base		= 0,
 		.size		= 0,
 	},
@@ -373,7 +373,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	int do_memset = 0;
 	int *bitmap_nos = NULL;
 	const char *device_name;
-	bool is_cbc = false;
+	bool is_compression = false;
 
 	device_name = dev_name(dev);
 	if (!device_name) {
@@ -381,11 +381,11 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 		return NULL;
 	}
 
-	if (!strncmp(device_name, "cbc", 3))
-		is_cbc = true;
+	if (!strncmp(device_name, "compression", 11))
+		is_compression = true;
 
-	if (is_cbc) {
-		/* Calculation for CBC should consider 2MB chunks */
+	if (is_compression) {
+		/* Calculation for Compression carveout should consider 2MB chunks */
 		count = size >> PAGE_SHIFT_2MB;
 	} else {
 		if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
@@ -411,7 +411,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	    dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) {
 		alloc_size = 1;
 		/* pages contain the array of pages of kernel PAGE_SIZE */
-		if (!is_cbc)
+		if (!is_compression)
 			pages = nvmap_kvzalloc_pages(count);
 		else
 			pages = nvmap_kvzalloc_pages(count * PAGES_PER_2MB);
@@ -426,14 +426,14 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 
-	if (!is_cbc && unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
+	if (!is_compression && unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
 		goto err;
-	else if (is_cbc && unlikely(size > ((u64)mem->size << PAGE_SHIFT_2MB)))
+	else if (is_compression && unlikely(size > ((u64)mem->size << PAGE_SHIFT_2MB)))
 		goto err;
 
 	if (((mem->flags & DMA_MEMORY_NOMAP) &&
 	    dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs)) ||
-	    is_cbc) {
+	    is_compression) {
 		align = 0;
 	} else  {
 		if (order > DMA_BUF_ALIGNMENT)
@@ -454,7 +454,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 
 		count -= alloc_size;
 		if (pages) {
-			if (!is_cbc)
+			if (!is_compression)
 				pages[i++] = pfn_to_page(mem->pfn_base + pageno);
 			else {
 				/* Handle 2MB chunks */
@@ -471,7 +471,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	/*
 	 * Memory was found in the coherent area.
 	 */
-	if (!is_cbc)
+	if (!is_compression)
 		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT);
 	else
 		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT_2MB);
@@ -525,7 +525,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 	unsigned long flags;
 	unsigned int pageno, page_shift_val;
 	struct dma_coherent_mem_replica *mem;
-	bool is_cbc = false;
+	bool is_compression = false;
 	const char *device_name;
 
 	if (!dev || !dev->dma_mem)
@@ -537,8 +537,8 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		return;
 	}
 
-	if (!strncmp(device_name, "cbc", 3))
-		is_cbc = true;
+	if (!strncmp(device_name, "compression", 11))
+		is_compression = true;
 
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 	if ((mem->flags & DMA_MEMORY_NOMAP) &&
@@ -547,7 +547,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		int i;
 
 		spin_lock_irqsave(&mem->spinlock, flags);
-		if (!is_cbc) {
+		if (!is_compression) {
 			for (i = 0; i < (size >> PAGE_SHIFT); i++) {
 				pageno = page_to_pfn(pages[i]) - mem->pfn_base;
 				if (WARN_ONCE(pageno > mem->size,
@@ -574,7 +574,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 	else
 		mem_addr =  mem->virt_base;
 
-	page_shift_val = is_cbc ? PAGE_SHIFT_2MB : PAGE_SHIFT;
+	page_shift_val = is_compression ? PAGE_SHIFT_2MB : PAGE_SHIFT;
 	if (mem && cpu_addr >= mem_addr &&
 	    cpu_addr - mem_addr < (u64)mem->size << page_shift_val) {
 		unsigned int page = (cpu_addr - mem_addr) >> page_shift_val;
@@ -582,7 +582,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		unsigned int count;
 
 		if (DMA_ATTR_ALLOC_EXACT_SIZE & attrs) {
-			if (is_cbc)
+			if (is_compression)
 				count = ALIGN_2MB(size) >> page_shift_val;
 			else
 				count = PAGE_ALIGN(size) >> page_shift_val;
@@ -674,7 +674,7 @@ static int nvmap_dma_assign_coherent_memory(struct device *dev,
 
 static int nvmap_dma_init_coherent_memory(
 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-	struct dma_coherent_mem_replica **mem, bool is_cbc)
+	struct dma_coherent_mem_replica **mem, bool is_compression)
 {
 	struct dma_coherent_mem_replica *dma_mem = NULL;
 	void *mem_base = NULL;
@@ -685,7 +685,7 @@ static int nvmap_dma_init_coherent_memory(
 	if (!size)
 		return -EINVAL;
 
-	if (is_cbc)
+	if (is_compression)
 		pages = size >> PAGE_SHIFT_2MB;
 	else
 		pages = size >> PAGE_SHIFT;
@@ -729,12 +729,13 @@ err_memunmap:
 }
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-			dma_addr_t device_addr, size_t size, int flags, bool is_cbc)
+			dma_addr_t device_addr, size_t size, int flags, bool is_compression)
 {
 	struct dma_coherent_mem_replica *mem;
 	int ret;
 
-	ret = nvmap_dma_init_coherent_memory(phys_addr, device_addr, size, flags, &mem, is_cbc);
+	ret = nvmap_dma_init_coherent_memory(phys_addr, device_addr, size, flags, &mem,
+					     is_compression);
 	if (ret)
 		return ret;
 
@@ -766,7 +767,7 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 #else
 		err = nvmap_dma_declare_coherent_memory(co->dma_dev, 0,
 				co->base, co->size,
-				DMA_MEMORY_NOMAP, co->is_cbc);
+				DMA_MEMORY_NOMAP, co->is_compression_co);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -896,8 +897,8 @@ int __init nvmap_co_setup(struct reserved_mem *rmem)
 	co->base = rmem->base;
 	co->size = rmem->size;
 	co->cma_dev = NULL;
-	if (!strncmp(co->name, "cbc", 3))
-		co->is_cbc = true;
+	if (!strncmp(co->name, "compression", 11))
+		co->is_compression_co = true;
 
 	nvmap_init_time += sched_clock() - start;
 	return ret;

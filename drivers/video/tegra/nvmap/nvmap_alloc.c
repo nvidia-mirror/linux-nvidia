@@ -719,7 +719,7 @@ static void alloc_handle(struct nvmap_client *client,
 					void *cpu_addr;
 
 					if (h->pgalloc.pages &&
-					    h->heap_type == NVMAP_HEAP_CARVEOUT_CBC) {
+					    h->heap_type == NVMAP_HEAP_CARVEOUT_COMPRESSION) {
 						unsigned long page_count;
 						int i;
 

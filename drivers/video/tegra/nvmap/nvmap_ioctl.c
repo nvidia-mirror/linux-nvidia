@@ -208,9 +208,9 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 		return -EINVAL;
 
 	/*
-	 * In case of CBC carveout, the handle size needs to be aligned to 2MB.
+	 * In case of Compression carveout, the handle size needs to be aligned to 2MB.
 	 */
-	if (op.heap_mask & NVMAP_HEAP_CARVEOUT_CBC) {
+	if (op.heap_mask & NVMAP_HEAP_CARVEOUT_COMPRESSION) {
 		handle->size = ALIGN_2MB(handle->size);
 		page_sz = SIZE_2MB;
 	}
@@ -1143,10 +1143,10 @@ int nvmap_ioctl_get_handle_parameters(struct file *filp, void __user *arg)
 	/*
 	 * Check handle is allocated or not while setting contig.
 	 * If heap type is IOVMM, check if it has flag set for contiguous memory
-	 * allocation request. Otherwise, if handle belongs to any carveout except cbc
-	 * then all allocations are contiguous, hence set contig flag to true.
-	 * In case of cbc, if allocation is page based then set contig flag to false
-	 * otherwise true.
+	 * allocation request. Otherwise, if handle belongs to any carveout except compression
+	 * carveout then all allocations are contiguous, hence set contig flag to true.
+	 * In case of compression carveout, if allocation is page based then set contig flag to
+	 * false otherwise true.
 	 */
 	if (handle->alloc &&
 	   ((handle->heap_type == NVMAP_HEAP_IOVMM &&
