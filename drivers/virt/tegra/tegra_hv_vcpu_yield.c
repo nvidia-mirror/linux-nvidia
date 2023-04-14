@@ -289,7 +289,6 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 	int *vcpu_list = NULL;
 	struct class *vcpu_yield_class;
 	struct tegra_hv_ivc_cookie *ivck;
-	struct cpumask cpumask;
 
 	dt_array_mem = kcalloc(3, MAX_YIELD_VM_COUNT * sizeof(int), GFP_KERNEL);
 	if (dt_array_mem == NULL) {
@@ -432,9 +431,7 @@ static int tegra_hv_vcpu_yield_probe(struct platform_device *pdev)
 			goto out;
 		}
 
-		cpumask_clear(&cpumask);
-		cpumask_set_cpu(vcpu_yield->vcpu, &cpumask);
-		irq_set_affinity_hint(ivck->irq, &cpumask);
+		irq_set_affinity_hint(ivck->irq, cpumask_of(vcpu_yield->vcpu));
 
 		tegra_hv_ivc_channel_reset(ivck);
 	}
