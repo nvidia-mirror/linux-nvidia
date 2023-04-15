@@ -800,8 +800,8 @@ static int tegra_hv_vblk_oops_resume(struct device *dev)
 }
 
 static const struct dev_pm_ops tegra_hv_vblk_oops_pm_ops = {
-	.suspend = tegra_hv_vblk_oops_suspend,
-	.resume = tegra_hv_vblk_oops_resume,
+	.suspend_noirq = tegra_hv_vblk_oops_suspend,
+	.resume_noirq = tegra_hv_vblk_oops_resume,
 };
 #endif /* CONFIG_PM_SLEEP */
 
