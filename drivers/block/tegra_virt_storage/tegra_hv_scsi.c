@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -25,6 +25,8 @@
 #include <scsi/sg.h>
 #include "tegra_vblk.h"
 
+#define UFS_REQUEST_SENS_DATA_LEN 18U
+
 int vblk_prep_sg_io(struct vblk_dev *vblkdev,
 		struct vblk_ioctl_req *ioctl_req,
 		void __user *user)
@@ -44,6 +46,7 @@ int vblk_prep_sg_io(struct vblk_dev *vblkdev,
 	uint32_t data_buf_size_aligned;
 	uint32_t ioctl_len;
 	void *ioctl_buf = NULL;
+	uint32_t max_sb_len;
 
 	hp = kmalloc(header_len, GFP_KERNEL);
 	if (hp == NULL) {
@@ -69,7 +72,12 @@ int vblk_prep_sg_io(struct vblk_dev *vblkdev,
 		goto free_hp;
 	}
 
-	data_buf_offset = (sbp_offset + hp->mx_sb_len);
+	if (hp->mx_sb_len == 0)
+		max_sb_len = UFS_REQUEST_SENS_DATA_LEN;
+	else
+		max_sb_len = hp->mx_sb_len;
+
+	data_buf_offset = (sbp_offset + max_sb_len);
 	if (data_buf_offset < sbp_offset) {
 		err = -EMSGSIZE;
 		goto free_hp;
@@ -138,7 +146,7 @@ int vblk_prep_sg_io(struct vblk_dev *vblkdev,
 	}
 
 	vblk_hp->cmd_len = hp->cmd_len;
-	vblk_hp->mx_sb_len = hp->mx_sb_len;
+	vblk_hp->mx_sb_len = max_sb_len;
 	/* This is actual data len on which storage server needs to act */
 	vblk_hp->dxfer_len = hp->dxfer_len;
 	/* This is the data buffer len, data length is strictly dependent on the
@@ -201,7 +209,11 @@ int vblk_complete_sg_io(struct vblk_dev *vblkdev,
 	hp->msg_status = msg_byte(vblk_hp->status);
 	hp->host_status = host_byte(vblk_hp->status);
 	hp->driver_status = driver_byte(vblk_hp->status);
-	hp->sb_len_wr = vblk_hp->sb_len_wr;
+	if (hp->mx_sb_len != 0U)
+		hp->sb_len_wr = vblk_hp->sb_len_wr;
+	else
+		hp->sb_len_wr = 0U;
+
 	/* TODO: Handle the residual length */
 	hp->resid = 0;
 
