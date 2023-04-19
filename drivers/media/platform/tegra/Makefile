@@ -11,3 +11,4 @@ obj-$(CONFIG_VIDEO_TEGRA_VI_TPG) += tpg/
 obj-$(CONFIG_TEGRA_MIPI_CAL)	+= mipical/
 obj-$(CONFIG_VIDEO_ISC)		+= isc/
 obj-$(CONFIG_VIDEO_CDI)		+= cdi/
+obj-$(CONFIG_VIDEO_CDI)		+= cam_fsync/
