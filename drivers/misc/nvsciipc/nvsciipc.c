@@ -239,7 +239,8 @@ static int nvsciipc_ioctl_validate_auth_token(struct nvsciipc *ctx,
 	int32_t ret = 0;
 
 	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		ret = -EPERM;
 		goto exit;
 	}
@@ -276,7 +277,8 @@ static int nvsciipc_ioctl_map_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	int32_t ret = 0;
 
 	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		ret = -EPERM;
 		goto exit;
 	}
@@ -313,7 +315,8 @@ static int nvsciipc_ioctl_get_db_by_name(struct nvsciipc *ctx, unsigned int cmd,
 	int i;
 
 	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		return -EPERM;
 	}
 
@@ -333,6 +336,7 @@ static int nvsciipc_ioctl_get_db_by_name(struct nvsciipc *ctx, unsigned int cmd,
 	}
 
 	if (i == ctx->num_eps) {
+		INFO("%s : no entry (%s)\n", __func__, get_db.ep_name);
 		return -ENOENT;
 	} else if (copy_to_user((void __user *)arg, &get_db,
 				_IOC_SIZE(cmd))) {
@@ -350,7 +354,8 @@ static int nvsciipc_ioctl_get_db_by_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	int i;
 
 	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		return -EPERM;
 	}
 
@@ -369,6 +374,7 @@ static int nvsciipc_ioctl_get_db_by_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	}
 
 	if (i == ctx->num_eps) {
+		INFO("%s : no entry (0x%llx)\n", __func__, get_db.vuid);
 		return -ENOENT;
 	} else if (copy_to_user((void __user *)arg, &get_db,
 				_IOC_SIZE(cmd))) {
@@ -386,7 +392,8 @@ static int nvsciipc_ioctl_get_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	int i;
 
 	if ((ctx->num_eps == 0) || (ctx->set_db_f != true)) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		return -EPERM;
 	}
 
@@ -405,6 +412,7 @@ static int nvsciipc_ioctl_get_vuid(struct nvsciipc *ctx, unsigned int cmd,
 	}
 
 	if (i == ctx->num_eps) {
+		INFO("%s : no entry (%s)\n", __func__, get_vuid.ep_name);
 		return -ENOENT;
 	} else if (copy_to_user((void __user *)arg, &get_vuid,
 				_IOC_SIZE(cmd))) {
@@ -422,6 +430,8 @@ static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
 	struct nvsciipc_config_entry **entry_ptr;
 	int ret = 0;
 	int i;
+
+	INFO("set_db start\n");
 
 #if defined(CONFIG_ANDROID)
 	if ((current_cred()->uid.val != SYSTEM_GID) &&
@@ -524,6 +534,8 @@ static int nvsciipc_ioctl_set_db(struct nvsciipc *ctx, unsigned int cmd,
 
 	ctx->set_db_f = true;
 
+	INFO("set_db done\n");
+
 	return ret;
 
 ptr_error:
@@ -553,7 +565,8 @@ static int nvsciipc_ioctl_get_dbsize(struct nvsciipc *ctx, unsigned int cmd,
 	int32_t ret = 0;
 
 	if (ctx->set_db_f != true) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		ret = -EPERM;
 		goto exit;
 	}
@@ -648,7 +661,8 @@ static ssize_t nvsciipc_dbg_read(struct file *filp, char __user *buf,
 	}
 
 	if (ctx->set_db_f != true) {
-		ERR("need to set endpoint database first\n");
+		ERR("%s[%d] need to set endpoint database first\n", __func__,
+			get_current()->pid);
 		return -EPERM;
 	}
 
