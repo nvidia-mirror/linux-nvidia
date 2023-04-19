@@ -671,7 +671,7 @@ int esc_mods_net_force_link(struct mods_client          *client,
 			    struct MODS_NET_DEVICE_NAME *p);
 #endif
 
-#if defined(MODS_HAS_DMABUF) && defined(CONFIG_DMA_SHARED_BUFFER)
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_DMA_SHARED_BUFFER)
 int esc_mods_dmabuf_get_phys_addr(struct mods_client *client,
 				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *p);
 #else
@@ -735,7 +735,7 @@ static inline int mods_create_debugfs(struct miscdevice *modsdev)
 static inline void mods_remove_debugfs(void) {}
 #endif /* CONFIG_DEBUG_FS */
 
-#if defined(MODS_HAS_DMABUF) && defined(CONFIG_DMA_SHARED_BUFFER)
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_DMA_SHARED_BUFFER)
 int mods_init_dmabuf(void);
 void mods_exit_dmabuf(void);
 #else

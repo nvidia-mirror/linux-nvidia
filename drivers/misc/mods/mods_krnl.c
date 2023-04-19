@@ -2656,7 +2656,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 				    MODS_FLUSH_CPU_CACHE_RANGE);
 		break;
 #endif
-#if defined(MODS_HAS_DMABUF)
+#if defined(MODS_HAS_TEGRA) && defined(CONFIG_DMA_SHARED_BUFFER)
 	case MODS_ESC_DMABUF_GET_PHYSICAL_ADDRESS:
 		MODS_IOCTL(MODS_ESC_DMABUF_GET_PHYSICAL_ADDRESS,
 			   esc_mods_dmabuf_get_phys_addr,

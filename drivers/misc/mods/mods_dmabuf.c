@@ -2,7 +2,7 @@
 /*
  * This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -24,6 +24,10 @@
 #include <linux/platform_device.h>
 
 #include "mods_internal.h"
+
+#if KERNEL_VERSION(5, 4, 0) <= MODS_KERNEL_VERSION
+MODULE_IMPORT_NS(DMA_BUF);
+#endif
 
 static struct device *dummy_device;
 
