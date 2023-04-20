@@ -78,7 +78,11 @@
 #define NVVSE_MAX_ALLOCATED_SHA_RESULT_BUFF_SIZE	256U
 
 #define MISC_DEVICE_NAME_LEN		32U
-static struct miscdevice *g_misc_devices[MAX_NUMBER_MISC_DEVICES];
+
+struct nvvse_devnode {
+	struct miscdevice *g_misc_devices;
+	bool is_node_open;
+} nvvse_devnode[MAX_NUMBER_MISC_DEVICES];
 
 /* SHA Algorithm Names */
 static const char *sha_alg_names[] = {
@@ -1801,11 +1805,31 @@ static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 	char root_path_buf[512];
 	const char *root_path, *str;
 	int ret = 0;
+	uint32_t node_id;
+
+	/* get the node id from file name */
+	root_path = dentry_path_raw(filp->f_path.dentry, root_path_buf, sizeof(root_path_buf));
+	str = strrchr(root_path, '-');
+	if (str == NULL) {
+		pr_err("%s: invalid dev node name\n", __func__);
+		return -EINVAL;
+	}
+
+	if (kstrtou32(str+1, 10, &node_id)) {
+		pr_err("%s: invalid crypto dev instance passed\n", __func__);
+		return -EINVAL;
+	}
+
+	if (nvvse_devnode[node_id].is_node_open) {
+		pr_err("%s: Trying to open already opened node. node_id %u\n", __func__, node_id);
+		return -EAGAIN;
+	}
 
 	ctx = kzalloc(sizeof(struct tnvvse_crypto_ctx), GFP_KERNEL);
 	if (!ctx) {
 		return -ENOMEM;
 	}
+	ctx->node_id = node_id;
 
 	mutex_init(&ctx->lock);
 
@@ -1823,26 +1847,11 @@ static int tnvvse_crypto_dev_open(struct inode *inode, struct file *filp)
 		goto free_rng_buf;
 	}
 
-	/* get the node id from file name */
-	root_path = dentry_path_raw(filp->f_path.dentry, root_path_buf, sizeof(root_path_buf));
-	str = strrchr(root_path, '-');
-	if (str == NULL) {
-		pr_err("%s: invalid dev node name\n", __func__);
-		ret = -EINVAL;
-		goto free_sha_buf;
-	}
-
-	if (kstrtou32(str+1, 10, &ctx->node_id)) {
-		pr_err("%s: invalid crypto dev instance passed\n", __func__);
-		ret = -EINVAL;
-		goto free_sha_buf;
-	}
-
 	filp->private_data = ctx;
+	nvvse_devnode[node_id].is_node_open = true;
+
 	return ret;
 
-free_sha_buf:
-	kfree(ctx->sha_result);
 free_rng_buf:
 	kfree(ctx->rng_buff);
 free_mutex:
@@ -1861,6 +1870,7 @@ static int tnvvse_crypto_dev_release(struct inode *inode, struct file *filp)
 	kfree(ctx->rng_buff);
 	kfree(ctx);
 	filp->private_data = NULL;
+	nvvse_devnode[ctx->node_id].is_node_open = false;
 
 	return ret;
 }
@@ -2148,17 +2158,17 @@ static int __init tnvvse_crypto_device_init(void)
 			pr_err("%s: misc dev %u registeration failed err %d\n", __func__, cnt, ret);
 			goto fail;
 		}
-		g_misc_devices[cnt] = misc;
+		nvvse_devnode[cnt].g_misc_devices = misc;
 	}
 
 	return ret;
 
 fail:
 	for (ctr = 0; ctr < cnt; ctr++) {
-		misc_deregister(g_misc_devices[ctr]);
-		kfree(g_misc_devices[ctr]->name);
-		kfree(g_misc_devices[ctr]);
-		g_misc_devices[ctr] = NULL;
+		misc_deregister(nvvse_devnode[ctr].g_misc_devices);
+		kfree(nvvse_devnode[ctr].g_misc_devices->name);
+		kfree(nvvse_devnode[ctr].g_misc_devices);
+		nvvse_devnode[ctr].g_misc_devices = NULL;
 	}
 	return ret;
 }
@@ -2169,11 +2179,11 @@ static void __exit tnvvse_crypto_device_exit(void)
 	uint32_t ctr;
 
 	for (ctr = 0; ctr < MAX_NUMBER_MISC_DEVICES; ctr++) {
-		if (g_misc_devices[ctr] != NULL) {
-			misc_deregister(g_misc_devices[ctr]);
-			kfree(g_misc_devices[ctr]->name);
-			kfree(g_misc_devices[ctr]);
-			g_misc_devices[ctr] = NULL;
+		if (nvvse_devnode[ctr].g_misc_devices != NULL) {
+			misc_deregister(nvvse_devnode[ctr].g_misc_devices);
+			kfree(nvvse_devnode[ctr].g_misc_devices->name);
+			kfree(nvvse_devnode[ctr].g_misc_devices);
+			nvvse_devnode[ctr].g_misc_devices = NULL;
 		}
 	}
 }
