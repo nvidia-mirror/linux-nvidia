@@ -308,11 +308,11 @@ static int pva_init_fw(struct platform_device *pdev)
 	struct pva_fw *fw_info = &pva->fw_info;
 	struct pva_dma_alloc_info *priv1_buffer;
 	struct pva_dma_alloc_info *priv2_buffer;
-	u32 *ucode_ptr;
 	int err = 0;
 	u64 ucode_useg_addr;
 	u32 sema_value = 0;
 	u32 dram_base;
+	u32 ucode_seg_addr_hi = 0;
 	uint64_t useg_addr;
 	u32 i;
 
@@ -320,26 +320,29 @@ static int pva_init_fw(struct platform_device *pdev)
 
 	priv1_buffer = &fw_info->priv1_buffer;
 	priv2_buffer = &fw_info->priv2_buffer;
-	ucode_ptr = priv1_buffer->va;
 
 	/* Set the Ucode Header address for R5 */
 	/* Program user seg subtracting the offset */
-	ucode_useg_addr = 0;
-	host1x_writel(pdev, cfg_r5user_lsegreg_r(pva->version),
-		      PVA_LOW32(ucode_useg_addr));
-	host1x_writel(pdev, cfg_r5user_usegreg_r(pva->version),
-		      PVA_EXTRACT64(ucode_useg_addr, 39, 32, u32));
+	ucode_useg_addr = 0x80000000;
+	pva->version_config->write_mailbox(pdev, PVA_MBOXID_USERSEG_L,
+					   PVA_LOW32(ucode_useg_addr));
+	ucode_seg_addr_hi = PVA_EXTRACT64(ucode_useg_addr, 39, 32, u32);
+	pva->version_config->write_mailbox(pdev, PVA_MBOXID_USERSEG_H,
+					   ucode_seg_addr_hi);
 
 	/* Program the extra memory to be used by R5 */
-	ucode_useg_addr = priv2_buffer->pa - fw_info->priv2_reg_offset;
+	ucode_useg_addr = priv2_buffer->pa;
+	ucode_seg_addr_hi = PVA_EXTRACT64(ucode_useg_addr, 39, 32, u32);
+
 	host1x_writel(pdev, cfg_priv_ar2_start_r(pva->version),
 		      fw_info->priv2_reg_offset);
 	host1x_writel(pdev, cfg_priv_ar2_end_r(pva->version),
 		      fw_info->priv2_reg_offset + priv2_buffer->size);
-	host1x_writel(pdev, cfg_priv_ar2_lsegreg_r(pva->version),
-		      PVA_LOW32(ucode_useg_addr));
-	host1x_writel(pdev, cfg_priv_ar2_usegreg_r(pva->version),
-		      PVA_EXTRACT64(ucode_useg_addr, 39, 32, u32));
+
+	pva->version_config->write_mailbox(pdev, PVA_MBOXID_PRIV2SEG_L,
+					   PVA_LOW32(ucode_useg_addr));
+	pva->version_config->write_mailbox(pdev, PVA_MBOXID_PRIV2SEG_H,
+					   ucode_seg_addr_hi);
 
 	/* Write EVP registers */
 	for (i = 0; i < EVP_REG_NUM; i++)
@@ -352,12 +355,21 @@ static int pva_init_fw(struct platform_device *pdev)
 		      cfg_priv_ar1_end_r(pva->version),
 		      FW_CODE_DATA_END_ADDR);
 	useg_addr = priv1_buffer->pa - FW_CODE_DATA_START_ADDR;
-	host1x_writel(pdev,
-		      cfg_priv_ar1_lsegreg_r(pva->version),
-		      PVA_LOW32(useg_addr));
-	host1x_writel(pdev,
-		      cfg_priv_ar1_usegreg_r(pva->version),
-		      PVA_EXTRACT64((useg_addr), 39, 32, u32));
+	if (pva->is_hv_mode) {
+		host1x_writel(pdev,
+			      cfg_priv_ar1_lsegreg_r(pva->version),
+			      0xFFFFFFFF);
+		host1x_writel(pdev,
+			      cfg_priv_ar1_usegreg_r(pva->version),
+			      0xFFFFFFFF);
+	} else {
+		host1x_writel(pdev,
+			      cfg_priv_ar1_lsegreg_r(pva->version),
+			      PVA_LOW32(useg_addr));
+		host1x_writel(pdev,
+			      cfg_priv_ar1_usegreg_r(pva->version),
+			      PVA_EXTRACT64((useg_addr), 39, 32, u32));
+	}
 
 	/* Indicate the OS is waiting for PVA ready Interrupt */
 	pva->cmd_status[PVA_MAILBOX_INDEX] = PVA_CMD_STATUS_WFI;
@@ -548,6 +560,12 @@ static int pva_read_ucode_co(struct platform_device *pdev,
 	int err = 0;
 	struct pva_fw *fw_info = &pva->fw_info;
 
+	if (pva->is_hv_mode) {
+		pva->priv1_dma.pa = 0xFFFFFFFF;
+		pva->priv1_dma.va = 0;
+		goto update_info;
+	}
+
 	if (pva->map_co_needed) {
 		err = nvpva_map_region(&pdev->dev,
 				       pva->co->base,
@@ -562,6 +580,8 @@ static int pva_read_ucode_co(struct platform_device *pdev,
 		pva->priv1_dma.pa = pva->co->base;
 		pva->priv1_dma.va = 0;
 	}
+
+update_info:
 
 	fw_info->priv1_buffer.va = pva->priv1_dma.va;
 	fw_info->priv1_buffer.pa = pva->priv1_dma.pa;
@@ -812,7 +832,6 @@ int pva_finalize_poweron(struct platform_device *pdev)
 	if (!pva->boot_from_file) {
 		nvpva_dbg_fn(pva, "boot from co");
 		pva->co = pva_fw_co_get_info(pva);
-
 		if (pva->co == NULL) {
 			nvpva_dbg_fn(pva, "failed to get carveout");
 			err = -ENOMEM;
@@ -1136,7 +1155,8 @@ static int pva_probe(struct platform_device *pdev)
 	pva->syncpts.syncpts_mapped_r = false;
 	pva->syncpts.syncpts_mapped_rw = false;
 	nvpva_dbg_fn(pva, "match. compatible = %s", match->compatible);
-	if (is_tegra_hypervisor_mode())
+	pva->is_hv_mode = is_tegra_hypervisor_mode();
+	if (pva->is_hv_mode)
 		pva->map_co_needed = false;
 	else
 		pva->map_co_needed = true;

@@ -441,6 +441,7 @@ struct pva {
 	bool stats_enabled;
 	bool map_co_needed;
 	bool boot_from_file;
+	bool is_hv_mode;
 	struct pva_vpu_util_info vpu_util_info;
 	u32 profiling_level;
 
