@@ -29,11 +29,7 @@ mods-$(CONFIG_PCI)                 += mods_pci.o
 mods-$(CONFIG_ARCH_TEGRA_19x_SOC)  += mods_ras.o
 mods-$(CONFIG_ARCH_TEGRA)          += mods_smmu_drv.o
 mods-$(CONFIG_TEGRA_DC)            += mods_tegradc.o
+mods-$(CONFIG_ARCH_TEGRA)          += mods_tegraprod.o
 mods-$(CONFIG_TRUSTY)              += mods_tz.o
 
 mods-objs                          := mods.dtb.o
-
-ifneq ($(CONFIG_TEGRA_OOT_MODULE),m)
-ccflags-y                          += -DMODS_HAS_PROD
-mods-$(CONFIG_ARCH_TEGRA)          += mods_tegraprod.o
-endif

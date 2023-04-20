@@ -558,11 +558,6 @@ static int __init mods_init_module(void)
 	if (rc < 0)
 		return rc;
 
-#if defined(MODS_HAS_PROD)
-	/* tegra prod */
-	mods_tegra_prod_init(&mods_dev);
-#endif
-
 #if defined(CONFIG_DMA_ENGINE)
 	rc = mods_init_dma();
 	if (rc < 0)
@@ -2552,7 +2547,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   MODS_GET_RESET_HANDLE);
 		break;
 #endif
-#if defined(MODS_HAS_PROD)
+#if defined(MODS_HAS_TEGRA)
 	case MODS_ESC_BPMP_SET_PCIE_STATE:
 		MODS_IOCTL(MODS_ESC_BPMP_SET_PCIE_STATE,
 			   esc_mods_bpmp_set_pcie_state,
@@ -2564,8 +2559,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_bpmp_init_pcie_ep_pll,
 			   MODS_INIT_PCIE_EP_PLL);
 		break;
-#endif
-#if defined(MODS_HAS_TEGRA)
+
 	case MODS_ESC_DMA_ALLOC_COHERENT:
 		MODS_IOCTL(MODS_ESC_DMA_ALLOC_COHERENT,
 			   esc_mods_dma_alloc_coherent,
@@ -2713,44 +2707,6 @@ static long mods_krnl_ioctl(struct file  *fp,
 	case MODS_ESC_RESUME_CONSOLE:
 		MODS_IOCTL_VOID(MODS_ESC_RESUME_CONSOLE,
 			   esc_mods_resume_console);
-		break;
-#endif
-
-#if defined(MODS_HAS_PROD)
-	case MODS_ESC_TEGRA_PROD_IS_SUPPORTED:
-		MODS_IOCTL(MODS_ESC_TEGRA_PROD_IS_SUPPORTED,
-			   esc_mods_tegra_prod_is_supported,
-			   MODS_TEGRA_PROD_IS_SUPPORTED);
-		break;
-
-	case MODS_ESC_TEGRA_PROD_SET_PROD_ALL:
-		MODS_IOCTL_NORETVAL(MODS_ESC_TEGRA_PROD_SET_PROD_ALL,
-				    esc_mods_tegra_prod_set_prod_all,
-				    MODS_TEGRA_PROD_SET_TUPLE);
-		break;
-
-	case MODS_ESC_TEGRA_PROD_SET_PROD_BOOT:
-		MODS_IOCTL_NORETVAL(MODS_ESC_TEGRA_PROD_SET_PROD_BOOT,
-				    esc_mods_tegra_prod_set_prod_boot,
-				    MODS_TEGRA_PROD_SET_TUPLE);
-		break;
-
-	case MODS_ESC_TEGRA_PROD_SET_PROD_BY_NAME:
-		MODS_IOCTL_NORETVAL(MODS_ESC_TEGRA_PROD_SET_PROD_BY_NAME,
-				    esc_mods_tegra_prod_set_prod_by_name,
-				    MODS_TEGRA_PROD_SET_TUPLE);
-		break;
-
-	case MODS_ESC_TEGRA_PROD_SET_PROD_EXACT:
-		MODS_IOCTL_NORETVAL(MODS_ESC_TEGRA_PROD_SET_PROD_EXACT,
-				    esc_mods_tegra_prod_set_prod_exact,
-				    MODS_TEGRA_PROD_SET_TUPLE);
-		break;
-
-	case MODS_ESC_TEGRA_PROD_ITERATE_DT:
-		MODS_IOCTL(MODS_ESC_TEGRA_PROD_ITERATE_DT,
-			   esc_mods_tegra_prod_iterate_dt,
-			   MODS_TEGRA_PROD_ITERATOR);
 		break;
 #endif
 

@@ -593,15 +593,12 @@ int esc_mods_register_irq_4(struct mods_client         *client,
 int esc_mods_query_irq_3(struct mods_client      *client,
 			 struct MODS_QUERY_IRQ_3 *p);
 
-#ifdef MODS_HAS_PROD
+#ifdef MODS_HAS_TEGRA
 /* bpmp uphy */
 int esc_mods_bpmp_set_pcie_state(struct mods_client *client,
 				  struct MODS_SET_PCIE_STATE *p);
 int esc_mods_bpmp_init_pcie_ep_pll(struct mods_client *client,
 				  struct MODS_INIT_PCIE_EP_PLL *p);
-#endif
-
-#ifdef MODS_HAS_TEGRA
 
 /* clock */
 int esc_mods_get_clock_handle(struct mods_client           *client,
@@ -686,23 +683,6 @@ int esc_mods_adsp_start(struct mods_client *client);
 int esc_mods_adsp_stop(struct mods_client *client);
 int esc_mods_adsp_run_app(struct mods_client            *client,
 			  struct MODS_ADSP_RUN_APP_INFO *p);
-#endif
-
-#ifdef MODS_HAS_PROD
-/* prod */
-int mods_tegra_prod_init(const struct miscdevice *misc_dev);
-int esc_mods_tegra_prod_iterate_dt(struct mods_client *client,
-	struct MODS_TEGRA_PROD_ITERATOR *iterator);
-int esc_mods_tegra_prod_is_supported(struct mods_client *client,
-	struct MODS_TEGRA_PROD_IS_SUPPORTED *tuple);
-int esc_mods_tegra_prod_set_prod_all(struct mods_client *client,
-	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
-int esc_mods_tegra_prod_set_prod_boot(struct mods_client *client,
-	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
-int esc_mods_tegra_prod_set_prod_by_name(struct mods_client *client,
-	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
-int esc_mods_tegra_prod_set_prod_exact(struct mods_client *client,
-	struct MODS_TEGRA_PROD_SET_TUPLE *tuple);
 #endif
 
 #ifdef CONFIG_TRUSTY
