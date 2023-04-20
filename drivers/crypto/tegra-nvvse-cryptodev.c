@@ -82,6 +82,7 @@
 struct nvvse_devnode {
 	struct miscdevice *g_misc_devices;
 	bool is_node_open;
+	bool sha_init_done;
 } nvvse_devnode[MAX_NUMBER_MISC_DEVICES];
 
 /* SHA Algorithm Names */
@@ -254,6 +255,11 @@ static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
 	int ret = -ENOMEM;
 	char *result_buff = NULL;
 
+	if (nvvse_devnode[ctx->node_id].sha_init_done) {
+		pr_err("%s: Sha init already done for this node_id %u\n", __func__, ctx->node_id);
+		return -EAGAIN;
+	}
+
 	if (init_ctl->sha_type < TEGRA_NVVSE_SHA_TYPE_SHA256  ||
 			init_ctl->sha_type >= TEGRA_NVVSE_SHA_TYPE_MAX) {
 		pr_err("%s(): SHA Type requested %d is not supported\n",
@@ -327,6 +333,7 @@ static int tnvvse_crypto_sha_init(struct tnvvse_crypto_ctx *ctx,
 	sha_state->digest_size = init_ctl->digest_size;
 	sha_state->remaining_bytes = init_ctl->total_msg_size;
 	sha_state->sha_done_success = false;
+	nvvse_devnode[ctx->node_id].sha_init_done = true;
 
 	memset(sha_state->result_buff , 0, 64);
 
@@ -490,6 +497,7 @@ stop_sha:
 	sha_state->total_bytes = 0;
 	sha_state->digest_size = 0;
 	sha_state->remaining_bytes = 0;
+	nvvse_devnode[ctx->node_id].sha_init_done = false;
 
 	return ret;
 }
