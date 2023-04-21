@@ -697,8 +697,6 @@ static void osd_receive_packet(void *priv, struct osi_rx_ring *rx_ring,
 			val = pdata->osi_dma->dstats.rx_vlan_pkt_n;
 			pdata->osi_dma->dstats.rx_vlan_pkt_n =
 				osi_update_stats_counter(val, 1UL);
-			__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
-					       rx_pkt_cx->vlan_tag);
 		}
 #endif /* !OSI_STRIPPED_LIB */
 

@@ -6020,11 +6020,6 @@ static int ether_parse_dt(struct ether_priv_data *pdata)
 		}
 	}
 
-#ifndef OSI_STRIPPED_LIB
-	/* Enable VLAN strip by default */
-	osi_core->strip_vlan_tag = OSI_ENABLE;
-#endif
-
 	ret = ether_parse_phy_dt(pdata, np);
 	if (ret < 0) {
 		dev_err(dev, "failed to parse PHY DT\n");
@@ -6302,7 +6297,6 @@ static void ether_set_ndev_features(struct net_device *ndev,
 
 #ifndef OSI_STRIPPED_LIB
 	/* Rx VLAN tag stripping/filtering enabled by default */
-	features |= NETIF_F_HW_VLAN_CTAG_RX;
 	features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 #endif /* !OSI_STRIPPED_LIB */
 
