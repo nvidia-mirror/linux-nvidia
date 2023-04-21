@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: GPL-2.0
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) 2017-2023, NVIDIA CORPORATION.  All rights reserved.
 
 ccflags-y += -I$(srctree.nvidia)/include
 ccflags-y += -DMODS_HAS_TEGRA
