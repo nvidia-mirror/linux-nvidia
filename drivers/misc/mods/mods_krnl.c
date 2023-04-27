@@ -1554,6 +1554,7 @@ static int resume_fb(struct mods_client *client)
 #endif
 
 static atomic_t console_is_locked;
+static atomic_t console_suspend_client_id;
 
 static int esc_mods_lock_console(struct mods_client *client)
 {
@@ -1582,10 +1583,22 @@ static int esc_mods_unlock_console(struct mods_client *client)
 static int esc_mods_suspend_console(struct mods_client *client)
 {
 	int err = -EINVAL;
+	int other_id;
 
 	LOG_ENT();
 
+	other_id = atomic_cmpxchg(&console_suspend_client_id, 0, client->client_id);
+	if (other_id) {
+		if (other_id == client->client_id)
+			cl_error("console already suspended by this client\n");
+		else
+			cl_error("console already suspended by client %u\n", other_id);
+		LOG_EXT();
+		return -EINVAL;
+	}
+
 	if (atomic_cmpxchg(&console_is_locked, 0, 1)) {
+		atomic_set(&console_suspend_client_id, 0);
 		cl_error("cannot suspend console, console is locked\n");
 		LOG_EXT();
 		return -EINVAL;
@@ -1607,8 +1620,10 @@ static int esc_mods_suspend_console(struct mods_client *client)
 	}
 #endif
 
-	if (err)
+	if (err) {
+		atomic_set(&console_suspend_client_id, 0);
 		cl_warn("no methods to suspend console available\n");
+	}
 
 	atomic_set(&console_is_locked, 0);
 
@@ -1619,22 +1634,46 @@ static int esc_mods_suspend_console(struct mods_client *client)
 
 static int esc_mods_resume_console(struct mods_client *client)
 {
+	if (atomic_read(&console_suspend_client_id) != client->client_id) {
+		cl_error("console was not suspended by this client\n");
+		return -EINVAL;
+	}
+
 	return mods_resume_console(client);
 }
 
 static int mods_resume_console(struct mods_client *client)
 {
-	int err = -EINVAL;
+	bool need_lock = true;
+	int  err       = -EINVAL;
 
 	LOG_ENT();
 
 	if (atomic_cmpxchg(&client->console_is_locked, 1, 0)) {
 		cl_warn("console was not properly unlocked\n");
 		console_unlock();
-	} else if (atomic_cmpxchg(&console_is_locked, 0, 1)) {
+		need_lock = false;
+	}
+
+	/* If we got here on close(), check if this client suspended the console. */
+	if (atomic_read(&console_suspend_client_id) != client->client_id) {
+		if (!need_lock)
+			atomic_set(&console_is_locked, 0);
+		LOG_EXT();
+		return -EINVAL;
+	}
+
+	if (need_lock && atomic_cmpxchg(&console_is_locked, 0, 1)) {
 		cl_error("cannot resume console, console is locked\n");
 		LOG_EXT();
 		return -EINVAL;
+	}
+
+	/* Another thread resumed the console before we took the lock */
+	if (atomic_read(&console_suspend_client_id) != client->client_id) {
+		atomic_set(&console_is_locked, 0);
+		LOG_EXT();
+		return OK;
 	}
 
 	err = resume_fb(client);
@@ -1653,6 +1692,7 @@ static int mods_resume_console(struct mods_client *client)
 	}
 #endif
 	atomic_set(&console_is_locked, 0);
+	atomic_set(&console_suspend_client_id, 0);
 
 	LOG_EXT();
 
@@ -2542,7 +2582,6 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_bpmp_init_pcie_ep_pll,
 			   MODS_INIT_PCIE_EP_PLL);
 		break;
-
 	case MODS_ESC_DMA_ALLOC_COHERENT:
 		MODS_IOCTL(MODS_ESC_DMA_ALLOC_COHERENT,
 			   esc_mods_dma_alloc_coherent,
