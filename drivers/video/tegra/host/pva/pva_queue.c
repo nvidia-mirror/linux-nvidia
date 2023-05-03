@@ -1423,8 +1423,8 @@ static int pva_queue_submit(struct nvpva_queue *queue, void *args)
 
 	set_task_parameters(task_header);
 
-	/* Update L2SRAM flags for T23x */
-	if (task_header->tasks[0]->pva->version == PVA_HW_GEN2)
+	/* Update L2SRAM flags for generations T23x and after */
+	if (task_header->tasks[0]->pva->version != PVA_HW_GEN1)
 		update_batch_tasks(task_header);
 
 	mutex_lock(&queue->tail_lock);
