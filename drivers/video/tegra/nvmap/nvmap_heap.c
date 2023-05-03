@@ -62,17 +62,6 @@
 
 static struct kmem_cache *heap_block_cache;
 
-struct list_block {
-	struct nvmap_heap_block block;
-	struct list_head all_list;
-	unsigned int mem_prot;
-	phys_addr_t orig_addr;
-	size_t size;
-	size_t align;
-	struct nvmap_heap *heap;
-	struct list_head free_list;
-};
-
 struct device *dma_dev_from_handle(unsigned long type)
 {
 	int i;
@@ -171,9 +160,9 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 		err = nvmap_dma_alloc_attrs(dev, len, &pa,
 				GFP_KERNEL, DMA_ATTR_ALLOC_EXACT_SIZE);
 		/*
-		 * In case of Compression carveout, try to allocate the entire chunk in physically
+		 * In case of Compression carveout, try to allocate the entire granule in physically
 		 * contiguous manner. If it returns error, then try to allocate the memory in
-		 * 2MB chunks.
+		 * granules of specified granule size.
 		 */
 		if (h->is_compression_co && IS_ERR(err)) {
 			err = nvmap_dma_alloc_attrs(dev, len, &pa,
@@ -503,7 +492,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 				DMA_MEMORY_NOMAP);
 #else
 		err = nvmap_dma_declare_coherent_memory(h->dma_dev, 0, base, len,
-				DMA_MEMORY_NOMAP, co->is_compression_co);
+				DMA_MEMORY_NOMAP, co->is_compression_co, co->granule_size);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -527,6 +516,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 	h->can_alloc = !!co->can_alloc;
 	h->is_ivm = co->is_ivm;
 	h->is_compression_co = co->is_compression_co;
+	h->granule_size = co->granule_size;
 	h->len = len;
 	h->free_size = len;
 	h->peer = co->peer;
@@ -655,15 +645,18 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 	h = block->handle;
 	if (h->pgalloc.pages) {
 		unsigned long page_count, i;
+		u32 granule_size = 0;
+		struct list_block *b = container_of(block, struct list_block, block);
 
 		/*
-		 * For Compression carveout with physically discontiguous 2MB chunks,
-		 * iterate over 2MB chunks and do cache maint for it.
+		 * For Compression carveout with physically discontiguous granules,
+		 * iterate over granules and do cache maint for it.
 		 */
 		page_count = h->size >> PAGE_SHIFT;
-		for (i = 0; i < page_count; i += PAGES_PER_2MB) {
+		granule_size = b->heap->granule_size;
+		for (i = 0; i < page_count; i += PAGES_PER_GRANULE(granule_size)) {
 			phys = page_to_phys(h->pgalloc.pages[i]);
-			end = phys + SIZE_2MB;
+			end = phys + granule_size;
 			ret = nvmap_cache_maint_phys_range(NVMAP_CACHE_OP_WB_INV, phys, end,
 					true, prot != NVMAP_HANDLE_INNER_CACHEABLE);
 			if (ret)

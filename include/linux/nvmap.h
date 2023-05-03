@@ -105,6 +105,7 @@ struct nvmap_platform_carveout {
 	bool init_done;	/* FIXME: remove once all caveouts use reserved-memory */
 	struct nvmap_pm_ops pm_ops;
 	bool is_compression_co; /* Compression carveout is treated differently */
+	u32 granule_size; /* Granule size for compression carveout */
 };
 
 struct nvmap_platform_data {

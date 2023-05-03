@@ -51,10 +51,9 @@
 
 #include <linux/fdtable.h>
 
-#define SIZE_2MB (2*1024*1024)
-#define ALIGN_2MB(size) ((size + SIZE_2MB - 1) & ~(SIZE_2MB - 1))
-#define PAGE_SHIFT_2MB 21
-#define PAGES_PER_2MB (SIZE_2MB / PAGE_SIZE)
+#define ALIGN_GRANULE_SIZE(size, GRANULE_SIZE) ((size + GRANULE_SIZE - 1) & ~(GRANULE_SIZE - 1))
+#define PAGE_SHIFT_GRANULE(GRANULE_SIZE) (order_base_2(GRANULE_SIZE))
+#define PAGES_PER_GRANULE(GRANULE_SIZE) (GRANULE_SIZE / PAGE_SIZE)
 
 #define DMA_ERROR_CODE	(~(dma_addr_t)0)
 
@@ -497,14 +496,20 @@ struct dma_coherent_mem_replica {
 };
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-			dma_addr_t device_addr, size_t size, int flags, bool is_compression);
+			dma_addr_t device_addr, size_t size, int flags, bool is_compression,
+			u32 granule_size);
 #endif
 int nvmap_probe(struct platform_device *pdev);
 int nvmap_remove(struct platform_device *pdev);
 int nvmap_init(struct platform_device *pdev);
 
 int nvmap_create_carveout(const struct nvmap_platform_carveout *co);
+
+#ifdef NVMAP_LOADABLE_MODULE
+int nvmap_co_setup(struct reserved_mem *rmem, u32 granule_size);
+#else
 int nvmap_co_setup(struct reserved_mem *rmem);
+#endif
 
 struct device *dma_dev_from_handle(unsigned long type);
 struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *dev,

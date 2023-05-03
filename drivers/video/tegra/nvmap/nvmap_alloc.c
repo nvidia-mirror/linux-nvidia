@@ -729,22 +729,28 @@ static void alloc_handle(struct nvmap_client *client,
 					if (h->pgalloc.pages &&
 					    h->heap_type == NVMAP_HEAP_CARVEOUT_COMPRESSION) {
 						unsigned long page_count;
+						u32 granule_size = 0;
 						int i;
+						struct list_block *lb;
 
+						lb = container_of(b, struct list_block, block);
+						granule_size = lb->heap->granule_size;
 						page_count = h->size >> PAGE_SHIFT;
-						/* Iterate over 2MB chunks */
-						for (i = 0; i < page_count; i += PAGES_PER_2MB) {
+						/* Iterate over granules */
+						for (i = 0; i < page_count;
+							i += PAGES_PER_GRANULE(granule_size)) {
 							cpu_addr = memremap(page_to_phys(
 									    h->pgalloc.pages[i]),
-									    SIZE_2MB, MEMREMAP_WB);
+									    granule_size,
+									    MEMREMAP_WB);
 							if (cpu_addr != NULL) {
-								memset(cpu_addr, 0, SIZE_2MB);
+								memset(cpu_addr, 0, granule_size);
 #ifdef NVMAP_UPSTREAM_KERNEL
 								arch_invalidate_pmem(cpu_addr,
-										     SIZE_2MB);
+										     granule_size);
 #else
 								__dma_flush_area(cpu_addr,
-										 SIZE_2MB);
+										 granule_size);
 #endif
 								memunmap(cpu_addr);
 							}

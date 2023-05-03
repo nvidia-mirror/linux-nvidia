@@ -42,6 +42,7 @@ struct nvmap_heap {
 	struct device *dma_dev;
 	bool is_ivm;
 	bool is_compression_co;
+	u32 granule_size;
 	bool can_alloc; /* Used only if is_ivm == true */
 	unsigned int peer; /* Used only if is_ivm == true */
 	unsigned int vm_id; /* Used only if is_ivm == true */
@@ -49,6 +50,17 @@ struct nvmap_heap {
 #ifdef NVMAP_CONFIG_DEBUG_MAPS
 	struct rb_root device_names;
 #endif /* NVMAP_CONFIG_DEBUG_MAPS */
+};
+
+struct list_block {
+	struct nvmap_heap_block block;
+	struct list_head all_list;
+	unsigned int mem_prot;
+	phys_addr_t orig_addr;
+	size_t size;
+	size_t align;
+	struct nvmap_heap *heap;
+	struct list_head free_list;
 };
 
 struct nvmap_heap *nvmap_heap_create(struct device *parent,

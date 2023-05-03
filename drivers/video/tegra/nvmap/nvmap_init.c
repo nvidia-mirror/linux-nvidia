@@ -374,6 +374,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	int *bitmap_nos = NULL;
 	const char *device_name;
 	bool is_compression = false;
+	u32 granule_size = 0;
 
 	device_name = dev_name(dev);
 	if (!device_name) {
@@ -381,12 +382,17 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 		return NULL;
 	}
 
-	if (!strncmp(device_name, "compression", 11))
+	if (!strncmp(device_name, "compression", 11)) {
+		struct nvmap_platform_carveout *co;
+
 		is_compression = true;
+		co = nvmap_get_carveout_pdata("compression");
+		granule_size = co->granule_size;
+	}
 
 	if (is_compression) {
-		/* Calculation for Compression carveout should consider 2MB chunks */
-		count = size >> PAGE_SHIFT_2MB;
+		/* Calculation for Compression carveout should consider granule size */
+		count = size >> PAGE_SHIFT_GRANULE(granule_size);
 	} else {
 		if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
 			page_count = PAGE_ALIGN(size) >> PAGE_SHIFT;
@@ -414,7 +420,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 		if (!is_compression)
 			pages = nvmap_kvzalloc_pages(count);
 		else
-			pages = nvmap_kvzalloc_pages(count * PAGES_PER_2MB);
+			pages = nvmap_kvzalloc_pages(count * PAGES_PER_GRANULE(granule_size));
 
 		if (!pages) {
 			kvfree(bitmap_nos);
@@ -428,7 +434,8 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 
 	if (!is_compression && unlikely(size > ((u64)mem->size << PAGE_SHIFT)))
 		goto err;
-	else if (is_compression && unlikely(size > ((u64)mem->size << PAGE_SHIFT_2MB)))
+	else if (is_compression &&
+		 unlikely(size > ((u64)mem->size << PAGE_SHIFT_GRANULE(granule_size))))
 		goto err;
 
 	if (((mem->flags & DMA_MEMORY_NOMAP) &&
@@ -457,10 +464,10 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 			if (!is_compression)
 				pages[i++] = pfn_to_page(mem->pfn_base + pageno);
 			else {
-				/* Handle 2MB chunks */
-				for (k = 0; k < (alloc_size * PAGES_PER_2MB); k++)
-					pages[i++] = pfn_to_page(mem->pfn_base +
-								 pageno * PAGES_PER_2MB + k);
+				/* Handle granules */
+				for (k = 0; k < (alloc_size * PAGES_PER_GRANULE(granule_size)); k++)
+					pages[i++] = pfn_to_page(mem->pfn_base + pageno *
+								 PAGES_PER_GRANULE(granule_size) + k);
 			}
 		}
 
@@ -474,7 +481,7 @@ static void *__nvmap_dma_alloc_from_coherent(struct device *dev,
 	if (!is_compression)
 		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT);
 	else
-		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT_2MB);
+		*dma_handle = mem->device_base + (first_pageno << PAGE_SHIFT_GRANULE(granule_size));
 
 	if (!(mem->flags & DMA_MEMORY_NOMAP)) {
 		addr = mem->virt_base + (first_pageno << PAGE_SHIFT);
@@ -527,6 +534,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 	struct dma_coherent_mem_replica *mem;
 	bool is_compression = false;
 	const char *device_name;
+	u32 granule_size = 0;
 
 	if (!dev || !dev->dma_mem)
 		return;
@@ -537,8 +545,13 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		return;
 	}
 
-	if (!strncmp(device_name, "compression", 11))
+	if (!strncmp(device_name, "compression", 11)) {
+		struct nvmap_platform_carveout *co;
+
 		is_compression = true;
+		co = nvmap_get_carveout_pdata("compression");
+		granule_size = co->granule_size;
+	}
 
 	mem = (struct dma_coherent_mem_replica *)(dev->dma_mem);
 	if ((mem->flags & DMA_MEMORY_NOMAP) &&
@@ -556,8 +569,9 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 				bitmap_clear(mem->bitmap, pageno, 1);
 			}
 		} else {
-			for (i = 0; i < (size >> PAGE_SHIFT); i += PAGES_PER_2MB) {
-				pageno = (page_to_pfn(pages[i]) - mem->pfn_base) / PAGES_PER_2MB;
+			for (i = 0; i < (size >> PAGE_SHIFT); i += PAGES_PER_GRANULE(granule_size)) {
+				pageno = (page_to_pfn(pages[i]) - mem->pfn_base) /
+						PAGES_PER_GRANULE(granule_size);
 				if (WARN_ONCE(pageno > mem->size,
 				      "invalid pageno:%d\n", pageno))
 					continue;
@@ -574,7 +588,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 	else
 		mem_addr =  mem->virt_base;
 
-	page_shift_val = is_compression ? PAGE_SHIFT_2MB : PAGE_SHIFT;
+	page_shift_val = is_compression ? PAGE_SHIFT_GRANULE(granule_size) : PAGE_SHIFT;
 	if (mem && cpu_addr >= mem_addr &&
 	    cpu_addr - mem_addr < (u64)mem->size << page_shift_val) {
 		unsigned int page = (cpu_addr - mem_addr) >> page_shift_val;
@@ -583,7 +597,7 @@ void nvmap_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 
 		if (DMA_ATTR_ALLOC_EXACT_SIZE & attrs) {
 			if (is_compression)
-				count = ALIGN_2MB(size) >> page_shift_val;
+				count = ALIGN_GRANULE_SIZE(size, granule_size) >> page_shift_val;
 			else
 				count = PAGE_ALIGN(size) >> page_shift_val;
 		}
@@ -674,7 +688,7 @@ static int nvmap_dma_assign_coherent_memory(struct device *dev,
 
 static int nvmap_dma_init_coherent_memory(
 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-	struct dma_coherent_mem_replica **mem, bool is_compression)
+	struct dma_coherent_mem_replica **mem, bool is_compression, u32 granule_size)
 {
 	struct dma_coherent_mem_replica *dma_mem = NULL;
 	void *mem_base = NULL;
@@ -686,7 +700,7 @@ static int nvmap_dma_init_coherent_memory(
 		return -EINVAL;
 
 	if (is_compression)
-		pages = size >> PAGE_SHIFT_2MB;
+		pages = size >> PAGE_SHIFT_GRANULE(granule_size);
 	else
 		pages = size >> PAGE_SHIFT;
 
@@ -729,13 +743,14 @@ err_memunmap:
 }
 
 int nvmap_dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-			dma_addr_t device_addr, size_t size, int flags, bool is_compression)
+			dma_addr_t device_addr, size_t size, int flags, bool is_compression,
+			u32 granule_size)
 {
 	struct dma_coherent_mem_replica *mem;
 	int ret;
 
 	ret = nvmap_dma_init_coherent_memory(phys_addr, device_addr, size, flags, &mem,
-					     is_compression);
+					     is_compression, granule_size);
 	if (ret)
 		return ret;
 
@@ -767,7 +782,8 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 #else
 		err = nvmap_dma_declare_coherent_memory(co->dma_dev, 0,
 				co->base, co->size,
-				DMA_MEMORY_NOMAP, co->is_compression_co);
+				DMA_MEMORY_NOMAP, co->is_compression_co,
+				co->granule_size);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 		if (!err) {
@@ -881,7 +897,7 @@ finish:
 	return ret;
 }
 #else
-int __init nvmap_co_setup(struct reserved_mem *rmem)
+int __init nvmap_co_setup(struct reserved_mem *rmem, u32 granule_size)
 {
 	struct nvmap_platform_carveout *co;
 	ulong start = sched_clock();
@@ -897,16 +913,18 @@ int __init nvmap_co_setup(struct reserved_mem *rmem)
 	co->base = rmem->base;
 	co->size = rmem->size;
 	co->cma_dev = NULL;
-	if (!strncmp(co->name, "compression", 11))
+	if (!strncmp(co->name, "compression", 11)) {
 		co->is_compression_co = true;
+		co->granule_size = granule_size;
+	}
 
 	nvmap_init_time += sched_clock() - start;
 	return ret;
 }
 #endif /* !NVMAP_LOADABLE_MODULE */
 
-RESERVEDMEM_OF_DECLARE(nvmap_co, "nvidia,generic_carveout", nvmap_co_setup);
 #ifndef NVMAP_LOADABLE_MODULE
+RESERVEDMEM_OF_DECLARE(nvmap_co, "nvidia,generic_carveout", nvmap_co_setup);
 RESERVEDMEM_OF_DECLARE(nvmap_vpr_co, "nvidia,vpr-carveout", nvmap_co_setup);
 RESERVEDMEM_OF_DECLARE(nvmap_fsi_co, "nvidia,fsi-carveout", nvmap_co_setup);
 #endif /* !NVMAP_LOADABLE_MODULE */
@@ -919,7 +937,9 @@ int __init nvmap_init(struct platform_device *pdev)
 {
 	int err;
 	struct reserved_mem rmem;
+
 #ifdef NVMAP_LOADABLE_MODULE
+	u32 granule_size = 0;
 	struct reserved_mem *rmem2;
 	struct device_node *np = pdev->dev.of_node;
 	struct of_phandle_iterator it;
@@ -929,6 +949,12 @@ int __init nvmap_init(struct platform_device *pdev)
 		while (!of_phandle_iterator_next(&it) && it.node) {
 			if (of_device_is_available(it.node) &&
 			    !of_device_is_compatible(it.node, "nvidia,ivm_carveout")) {
+				/* Read granule size in case of compression carveout */
+				if (of_device_is_compatible(it.node, "nvidia,compression_carveout")
+				    && of_property_read_u32(it.node, "granule-size", &granule_size)) {
+					pr_err("granule-size property is missing\n");
+					return -EINVAL;
+				}
 				rmem2 = of_reserved_mem_lookup(it.node);
 				if (!rmem2) {
 					if (!of_property_read_string(it.node, "compatible", &compp))
@@ -936,7 +962,7 @@ int __init nvmap_init(struct platform_device *pdev)
 							compp);
 					return -EINVAL;
 				}
-				nvmap_co_setup(rmem2);
+				nvmap_co_setup(rmem2, granule_size);
 			}
 		}
 	}

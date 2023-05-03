@@ -191,7 +191,7 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 	struct nvmap_handle *handle;
 	struct dma_buf *dmabuf = NULL;
 	bool is_ro;
-	int err;
+	int err, i;
 	unsigned int page_sz = PAGE_SIZE;
 
 	if (copy_from_user(&op, arg, sizeof(op)))
@@ -213,11 +213,16 @@ int nvmap_ioctl_alloc(struct file *filp, void __user *arg)
 		return -EINVAL;
 
 	/*
-	 * In case of Compression carveout, the handle size needs to be aligned to 2MB.
+	 * In case of Compression carveout, the handle size needs to be aligned to granule.
 	 */
 	if (op.heap_mask & NVMAP_HEAP_CARVEOUT_COMPRESSION) {
-		handle->size = ALIGN_2MB(handle->size);
-		page_sz = SIZE_2MB;
+		u32 granule_size = 0;
+
+		for (i = 0; i < nvmap_dev->nr_carveouts; i++)
+			if (nvmap_dev->heaps[i].heap_bit & NVMAP_HEAP_CARVEOUT_COMPRESSION)
+				granule_size = nvmap_dev->heaps[i].carveout->granule_size;
+		handle->size = ALIGN_GRANULE_SIZE(handle->size, granule_size);
+		page_sz = granule_size;
 	}
 
 	if (!is_nvmap_memory_available(handle->size, op.heap_mask)) {
