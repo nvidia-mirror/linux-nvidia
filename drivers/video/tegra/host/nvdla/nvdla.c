@@ -31,9 +31,7 @@
 #include <linux/pm_runtime.h>
 #include <soc/tegra/fuse-helper.h>
 #include <uapi/linux/nvhost_nvdla_ioctl.h>
-#ifdef CONFIG_TEGRA_SOC_HWPM
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
-#endif
 
 #if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
 #include <linux/tegra-hsierrrptinj.h>
@@ -765,7 +763,6 @@ static int nvdla_alloc_window_size_memory(struct platform_device *pdev)
 	return err;
 }
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 static int nvdla_hwpm_ip_pm(void *ip_dev, bool disable)
 {
 	int err = 0;
@@ -803,7 +800,6 @@ static int nvdla_hwpm_ip_reg_op(void *ip_dev,
 
 	return 0;
 }
-#endif
 
 static uint32_t nvdla_read_soft_sku_scratch_register(void)
 {
@@ -924,9 +920,7 @@ static int nvdla_probe(struct platform_device *pdev)
 	struct nvdla_device *nvdla_dev = NULL;
 	struct device *dev = &pdev->dev;
 	uint32_t soft_fuse_ret = 0U;
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
-#endif
 
 	if (pdev->dev.of_node) {
 		const struct of_device_id *match;
@@ -1063,13 +1057,13 @@ static int nvdla_probe(struct platform_device *pdev)
 	if (err)
 		goto err_alloc_window_size_mem;
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	nvdla_dbg_info(pdev, "hwpm ip %s register", pdev->name);
 	hwpm_ip_ops.ip_dev = (void *)pdev;
 	hwpm_ip_ops.ip_base_address = pdev->resource[0].start;
 	hwpm_ip_ops.resource_enum = TEGRA_SOC_HWPM_RESOURCE_NVDLA;
 	hwpm_ip_ops.hwpm_ip_pm = &nvdla_hwpm_ip_pm;
 	hwpm_ip_ops.hwpm_ip_reg_op = &nvdla_hwpm_ip_reg_op;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	tegra_soc_hwpm_ip_register(&hwpm_ip_ops);
 #endif
 
@@ -1088,9 +1082,9 @@ static int nvdla_probe(struct platform_device *pdev)
 
 #if (IS_ENABLED(CONFIG_TEGRA_HSIERRRPTINJ))
 err_inj_handler_init:
-#ifdef CONFIG_TEGRA_SOC_HWPM
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	tegra_soc_hwpm_ip_unregister(&hwpm_ip_ops);
-#endif /* CONFIG_TEGRA_SOC_HWPM */
+#endif
 	nvdla_free_window_size_memory(pdev);
 #endif /* CONFIG_TEGRA_HSIERRRPTINJ */
 err_alloc_window_size_mem:
@@ -1121,7 +1115,6 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvdla_device *nvdla_dev = pdata->private_data;
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
 	nvdla_dbg_info(pdev, "hwpm ip %s unregister", pdev->name);
 	hwpm_ip_ops.ip_dev = (void *)pdev;
@@ -1129,6 +1122,7 @@ static int __exit nvdla_remove(struct platform_device *pdev)
 	hwpm_ip_ops.resource_enum = TEGRA_SOC_HWPM_RESOURCE_NVDLA;
 	hwpm_ip_ops.hwpm_ip_pm = NULL;
 	hwpm_ip_ops.hwpm_ip_reg_op = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	tegra_soc_hwpm_ip_unregister(&hwpm_ip_ops);
 #endif
 

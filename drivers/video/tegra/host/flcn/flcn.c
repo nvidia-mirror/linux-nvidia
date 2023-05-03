@@ -29,9 +29,7 @@
 #include <linux/version.h>
 #include <linux/iopoll.h>
 #include <linux/string.h>
-#ifdef CONFIG_TEGRA_SOC_HWPM
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 #include <soc/tegra/tegra-cbb.h>
 #endif
@@ -857,7 +855,6 @@ static ssize_t reload_fw_write(struct device *device,
 
 static DEVICE_ATTR(reload_fw, 0200, NULL, reload_fw_write);
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 static u32 flcn_hwpm_get_ip_index(const char *name)
 {
 	if (strstr(name, "vic")) {
@@ -903,16 +900,13 @@ static int flcn_hwpm_ip_reg_op(void *ip_dev,
 	}
 	return 0;
 }
-#endif
 
 static int flcn_probe(struct platform_device *dev)
 {
 	int err;
 	struct nvhost_device_data *pdata = NULL;
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
 	u32 hwpm_ip_index;
-#endif
 
 	if (dev->dev.of_node) {
 		const struct of_device_id *match;
@@ -965,7 +959,7 @@ static int flcn_probe(struct platform_device *dev)
 
 	if (pdata->flcn_isr)
 		flcn_intr_init(dev);
-#ifdef CONFIG_TEGRA_SOC_HWPM
+
 	hwpm_ip_index = flcn_hwpm_get_ip_index(dev->name);
 	nvhost_dbg_fn("ip %s register", dev->name);
 	if (hwpm_ip_index != TERGA_SOC_HWPM_NUM_IPS) {
@@ -974,9 +968,10 @@ static int flcn_probe(struct platform_device *dev)
 		hwpm_ip_ops.resource_enum = hwpm_ip_index;
 		hwpm_ip_ops.hwpm_ip_pm = &flcn_hwpm_ip_pm;
 		hwpm_ip_ops.hwpm_ip_reg_op = &flcn_hwpm_ip_reg_op;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 		tegra_soc_hwpm_ip_register(&hwpm_ip_ops);
-	}
 #endif
+	}
 
 	return 0;
 }

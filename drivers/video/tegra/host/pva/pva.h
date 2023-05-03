@@ -33,9 +33,7 @@
 #include "pva_vpu_app_auth.h"
 #include "pva_fw_carveout.h"
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 #include <uapi/linux/tegra-soc-hwpm-uapi.h>
-#endif
 
 /**
  * PVA Host1x class IDs
@@ -454,9 +452,7 @@ struct pva {
 
 	struct pva_vpu_dbg_block vpu_dbg_blocks[NUM_VPU_BLOCKS];
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	struct tegra_soc_hwpm_ip_ops hwpm_ip_ops;
-#endif
 };
 
 /**

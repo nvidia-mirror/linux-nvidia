@@ -936,7 +936,6 @@ int pva_prepare_poweroff(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 int pva_hwpm_ip_pm(void *ip_dev, bool disable)
 {
 	int err = 0;
@@ -981,7 +980,6 @@ int pva_hwpm_ip_reg_op(void *ip_dev, enum tegra_soc_hwpm_ip_reg_op reg_op,
 
 	return 0;
 }
-#endif
 
 #if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
 static ssize_t clk_cap_store(struct kobject *kobj,
@@ -1053,10 +1051,7 @@ static int pva_probe(struct platform_device *pdev)
 	struct pva *pva;
 	int err = 0;
 	size_t i;
-
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	u32 offset;
-#endif
 
 #if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
 	struct kobj_attribute *attr = NULL;
@@ -1281,7 +1276,6 @@ static int pva_probe(struct platform_device *pdev)
 
 	++(pva->sid_count);
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
 	offset = hwpm_get_offset();
 
 	if ((UINT_MAX - offset) < pdev->resource[0].start) {
@@ -1295,6 +1289,7 @@ static int pva_probe(struct platform_device *pdev)
 	pva->hwpm_ip_ops.resource_enum = TEGRA_SOC_HWPM_RESOURCE_PVA;
 	pva->hwpm_ip_ops.hwpm_ip_pm = &pva_hwpm_ip_pm;
 	pva->hwpm_ip_ops.hwpm_ip_reg_op = &pva_hwpm_ip_reg_op;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	tegra_soc_hwpm_ip_register(&pva->hwpm_ip_ops);
 #endif
 
@@ -1387,8 +1382,7 @@ static int __exit pva_remove(struct platform_device *pdev)
 		kobject_put(&pdata->clk_cap_kobj);
 	}
 #endif
-
-#ifdef CONFIG_TEGRA_SOC_HWPM
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	tegra_soc_hwpm_ip_unregister(&pva->hwpm_ip_ops);
 #endif
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2021-2022, NVIDIA Corporation.  All rights reserved.
+/* Copyright (c) 2021-2023, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -48,8 +48,6 @@ int pva_finalize_poweron(struct platform_device *pdev);
  */
 int pva_prepare_poweroff(struct platform_device *pdev);
 
-#ifdef CONFIG_TEGRA_SOC_HWPM
-
 enum tegra_soc_hwpm_ip_reg_op;
 
 /**
@@ -87,5 +85,4 @@ int pva_hwpm_ip_reg_op(void *ip_dev,
 		       enum tegra_soc_hwpm_ip_reg_op reg_op,
 		       u32 inst_element_index, u64 reg_offset,
 		       u32 *reg_data);
-#endif
 #endif
