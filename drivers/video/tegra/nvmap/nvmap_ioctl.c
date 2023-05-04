@@ -1364,6 +1364,8 @@ int nvmap_ioctl_query_heap_params(struct file *filp, void __user *arg)
 				heap = nvmap_dev->heaps[i].carveout;
 				op.total = nvmap_query_heap_size(heap);
 				op.free = heap->free_size;
+				if (nvmap_dev->heaps[i].carveout->is_compression_co)
+					op.granule_size = nvmap_dev->heaps[i].carveout->granule_size;
 				break;
 			}
 		}
@@ -1377,6 +1379,7 @@ int nvmap_ioctl_query_heap_params(struct file *filp, void __user *arg)
 		if (ret)
 			goto exit;
 		op.free = free_mem;
+		op.granule_size = PAGE_SIZE;
 	}
 
 	if (copy_to_user(arg, &op, sizeof(op)))

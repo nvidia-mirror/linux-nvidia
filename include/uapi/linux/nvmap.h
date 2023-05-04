@@ -249,6 +249,7 @@ struct nvmap_query_heap_params {
 	__u64 total;
 	__u64 free;
 	__u64 largest_free_block;
+	__u32 granule_size;
 };
 
 /**
