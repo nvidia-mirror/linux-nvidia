@@ -1876,9 +1876,9 @@ static int tnvvse_crypto_dev_release(struct inode *inode, struct file *filp)
 	mutex_destroy(&ctx->lock);
 	kfree(ctx->sha_result);
 	kfree(ctx->rng_buff);
+	nvvse_devnode[ctx->node_id].is_node_open = false;
 	kfree(ctx);
 	filp->private_data = NULL;
-	nvvse_devnode[ctx->node_id].is_node_open = false;
 
 	return ret;
 }
