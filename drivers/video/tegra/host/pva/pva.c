@@ -47,6 +47,12 @@
 #endif
 #include <soc/tegra/fuse-helper.h>
 
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+#include <linux/clk.h>
+#include <linux/clkdev.h>
+#include <linux/clk-provider.h>
+#endif
+
 #include "pva_mailbox_t23x.h"
 #include "pva_interface_regs_t23x.h"
 #include "pva_version_config_t23x.h"
@@ -65,6 +71,7 @@
 #include "nvpva_syncpt.h"
 #include "pva-fw-address-map.h"
 #include "pva_sec_ec.h"
+
 /*
  * NO IOMMU set 0x60000000 as start address.
  * With IOMMU set 0x80000000(>2GB) as startaddress
@@ -957,6 +964,68 @@ int pva_hwpm_ip_reg_op(void *ip_dev, enum tegra_soc_hwpm_ip_reg_op reg_op,
 }
 #endif
 
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+static ssize_t clk_cap_store(struct kobject *kobj,
+	struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	struct nvhost_device_data *pdata =
+		container_of(kobj, struct nvhost_device_data, clk_cap_kobj);
+	/* i is indeed 'index' here after type conversion */
+	int ret, i = attr - pdata->clk_cap_attrs;
+	struct clk_bulk_data *clks = &pdata->clks[i];
+	struct clk *clk = clks->clk;
+	unsigned long freq_cap;
+	long freq_cap_signed;
+
+	ret = kstrtoul(buf, 0, &freq_cap);
+	if (ret)
+		return -EINVAL;
+	/* Remove previous freq cap to get correct rounted rate for new cap */
+	ret = clk_set_max_rate(clk, UINT_MAX);
+	if (ret < 0)
+		return ret;
+
+	freq_cap_signed = clk_round_rate(clk, freq_cap);
+	if (freq_cap_signed < 0)
+		return -EINVAL;
+	freq_cap = (unsigned long)freq_cap_signed;
+	/* Apply new freq cap */
+	ret = clk_set_max_rate(clk, freq_cap);
+	if (ret < 0)
+		return ret;
+
+	/* Update the clock rate */
+	clk_set_rate(clks->clk, freq_cap);
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
+static ssize_t clk_cap_show(struct kobject *kobj,
+	struct kobj_attribute *attr, char *buf)
+{
+	struct nvhost_device_data *pdata =
+		container_of(kobj, struct nvhost_device_data, clk_cap_kobj);
+	/* i is indeed 'index' here after type conversion */
+	int i = attr - pdata->clk_cap_attrs;
+	struct clk_bulk_data *clks = &pdata->clks[i];
+	struct clk *clk = clks->clk;
+	long max_rate;
+
+	max_rate = clk_round_rate(clk, UINT_MAX);
+	if (max_rate < 0)
+		return max_rate;
+
+	return snprintf(buf, PAGE_SIZE, "%ld\n", max_rate);
+}
+
+static struct kobj_type nvpva_kobj_ktype = {
+	.sysfs_ops  = &kobj_sysfs_ops,
+};
+
+#endif
+
 static int pva_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -968,6 +1037,13 @@ static int pva_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_TEGRA_SOC_HWPM
 	u32 offset;
+#endif
+
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+	struct kobj_attribute *attr = NULL;
+	int j = 0;
+	struct clk_bulk_data *clks;
+	struct clk *c;
 #endif
 
 	match = of_match_device(tegra_pva_of_match, dev);
@@ -1202,8 +1278,50 @@ static int pva_probe(struct platform_device *pdev)
 	tegra_soc_hwpm_ip_register(&pva->hwpm_ip_ops);
 #endif
 
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+	if (pdata->num_clks > 0) {
+		err = kobject_init_and_add(&pdata->clk_cap_kobj, &nvpva_kobj_ktype,
+				&pdev->dev.kobj, "%s", "clk_cap");
+		if (err) {
+			dev_err(dev, "Could not add dir 'clk_cap'\n");
+				goto err_iommu_ctxt_init;
+		}
+
+		pdata->clk_cap_attrs = devm_kcalloc(dev, pdata->num_clks,
+			sizeof(*attr), GFP_KERNEL);
+		if (!pdata->clk_cap_attrs)
+			goto err_cleanup_sysfs;
+
+		for (j = 0; j < pdata->num_clks; ++j) {
+			clks = &pdata->clks[j];
+			c = clks->clk;
+			if (!c)
+				continue;
+
+			attr = &pdata->clk_cap_attrs[j];
+			attr->attr.name = __clk_get_name(c);
+			/* octal permission is preferred nowadays */
+			attr->attr.mode = 0644;
+			attr->show = clk_cap_show;
+			attr->store = clk_cap_store;
+			sysfs_attr_init(&attr->attr);
+			if (sysfs_create_file(&pdata->clk_cap_kobj, &attr->attr)) {
+				dev_err(dev, "Could not create sysfs attribute %s\n",
+					__clk_get_name(c));
+				err = -EIO;
+				goto err_cleanup_sysfs;
+			}
+		}
+	}
+#endif
+
 	return 0;
 
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+err_cleanup_sysfs:
+	/* kobj of nvpva_kobj_ktype cleans up sysfs entries automatically */
+	kobject_put(&pdata->clk_cap_kobj);
+#endif
 err_iommu_ctxt_init:
 	nvpva_syncpt_unit_interface_deinit(pdev, pva->aux_pdev);
 err_syncpt_xface_init:
@@ -1236,6 +1354,19 @@ static int __exit pva_remove(struct platform_device *pdev)
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct pva *pva = pdata->private_data;
 	int i;
+
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+	struct kobj_attribute *attr = NULL;
+
+	if (&pdata->clk_cap_kobj) {
+		for (i = 0; i < pdata->num_clks; i++) {
+			attr = &pdata->clk_cap_attrs[i];
+			sysfs_remove_file(&pdata->clk_cap_kobj, &attr->attr);
+		}
+
+		kobject_put(&pdata->clk_cap_kobj);
+	}
+#endif
 
 #ifdef CONFIG_TEGRA_SOC_HWPM
 	tegra_soc_hwpm_ip_unregister(&pva->hwpm_ip_ops);
