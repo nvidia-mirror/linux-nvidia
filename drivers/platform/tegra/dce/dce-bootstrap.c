@@ -163,6 +163,7 @@ dce_start_boot_flow(struct tegra_dce *d)
 	}
 
 	dce_admin_ivc_channel_reset(d);
+	dce_usleep_range(10, 50);
 
 	ret = dce_start_admin_seq(d);
 	if (ret) {

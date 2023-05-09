@@ -49,6 +49,8 @@ void dce_kfree(struct tegra_dce *d, void *addr);
 
 unsigned long dce_get_nxt_pow_of_2(unsigned long *addr, u8 nbits);
 
+void dce_usleep_range(unsigned long min, unsigned long max);
+
 static inline void dce_bitmap_set(unsigned long *map,
 				  unsigned int start, unsigned int len)
 {

@@ -610,6 +610,20 @@ unsigned long dce_get_nxt_pow_of_2(unsigned long *addr, u8 nbits)
 }
 
 /*
+ * dce_usleep_range : sleep between min-max range
+ *
+ * @min : minimum sleep time in usec
+ * @max : maximum sleep time in usec
+ *
+ * Return : void
+ */
+
+void dce_usleep_range(unsigned long min, unsigned long max)
+{
+	usleep_range(min, max);
+}
+
+/*
  * dce_schedule_work : schedule work in global highpri workqueue
  *
  * @work : dce work to be scheduled
