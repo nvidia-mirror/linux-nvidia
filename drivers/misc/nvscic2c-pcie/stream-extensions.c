@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -92,13 +92,12 @@ struct copy_request {
 
 	/*
 	 * actual number of edma-desc per the submit-copy request.
-	 * Shall include (num_flush_range + num_remote_post_fences (eDMAed))
+	 * Shall include (num_flush_range).
 	 */
 	u64 num_edma_desc;
 	/*
 	 * space for num_edma_desc considering worst-case allocation:
-	 * (max_flush_ranges + max_post_fences), assuming submit-copy could have
-	 * all the post-fences for remote signalling by eDMA.
+	 * (max_flush_ranges).
 	 */
 	struct tegra_pcie_edma_desc *edma_desc;
 
@@ -233,7 +232,7 @@ signal_remote_post_fences(struct copy_request *cr);
 
 static int
 prepare_edma_desc(enum drv_mode_t drv_mode, struct copy_req_params *params,
-		  struct tegra_pcie_edma_desc *desc, u64 *num_desc, enum peer_cpu_t);
+		  struct tegra_pcie_edma_desc *desc, u64 *num_desc);
 
 static edma_xfer_status_t
 schedule_edma_xfer(void *edma_h, void *priv, u64 num_desc,
@@ -508,8 +507,20 @@ ioctl_import_obj(struct stream_ext_ctx_t *ctx,
 	}
 
 	peer_cpu = pci_client_get_peer_cpu(ctx->pci_client_h);
-	if (peer_cpu == NVCPU_X86_64)
-		stream_obj->import_obj_map = ioremap(stream_obj->aper, PAGE_SIZE);
+	if (peer_cpu == NVCPU_X86_64) {
+		stream_obj->import_obj_map = ioremap(stream_obj->aper,
+						     PAGE_SIZE);
+	} else {
+		if (stream_obj->import_type == STREAM_OBJ_TYPE_SYNC) {
+			stream_obj->import_obj_map = ioremap(stream_obj->aper,
+							     PAGE_SIZE);
+			if (WARN_ON(!stream_obj->import_obj_map)) {
+				fput(filep);
+				return -ENOMEM;
+			}
+		}
+	}
+
 	fput(filep);
 
 	args->out.handle = handle;
@@ -589,9 +600,9 @@ ioctl_submit_copy_request(struct stream_ext_ctx_t *ctx,
 		goto reclaim_cr;
 
 	cr->peer_cpu = pci_client_get_peer_cpu(ctx->pci_client_h);
-	/* generate eDMA descriptors from flush_ranges, remote_post_fences.*/
+	/* generate eDMA descriptors from flush_ranges.*/
 	ret = prepare_edma_desc(ctx->drv_mode, &ctx->cr_params, cr->edma_desc,
-				&cr->num_edma_desc, cr->peer_cpu);
+				&cr->num_edma_desc);
 	if (ret) {
 		release_copy_request_handles(cr);
 		goto reclaim_cr;
@@ -938,13 +949,9 @@ callback_edma_xfer(void *priv, edma_xfer_status_t status,
 	struct copy_request *cr = (struct copy_request *)priv;
 
 	mutex_lock(&cr->ctx->free_lock);
-	/* increment num_local_fences.*/
+	/* increment post fences: local and remote.*/
 	if (status == EDMA_XFER_SUCCESS) {
-		/* X86 remote end fences are signaled through CPU */
-		if (cr->peer_cpu == NVCPU_X86_64)
-			signal_remote_post_fences(cr);
-
-		/* Signal local fences for Tegra*/
+		signal_remote_post_fences(cr);
 		signal_local_post_fences(cr);
 	}
 
@@ -961,16 +968,14 @@ callback_edma_xfer(void *priv, edma_xfer_status_t status,
 
 static int
 prepare_edma_desc(enum drv_mode_t drv_mode, struct copy_req_params *params,
-		  struct tegra_pcie_edma_desc *desc, u64 *num_desc, enum peer_cpu_t peer_cpu)
+		  struct tegra_pcie_edma_desc *desc, u64 *num_desc)
 {
 	u32 i = 0;
 	int ret = 0;
 	u32 iter = 0;
-	s32 handle = -1;
 	struct file *filep = NULL;
 	struct stream_ext_obj *stream_obj = NULL;
 	struct nvscic2c_pcie_flush_range *flush_range = NULL;
-	phys_addr_t dummy_addr = 0x0;
 
 	*num_desc = 0;
 	for (i = 0; i < params->num_flush_ranges; i++) {
@@ -979,7 +984,6 @@ prepare_edma_desc(enum drv_mode_t drv_mode, struct copy_req_params *params,
 		filep = fget(flush_range->src_handle);
 		stream_obj = filep->private_data;
 		desc[iter].src = (stream_obj->vmap.iova + flush_range->offset);
-		dummy_addr = stream_obj->vmap.iova;
 		fput(filep);
 
 		filep = fget(flush_range->dst_handle);
@@ -993,27 +997,6 @@ prepare_edma_desc(enum drv_mode_t drv_mode, struct copy_req_params *params,
 
 		desc[iter].sz = flush_range->size;
 		iter++;
-	}
-	/* With Orin as remote end, the remote fence signaling is done using DMA
-	 * With X86 as remote end, the remote fence signaling is done using CPU
-	 */
-	if (peer_cpu == NVCPU_ORIN) {
-		for (i = 0; i < params->num_remote_post_fences; i++) {
-			handle = params->remote_post_fences[i];
-			desc[iter].src = dummy_addr;
-
-			filep = fget(handle);
-			stream_obj = filep->private_data;
-			if (drv_mode == DRV_MODE_EPC)
-				desc[iter].dst = stream_obj->aper;
-			else
-				desc[iter].dst = stream_obj->vmap.iova;
-
-			fput(filep);
-
-			desc[iter].sz = 4;
-			iter++;
-		}
 	}
 	*num_desc += iter;
 	return ret;
@@ -1038,19 +1021,34 @@ signal_remote_post_fences(struct copy_request *cr)
 {
 	u32 i = 0;
 	struct stream_ext_obj *stream_obj = NULL;
-	/* Dummy read operation is done on the imported buffer object to ensure
-	 * coherence of data on Vidmem of GA100 dGPU, which is connected as an EP to X86.
-	 * This is needed as Ampere architecture doesn't support coherence of Write after
-	 * Write operation and the dummy read of 4 bytes ensures the data is reconciled in
-	 * vid-memory when the consumer waiting on a sysmem semaphore is unblocked.
-	 */
-	for (i = 0; i < cr->num_remote_buf_objs; i++) {
-		stream_obj = cr->remote_buf_objs[i];
-		(void)readl(stream_obj->import_obj_map);
-	}
-	for (i = 0; i < cr->num_remote_post_fences; i++) {
-		stream_obj = cr->remote_post_fences[i];
-		writeq(cr->remote_post_fence_values[i], stream_obj->import_obj_map);
+
+	/* X86 remote end fences are signaled through CPU */
+	if (cr->peer_cpu == NVCPU_X86_64) {
+		/* Dummy read operation is done on the imported buffer object
+		 * to ensure coherence of data on Vidmem of GA100 dGPU, which is
+		 * connected as an EP to X86. This is needed as Ampere architecture
+		 * doesn't support coherence of Write after Write operation and the
+		 * dummy read of 4 bytes ensures the data is reconciled in vid-memory
+		 * when the consumer waiting on a sysmem semaphore is unblocked.
+		 */
+		for (i = 0; i < cr->num_remote_buf_objs; i++) {
+			stream_obj = cr->remote_buf_objs[i];
+			(void)readl(stream_obj->import_obj_map);
+		}
+		for (i = 0; i < cr->num_remote_post_fences; i++) {
+			stream_obj = cr->remote_post_fences[i];
+			writeq(cr->remote_post_fence_values[i], stream_obj->import_obj_map);
+		}
+	} else {
+		for (i = 0; i < cr->num_remote_post_fences; i++) {
+			stream_obj = cr->remote_post_fences[i];
+			/*
+			 * Issue dummy pcie read to ensure all data is visible
+			 * to remote SoC before notification is delivered.
+			 */
+			(void)readl(stream_obj->import_obj_map);
+			writel(0x1, stream_obj->import_obj_map);
+		}
 	}
 }
 
@@ -1374,13 +1372,9 @@ allocate_copy_request(struct stream_ext_ctx_t *ctx,
 		goto err;
 	}
 
-	/*
-	 * edma_desc shall include flush_range + worst-case all post-fences
-	 * (all max_post_fences could be remote_post_fence which need be eDMAd).
-	 */
+	/* edma_desc shall include flush_range.*/
 	cr->edma_desc = kzalloc((sizeof(*cr->edma_desc) *
-				(ctx->cr_limits.max_flush_ranges +
-				ctx->cr_limits.max_post_fences)),
+				ctx->cr_limits.max_flush_ranges),
 				GFP_KERNEL);
 	if (WARN_ON(!cr->edma_desc)) {
 		ret = -ENOMEM;

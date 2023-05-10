@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -490,10 +490,21 @@ ioctl_notify_remote_impl(struct endpoint_t *endpoint)
 		ret = pci_client_raise_irq(endpoint->pci_client_h, PCI_EPC_IRQ_MSI,
 					   endpoint->msi_irq);
 	} else {
-	/*
-	 * increment peer's syncpoint. Write of any 4-byte value
-	 * increments remote's syncpoint shim by 1.
-	 */
+		/*
+		 * Ordering between message/data and host1x syncpoints is not
+		 * enforced strictly. Out of the possible WARs, implement dummy
+		 * PCIe Read before any syncpoint notifications towards peer.
+		 *
+		 * For any writes from UMD which require notification, issuing a
+		 * dummy PCIe read here shall suffice for all cases where UMD writes
+		 * data and requires notification via syncpoint.
+		 */
+		(void)readl(syncpt->peer_mem.pva);
+
+		/*
+		 * increment peer's syncpoint. Write of any 4-byte value
+		 * increments remote's syncpoint shim by 1.
+		 */
 		writel(0x1, syncpt->peer_mem.pva);
 	}
 
