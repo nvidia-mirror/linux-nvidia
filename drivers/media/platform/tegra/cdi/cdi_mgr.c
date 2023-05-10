@@ -294,6 +294,7 @@ static int cdi_mgr_gpio_eq_intr_timer(
 	struct cam_gpio_timer_queue *queue;
 	u32 queue_cap;
 	ktime_t timeout_abs;
+	struct cdi_mgr_gpio_intr event;
 
 	if (!pin || !pin->mgr)
 		return -EINVAL;
@@ -310,6 +311,15 @@ static int cdi_mgr_gpio_eq_intr_timer(
 		dev_err(cdi_mgr->dev,
 			"%s: failed to enqueue interrupt timer, overflow\n",
 			__func__);
+
+		/* Report cdi-mgr fault */
+		event.idx = pin->idx;
+		event.code = CDI_MGR_GPIO_INTR_FAULT;
+		if (cdi_mgr_gpio_eq_event(cdi_mgr, event) != 0)
+			dev_err(cdi_mgr->dev,
+				"%s: failed to enqueue cdi-mgr fault event, "
+				"idx %d\n", __func__, pin->idx);
+
 		return -ENOMEM;
 	}
 
