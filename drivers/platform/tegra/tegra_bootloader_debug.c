@@ -338,7 +338,15 @@ static int __init tegra_bootloader_debuginit(void)
 #ifdef CONFIG_DEBUG_FS
 	void __iomem *ptr_bl_debug_data_start = NULL;
 	void __iomem *ptr_bl_boot_cfg_start = NULL;
+#endif
 
+	if (!tegra_bl_prof_start || !tegra_bl_prof_size) {
+		pr_err("%s: command line parameter bl_prof_dataptr not initialized\n",
+			module_name);
+		return -ENODEV;
+	}
+
+#ifdef CONFIG_DEBUG_FS
 	bl_debug_node = debugfs_create_dir(dir_name, NULL);
 
 	if (IS_ERR_OR_NULL(bl_debug_node)) {
@@ -376,26 +384,28 @@ static int __init tegra_bootloader_debuginit(void)
 		goto ignore_debugfs_failure;
 	}
 
-	tegra_bl_mapped_debug_data_start =
-		phys_to_virt(tegra_bl_debug_data_start);
-	if (tegra_bl_debug_data_start != 0
-			&& !pfn_valid(__phys_to_pfn(tegra_bl_debug_data_start))) {
-		ptr_bl_debug_data_start = ioremap(tegra_bl_debug_data_start,
-				tegra_bl_debug_data_size);
+	if (tegra_bl_debug_data_start && tegra_bl_debug_data_size) {
+		tegra_bl_mapped_debug_data_start =
+			phys_to_virt(tegra_bl_debug_data_start);
+		if (!pfn_valid(__phys_to_pfn(tegra_bl_debug_data_start))) {
+			ptr_bl_debug_data_start = ioremap(tegra_bl_debug_data_start,
+					tegra_bl_debug_data_size);
 
-		WARN_ON(!ptr_bl_debug_data_start);
-		if (!ptr_bl_debug_data_start) {
-			pr_err("%s: Failed to map tegra_bl_debug_data_start%08x\n",
-			   __func__, (unsigned int)tegra_bl_debug_data_start);
-			goto ignore_debugfs_failure;
+			WARN_ON(!ptr_bl_debug_data_start);
+			if (!ptr_bl_debug_data_start) {
+				pr_err("%s: Failed to map tegra_bl_debug_data_start%08x\n",
+				   __func__, (unsigned int)tegra_bl_debug_data_start);
+				goto ignore_debugfs_failure;
+			}
+
+			pr_info("Remapped tegra_bl_debug_data_start(0x%llx)"
+				" to address(0x%llx), size(0x%llx)\n",
+				(u64)tegra_bl_debug_data_start,
+				(__force u64)ptr_bl_debug_data_start,
+				(u64)tegra_bl_debug_data_size);
+			tegra_bl_mapped_debug_data_start =
+					(__force void *)ptr_bl_debug_data_start;
 		}
-
-		pr_info("Remapped tegra_bl_debug_data_start(0x%llx)"
-			" to address(0x%llx), size(0x%llx)\n",
-			(u64)tegra_bl_debug_data_start,
-			(__force u64)ptr_bl_debug_data_start,
-			(u64)tegra_bl_debug_data_size);
-		tegra_bl_mapped_debug_data_start = (__force void *)ptr_bl_debug_data_start;
 	}
 
 	/*
@@ -452,8 +462,7 @@ ignore_debugfs_failure:
 		goto out_err;
 	}
 
-	if (tegra_bl_prof_start != 0 && tegra_bl_prof_size != 0 &&
-			!pfn_valid(__phys_to_pfn(tegra_bl_prof_start))) {
+	if (!pfn_valid(__phys_to_pfn(tegra_bl_prof_start))) {
 		ptr_bl_prof_carveout = ioremap(tegra_bl_prof_start, tegra_bl_prof_size);
 		if (!ptr_bl_prof_carveout) {
 			pr_err("%s: failed to map tegra_bl_prof_start\n", __func__);
