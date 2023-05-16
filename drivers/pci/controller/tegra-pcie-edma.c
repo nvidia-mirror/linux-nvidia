@@ -326,6 +326,24 @@ static irqreturn_t edma_irq(int irq, void *cookie)
 	return IRQ_WAKE_THREAD;
 }
 
+static void edma_check_and_ring_db(struct edma_prv *prv, u8 bit, u32 ctrl_off, u32 db_off)
+{
+	u32 reg = dma_channel_rd(prv->edma_base, bit, ctrl_off);
+
+#define CS_POS		5U
+#define CS_MASK		(OSI_BIT(5) | OSI_BIT(6))
+#define CS_RUNNING	2U
+	reg &= CS_MASK;
+	reg >>= CS_POS;
+	/*
+	 * There are pending descriptors to process, but
+	 * EDMA HW is not running. Ring the doorbell again
+	 * to ensure that descriptors are processed.
+	 */
+	if (reg != CS_RUNNING)
+		dma_common_wr(prv->edma_base, bit, db_off);
+}
+
 static irqreturn_t edma_irq_handler(int irq, void *cookie)
 {
 	struct edma_prv *prv = (struct edma_prv *)cookie;
@@ -336,6 +354,8 @@ static irqreturn_t edma_irq_handler(int irq, void *cookie)
 	u32 int_status_off[2] = {DMA_WRITE_INT_STATUS_OFF, DMA_READ_INT_STATUS_OFF};
 	u32 int_clear_off[2] = {DMA_WRITE_INT_CLEAR_OFF, DMA_READ_INT_CLEAR_OFF};
 	u32 mode_cnt[2] = {DMA_WR_CHNL_NUM, DMA_RD_CHNL_NUM};
+	u32 ctrl_off[2] = {DMA_CH_CONTROL1_OFF_WRCH, DMA_CH_CONTROL1_OFF_RDCH};
+	u32 db_off[2] = {DMA_WRITE_DOORBELL_OFF, DMA_READ_DOORBELL_OFF};
 
 	for (i = 0; i < 2; i++) {
 		if (!(prv->ch_init & OSI_BIT(i)))
@@ -383,6 +403,10 @@ static irqreturn_t edma_irq_handler(int irq, void *cookie)
 					dma_common_wr(prv->edma_base, OSI_BIT(bit),
 						      int_clear_off[i]);
 					process_ch_irq(prv, bit, ch, i);
+					/* Check if there are pending descriptors */
+					if (ch->w_idx != ch->r_idx)
+						edma_check_and_ring_db(prv, (u8)(bit & 0xFF),
+								       ctrl_off[i], db_off[i]);
 				}
 			}
 		}
