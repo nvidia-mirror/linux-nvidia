@@ -33,6 +33,9 @@
 #include "nvdla_debug.h"
 #include "dla_os_interface.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/nvdla_ftrace.h>
+
 #define NVDLA_QUEUE_ABORT_TIMEOUT	10000	/* 10 sec */
 #define NVDLA_QUEUE_ABORT_RETRY_PERIOD	500	/* 500 ms */
 
@@ -41,6 +44,12 @@ struct nvdla_add_fence_action_cb_args {
 	struct nvdla_queue *queue;
 	u8 **mem;
 };
+
+/* Computing a unique id to identify a task in a particular queue */
+static uint32_t nvdla_compute_task_id(u16 sequence_id, u16 queue_id)
+{
+	return (queue_id << 16 | sequence_id);
+}
 
 /* task management API's */
 static void nvdla_queue_dump_op(struct nvdla_queue *queue, struct seq_file *s)
@@ -341,14 +350,16 @@ static void nvdla_queue_update(void *priv)
 	u64 timestamp_start, timestamp_end;
 	u64 *timestamp_ptr;
 	int n_tasks_completed = 0;
-
+	uint32_t task_id;
+	int i;
 	mutex_lock(&queue->list_lock);
 
 	nvdla_dbg_fn(pdev, "");
 
 	/* check which task(s) finished */
 	list_for_each_entry_safe(task, safe, &queue->tasklist, list) {
-
+		task_id = nvdla_compute_task_id(task->task_desc->sequence,
+				task->task_desc->queue_id);
 		task_complete = nvhost_syncpt_is_expired_ext(pdev,
 					queue->syncpt_id, task->fence);
 
@@ -365,21 +376,16 @@ static void nvdla_queue_update(void *priv)
 			timestamp_end = *timestamp_ptr >> 5;
 			timestamp_start = (*timestamp_ptr -
 					(tsp_notifier->info32 * 1000)) >> 5;
-			nvhost_eventlib_log_task(pdev,
-				queue->syncpt_id,
-				task->fence,
-				timestamp_start,
-				timestamp_end);
+
+		if (IS_ENABLED(CONFIG_TRACING)) {
+			trace_job_timestamps(task_id, timestamp_start, timestamp_end);
 
 			/* Record task postfences */
-			nvhost_eventlib_log_fences(pdev,
-				queue->syncpt_id,
-				task->fence,
-				task->postfences,
-				task->num_postfences,
-				NVDEV_FENCE_KIND_POST,
-				timestamp_end);
-
+			for (i = 0; i < task->num_postfences; i++) {
+				trace_job_postfence(task_id, task->postfences[i].syncpoint_index,
+						task->postfences[i].syncpoint_value);
+			}
+		}
 			nvdla_task_free_locked(task);
 			n_tasks_completed++;
 		}
@@ -1190,7 +1196,7 @@ int nvdla_emulator_submit(struct nvdla_queue *queue, struct nvdla_emu_task *task
 			continue;
 
 		if ((task->prefences[i].type == NVDEV_FENCE_TYPE_SYNCPT) ||
-		    (task->prefences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
+			(task->prefences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
 			task->prefences[i].syncpoint_index =
 					queue->syncpt_id;
 			task->prefences[i].syncpoint_value =
@@ -1209,7 +1215,7 @@ int nvdla_emulator_submit(struct nvdla_queue *queue, struct nvdla_emu_task *task
 			continue;
 
 		if ((task->postfences[i].type == NVDEV_FENCE_TYPE_SYNCPT) ||
-		    (task->postfences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
+			(task->postfences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
 			task->postfences[i].syncpoint_index =
 					queue->syncpt_id;
 			task->postfences[i].syncpoint_value =
@@ -1249,7 +1255,7 @@ int nvdla_get_signal_fences(struct nvdla_queue *queue, void *in_task)
 			continue;
 
 		if ((task->prefences[i].type == NVDEV_FENCE_TYPE_SYNCPT) ||
-		    (task->prefences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
+			(task->prefences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
 			task->prefences[i].syncpoint_index =
 					queue->syncpt_id;
 			task->prefences[i].syncpoint_value =
@@ -1268,7 +1274,7 @@ int nvdla_get_signal_fences(struct nvdla_queue *queue, void *in_task)
 			continue;
 
 		if ((task->postfences[i].type == NVDEV_FENCE_TYPE_SYNCPT) ||
-		    (task->postfences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
+			(task->postfences[i].type == NVDEV_FENCE_TYPE_SYNC_FD)) {
 			task->postfences[i].syncpoint_index =
 					queue->syncpt_id;
 			task->postfences[i].syncpoint_value =
@@ -1296,7 +1302,9 @@ static int nvdla_queue_submit_op(struct nvdla_queue *queue, void *in_task)
 	struct nvdla_cmd_data cmd_data;
 	uint32_t method_data;
 	uint32_t method_id;
+	uint32_t task_id;
 	int err = 0;
+	int i;
 	u64 timestamp;
 
 	nvdla_dbg_fn(pdev, "");
@@ -1305,6 +1313,8 @@ static int nvdla_queue_submit_op(struct nvdla_queue *queue, void *in_task)
 
 	/* Get a reference before registration or submission */
 	nvdla_task_get(task);
+
+	task_id = nvdla_compute_task_id(task->task_desc->sequence, task->task_desc->queue_id);
 
 	/* get fence from nvhost for MMIO mode*/
 	if (nvdla_dev->submit_mode == NVDLA_SUBMIT_MODE_MMIO) {
@@ -1376,24 +1386,21 @@ static int nvdla_queue_submit_op(struct nvdla_queue *queue, void *in_task)
 			nvdla_dbg_err(pdev, "task[%p] submit failed", task);
 			/* deletes invalid task from queue, puts refs */
 			nvhost_syncpt_set_min_update(pdev, queue->syncpt_id,
-						     task->fence);
+							 task->fence);
 		}
 	}
 
-	if (!err) {
-		/* If submitted, record task submit and prefences */
-		nvhost_eventlib_log_submit(pdev,
-					   queue->syncpt_id,
-					   task->fence,
-					   timestamp);
+	if (IS_ENABLED(CONFIG_TRACING)) {
+		if (!err) {
+			/* If submitted, record task submit and prefences */
+			trace_job_submit(&pdev->dev, pdata->class, task_id, task->num_prefences, timestamp);
 
-		nvhost_eventlib_log_fences(pdev,
-					   queue->syncpt_id,
-					   task->fence,
-					   task->prefences,
-					   task->num_prefences,
-					   NVDEV_FENCE_KIND_PRE,
-					   timestamp);
+			/* Record task prefences */
+			for (i = 0; i < task->num_prefences; i++) {
+				trace_job_prefence(task_id, task->prefences[i].syncpoint_index,
+						task->prefences[i].syncpoint_value);
+			}
+		}
 	}
 
 	mutex_unlock(&queue->list_lock);
