@@ -641,11 +641,6 @@ int esc_mods_dma_async_issue_pending(struct mods_client     *client,
 				     struct MODS_DMA_HANDLE *p);
 #endif
 
-#ifdef CONFIG_TEGRA_DC
-int esc_mods_tegra_dc_config_possible(struct mods_client *client,
-				      struct MODS_TEGRA_DC_CONFIG_POSSIBLE *p);
-#endif
-
 #if defined(MODS_HAS_TEGRA) && defined(CONFIG_NET)
 int esc_mods_net_force_link(struct mods_client          *client,
 			    struct MODS_NET_DEVICE_NAME *p);

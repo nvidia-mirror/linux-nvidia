@@ -2645,13 +2645,6 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   MODS_DMA_WAIT_DESC);
 		break;
 #endif
-#ifdef CONFIG_TEGRA_DC
-	case MODS_ESC_TEGRA_DC_CONFIG_POSSIBLE:
-		MODS_IOCTL(MODS_ESC_TEGRA_DC_CONFIG_POSSIBLE,
-				   esc_mods_tegra_dc_config_possible,
-				   MODS_TEGRA_DC_CONFIG_POSSIBLE);
-		break;
-#endif
 #if defined(MODS_HAS_TEGRA) && defined(CONFIG_NET)
 	case MODS_ESC_NET_FORCE_LINK:
 		MODS_IOCTL(MODS_ESC_NET_FORCE_LINK,
