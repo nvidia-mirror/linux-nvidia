@@ -2,7 +2,7 @@
 /*
  * Tegra host1x Channel
  *
- * Copyright (c) 2010-2013, NVIDIA Corporation.
+ * Copyright (c) 2010-2023, NVIDIA Corporation.
  */
 
 #include <linux/slab.h>
@@ -104,8 +104,8 @@ static struct host1x_channel *acquire_unused_channel(struct host1x *host)
 	unsigned int index;
 
 	index = find_next_zero_bit(chlist->allocated_channels,
-		host->num_channels, host->channel_base);
-	if (index >= host->num_channels) {
+		host->channel_base + host->num_channels, host->channel_base);
+	if (index >= host->channel_base + host->num_channels) {
 		dev_err(host->dev, "failed to find free channel\n");
 		return NULL;
 	}
