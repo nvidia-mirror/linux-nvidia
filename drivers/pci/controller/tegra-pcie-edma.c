@@ -484,6 +484,7 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 
 			ch->type = ch_info->ch_type;
 			ch->desc_sz = ch_info->num_descriptors;
+			ch->edma_desc_size = (sizeof(struct edma_dblock)) * ((ch->desc_sz / 2) + 1);
 
 			if (prv->is_remote_dma) {
 				ch->dma_iova = ch_info->desc_iova;
@@ -497,8 +498,6 @@ void *tegra_pcie_edma_initialize(struct tegra_pcie_edma_init_info *info)
 					goto dma_iounmap;
 				}
 			} else {
-				ch->edma_desc_size = (sizeof(struct edma_dblock)) *
-						   ((ch->desc_sz / 2) + 1);
 				ch->desc = dma_alloc_coherent(prv->dev, ch->edma_desc_size,
 							      &ch->dma_iova, GFP_KERNEL);
 				if (!ch->desc) {
