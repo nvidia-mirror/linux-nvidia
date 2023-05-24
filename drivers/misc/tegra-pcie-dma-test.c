@@ -2,7 +2,7 @@
 /*
  * PCIe DMA test framework for Tegra PCIe
  *
- * Copyright (C) 2021-2022 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2021-2023 NVIDIA Corporation. All rights reserved.
  */
 
 #include <linux/aer.h>
@@ -21,8 +21,6 @@
 #include <linux/tegra-pcie-edma-test-common.h>
 
 #define MODULENAME "pcie_dma_host"
-
-#define EDMA_LIB_TEST 1
 
 struct ep_pvt {
 	struct pci_dev *pdev;
@@ -49,67 +47,20 @@ struct ep_pvt {
 
 static irqreturn_t ep_isr(int irq, void *arg)
 {
-#ifndef EDMA_LIB_TEST
-	struct ep_pvt *ep = (struct ep_pvt *)arg;
-	struct pcie_epf_bar0 *epf_bar0 = ep->bar0_virt;
-	int bit = 0;
-	u32 val;
-	unsigned long wr = DMA_WR_CHNL_MASK, rd = DMA_RD_CHNL_MASK;
-
-	val = dma_common_rd(ep->dma_base, DMA_WRITE_INT_STATUS_OFF);
-	for_each_set_bit(bit, &wr, DMA_WR_CHNL_NUM) {
-		if (BIT(bit) & val) {
-			dma_common_wr(ep->dma_base, BIT(bit),
-				      DMA_WRITE_INT_CLEAR_OFF);
-			epf_bar0->wr_data[bit].crc =
-				crc32_le(~0,
-					 ep->dma_virt + BAR0_DMA_BUF_OFFSET,
-					 epf_bar0->wr_data[bit].size);
-			/* Trigger interrupt to endpoint */
-			writel(epf_bar0->msi_data[bit],
-			       ep->bar0_virt + BAR0_MSI_OFFSET);
-		}
-	}
-
-	val = dma_common_rd(ep->dma_base, DMA_READ_INT_STATUS_OFF);
-	for_each_set_bit(bit, &rd, DMA_RD_CHNL_NUM) {
-		if (BIT(bit) & val) {
-			dma_common_wr(ep->dma_base, BIT(bit),
-				      DMA_READ_INT_CLEAR_OFF);
-			epf_bar0->rd_data[bit].crc =
-				crc32_le(~0,
-					 ep->dma_virt + BAR0_DMA_BUF_OFFSET,
-					 epf_bar0->rd_data[bit].size);
-			/* Trigger interrupt to endpoint */
-			writel(epf_bar0->msi_data[DMA_WR_CHNL_NUM + bit],
-			       ep->bar0_virt + BAR0_MSI_OFFSET);
-		}
-	}
-#else
 	struct ep_pvt *ep = (struct ep_pvt *)arg;
 	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)ep->bar0_virt;
 
 	epf_bar0->wr_data[0].crc = crc32_le(~0,	ep->dma_virt + BAR0_DMA_BUF_OFFSET,
 					    epf_bar0->wr_data[0].size);
-#endif
 
 	return IRQ_HANDLED;
 }
 
 static void tegra_pcie_dma_raise_irq(void *p)
 {
-	struct ep_pvt *ep = (struct ep_pvt *)p;
-	struct pcie_epf_bar0 *epf_bar0 = (struct pcie_epf_bar0 *)ep->bar0_virt;
-
-	writel(epf_bar0->msi_data[0], ep->bar0_virt + BAR0_MSI_OFFSET);
+	pr_err("%s: donot support raise IRQ from RP. CRC test if any started may fail.\n",
+	       __func__);
 }
-
-extern struct device *naga_pci[];
-struct edma_desc {
-	dma_addr_t src;
-	dma_addr_t dst;
-	size_t sz;
-};
 
 static struct device *tegra_pci_dma_get_host_bridge_device(struct pci_dev *dev)
 {
@@ -258,43 +209,6 @@ static int ep_test_dma_probe(struct pci_dev *pdev,
 		dev_err(&pdev->dev, "Failed to register isr\n");
 		goto fail_isr;
 	}
-
-	/* Set MSI address and data in DMA registers */
-#ifndef EDMA_LIB_TEST
-	pci_read_config_dword(pdev, pdev->msi_cap + PCI_MSI_ADDRESS_LO, &val);
-	dma_common_wr(ep->dma_base, val, DMA_WRITE_DONE_IMWR_LOW_OFF);
-	dma_common_wr(ep->dma_base, val, DMA_WRITE_ABORT_IMWR_LOW_OFF);
-	dma_common_wr(ep->dma_base, val, DMA_READ_DONE_IMWR_LOW_OFF);
-	dma_common_wr(ep->dma_base, val, DMA_READ_ABORT_IMWR_LOW_OFF);
-
-	pci_read_config_word(pdev, pdev->msi_cap + PCI_MSI_FLAGS, &val_16);
-	if (val_16 & PCI_MSI_FLAGS_64BIT) {
-		pci_read_config_dword(pdev, pdev->msi_cap + PCI_MSI_ADDRESS_HI,
-				      &val);
-		dma_common_wr(ep->dma_base, val, DMA_WRITE_DONE_IMWR_HIGH_OFF);
-		dma_common_wr(ep->dma_base, val, DMA_WRITE_ABORT_IMWR_HIGH_OFF);
-		dma_common_wr(ep->dma_base, val, DMA_READ_DONE_IMWR_HIGH_OFF);
-		dma_common_wr(ep->dma_base, val, DMA_READ_ABORT_IMWR_HIGH_OFF);
-
-		pci_read_config_word(pdev, pdev->msi_cap + PCI_MSI_DATA_64,
-				     &val_16);
-		val = val_16;
-		val = (val << 16) | val_16;
-		dma_common_wr(ep->dma_base, val, DMA_WRITE_IMWR_DATA_OFF_BASE);
-		dma_common_wr(ep->dma_base, val,
-			      DMA_WRITE_IMWR_DATA_OFF_BASE + 0x4);
-		dma_common_wr(ep->dma_base, val, DMA_READ_IMWR_DATA_OFF_BASE);
-	} else {
-		pci_read_config_word(pdev, pdev->msi_cap + PCI_MSI_DATA_32,
-				     &val_16);
-		val = val_16;
-		val = (val << 16) | val_16;
-		dma_common_wr(ep->dma_base, val, DMA_WRITE_IMWR_DATA_OFF_BASE);
-		dma_common_wr(ep->dma_base, val,
-			      DMA_WRITE_IMWR_DATA_OFF_BASE + 0x4);
-		dma_common_wr(ep->dma_base, val, DMA_READ_IMWR_DATA_OFF_BASE);
-	}
-#endif
 
 	ep->dma_virt = dma_alloc_coherent(&pdev->dev, BAR0_SIZE, &ep->dma_phy,
 					  GFP_KERNEL);
