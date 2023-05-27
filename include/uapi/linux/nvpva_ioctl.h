@@ -465,6 +465,8 @@ struct nvpva_hwseq_config {
 };
 
 struct nvpva_ioctl_task {
+	uint64_t prog_id;
+	uint64_t stream_id;
 	uint16_t exe_id;
 	uint32_t flags;
 	uint32_t l2_alloc_size; /* Not applicable for Xavier */
