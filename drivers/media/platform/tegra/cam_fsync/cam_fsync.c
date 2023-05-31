@@ -868,7 +868,7 @@ static int cam_fsync_find_and_add_groups(struct cam_fsync_controller *controller
 		return err;
 	}
 	if (strcmp("okay", node_status) != 0) {
-		dev_err(controller->dev, "Grouping disabled\n");
+		dev_info(controller->dev, "Grouping disabled\n");
 		return -EOPNOTSUPP;
 	}
 
