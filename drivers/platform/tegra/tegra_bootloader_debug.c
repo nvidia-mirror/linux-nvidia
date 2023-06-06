@@ -67,7 +67,7 @@ static const char *boot_cfg = "boot_cfg";
 static char *bl_debug_data = "0@0x0";
 static char *bl_prof_dataptr = "0@0x0";
 static char *bl_prof_ro_ptr = "0@0x0";
-static char *bl_bcp_ptr = "0@0x0";
+static char *boot_cfg_dataptr = "0@0x0";
 
 struct gr_address_value {
 	unsigned int gr_address;
@@ -668,7 +668,7 @@ static int __init tegra_bl_debuginit_module_init(void)
 	if (err != 0)
 		return err;
 
-	err = tegra_bl_args(bl_bcp_ptr,
+	err = tegra_bl_args(boot_cfg_dataptr,
 			&tegra_bl_bcp_size,
 			&tegra_bl_bcp_start);
 
@@ -712,7 +712,7 @@ static void __exit tegra_bl_debuginit_module_exit(void)
 module_param(bl_debug_data, charp, 0400);
 module_param(bl_prof_dataptr, charp, 0400);
 module_param(bl_prof_ro_ptr, charp, 0400);
-module_param(bl_bcp_ptr, charp, 0400);
+module_param(boot_cfg_dataptr, charp, 0400);
 
 module_init(tegra_bl_debuginit_module_init);
 module_exit(tegra_bl_debuginit_module_exit);
