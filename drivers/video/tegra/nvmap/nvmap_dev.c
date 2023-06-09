@@ -1429,6 +1429,7 @@ int __init nvmap_probe(struct platform_device *pdev)
 	dev->dev_user.fops = &nvmap_user_fops;
 	dev->dev_user.parent = &pdev->dev;
 	dev->handles = RB_ROOT;
+	dev->serial_id_counter = 0;
 
 #ifdef NVMAP_CONFIG_PAGE_POOLS
 	e = nvmap_page_pool_init(dev);

@@ -237,6 +237,7 @@ struct nvmap_handle_parameters {
     __u64 coherency;
     __u64 size;
     __u64 offset;
+    __u64 serial_id;
 };
 
 /**

@@ -278,6 +278,7 @@ struct nvmap_handle {
 	 */
 	wait_queue_head_t waitq;
 	int numa_id;
+	u64 serial_id;
 };
 
 struct nvmap_handle_info {
@@ -414,6 +415,7 @@ struct nvmap_device {
 #endif /* NVMAP_CONFIG_DEBUG_MAPS */
 	/* Perform cache flush at buffer allocation from carveout */
 	bool co_cache_flush_at_alloc;
+	u64 serial_id_counter; /* This is global counter common across different client processes */
 };
 
 struct handles_range {

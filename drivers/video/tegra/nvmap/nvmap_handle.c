@@ -87,6 +87,12 @@ void nvmap_handle_add(struct nvmap_device *dev, struct nvmap_handle *h)
 	rb_link_node(&h->node, parent, p);
 	rb_insert_color(&h->node, &dev->handles);
 	nvmap_lru_add(h);
+	/*
+	 * Set handle's serial_id to global serial id counter and then update the counter.
+	 * This operation is done here, so as to protect from concurrency issue, as we take
+	 * lock on handle_lock.
+	 */
+	h->serial_id = dev->serial_id_counter++;
 	spin_unlock(&dev->handle_lock);
 }
 

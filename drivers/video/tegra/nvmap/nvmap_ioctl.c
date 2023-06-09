@@ -1178,6 +1178,7 @@ int nvmap_ioctl_get_handle_parameters(struct file *filp, void __user *arg)
 	if (is_ro)
 		op.access_flags = NVMAP_HANDLE_RO;
 
+	op.serial_id = handle->serial_id;
 	nvmap_handle_put(handle);
 
 	if (copy_to_user(arg, &op, sizeof(op)))
